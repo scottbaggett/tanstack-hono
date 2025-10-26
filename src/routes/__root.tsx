@@ -5,9 +5,10 @@ import {
 	Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import Header from "../components/Header";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "../lib/query-client";
 import type { RouterContext } from "../routerContext";
-import appCss from "../styles.css?url";
+import appCss from "../styles/index.css?url";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
 	head: () => ({
@@ -17,7 +18,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		],
 		meta: [
 			{
-				title: "TanStack Router SSR Basic File Based Streaming",
+				title: "Workflowz",
 			},
 			{
 				charSet: "UTF-8",
@@ -53,7 +54,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		],
 	}),
 	errorComponent: ({ error }) => (
-		<html lang="en">
+		<html lang="en" className="dark">
 			<head>
 				<HeadContent />
 			</head>
@@ -83,14 +84,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootComponent() {
 	return (
-		<html lang="en">
+		<html lang="en" className="dark">
 			<head>
 				<HeadContent />
 			</head>
 			<body>
-				<Header />
-				<Outlet />
-				<TanStackRouterDevtools position="bottom-right" />
+				<QueryClientProvider client={queryClient}>
+					<Outlet />
+					<TanStackRouterDevtools position="bottom-right" />
+				</QueryClientProvider>
 				<Scripts />
 			</body>
 		</html>

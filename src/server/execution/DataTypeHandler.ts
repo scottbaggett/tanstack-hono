@@ -6,12 +6,11 @@
  */
 
 import type { INodeExecutionData, INodeOutputData, INodeOutputDataSerialized } from "../../types/execution";
-import type { TypedValue, SerializedValue, DataTypeId } from "../../types/datatypes";
+import type { TypedValue, DataTypeId } from "../../types/datatypes";
 import {
 	inferDataType,
 	serializeValue,
 	deserializeValue,
-	isJsonSerializable,
 	DATA_TYPE_METADATA,
 } from "../../types/datatypes";
 

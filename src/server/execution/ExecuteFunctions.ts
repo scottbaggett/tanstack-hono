@@ -12,7 +12,6 @@ import type { Tool } from "@langchain/core/tools";
 import { promises as fs } from "fs";
 import path from "path";
 import { spawn } from "child_process";
-import { promisify } from "util";
 
 import type {
 	IExecuteFunctions,
@@ -31,6 +30,9 @@ import { extractDynamicInputHandles } from "./InputResolver";
 export class ExecuteFunctions implements IExecuteFunctions {
 	private outputs: INodeOutputData = {};
 	private events: StreamEvent[] = [];
+
+	// Index signature to match interface
+	[key: string]: unknown;
 
 	constructor(
 		private nodeId: string,
@@ -375,34 +377,34 @@ ${code}
 		environment: Record<string, string>,
 		timeout: number
 	): Promise<{ stdout: string; stderr: string }> {
-		return new Promise((resolve, reject) => {
-			const env = {
-				...process.env,
+		return new Promise((resolve) => {
+			const env: Record<string, string> = {
+				...(process.env as unknown as Record<string, string>),
 				...environment,
 			};
 
 			const process = spawn("bash", ["-c", code], {
 				timeout,
 				stdio: ["pipe", "pipe", "pipe"],
-				env,
+				env: env as NodeJS.ProcessEnv,
 			});
 
 			let stdout = "";
 			let stderr = "";
 
-			process.stdout?.on("data", (data) => {
+			process.stdout?.on("data", (data: Buffer) => {
 				stdout += data.toString();
 			});
 
-			process.stderr?.on("data", (data) => {
+			process.stderr?.on("data", (data: Buffer) => {
 				stderr += data.toString();
 			});
 
-			process.on("close", (code) => {
+			process.on("close", () => {
 				resolve({ stdout, stderr });
 			});
 
-			process.on("error", (error) => {
+			process.on("error", (error: Error) => {
 				stderr += error.message;
 				resolve({ stdout, stderr });
 			});

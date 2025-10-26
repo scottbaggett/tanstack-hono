@@ -78,7 +78,7 @@ code {
 	--accent-foreground: var(--color-surface-12);
 	--destructive: var(--red-9);
 	--destructive-foreground: var(--red-11);
-	--border: var(--color-surface-6);
+	--border: var(--color-surface-4);
 	--input: var(--color-surface-5);
 	--ring: var(--color-surface-8);
 	--chart-1: oklch(0.646 0.222 41.116);

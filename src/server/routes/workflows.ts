@@ -19,8 +19,9 @@ import { z } from "zod";
 import type { WorkflowDefinition } from "../../types/workflow";
 import type { StreamEvent } from "../../types/execution";
 import { db } from "../db";
-import { workflows, workflowRuns, nodeExecutions } from "../db/schema";
+import { workflows, workflowVersions, workflowRuns, nodeExecutions } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
+import { getAuthUser } from "../auth/middleware";
 
 // ============================================================================
 // TYPES
@@ -39,14 +40,21 @@ interface ExecutionContext {
 
 export const workflowRoutes = new Hono();
 
-// GET /workflows - List all workflows
+// GET /workflows - List all workflows for current user
 workflowRoutes.get("/", async (c) => {
 	try {
-		const allWorkflows = await db.select().from(workflows);
+		const user = getAuthUser(c);
+		const allWorkflows = await db
+			.select()
+			.from(workflows)
+			.where(eq(workflows.ownerId, user.userId));
 
 		return c.json({
 			success: true,
-			data: allWorkflows,
+			data: {
+				workflows: allWorkflows,
+				total: allWorkflows.length,
+			},
 		});
 	} catch (error) {
 		console.error("Failed to list workflows:", error);
@@ -64,9 +72,14 @@ workflowRoutes.get("/", async (c) => {
 // GET /workflows/:id - Get workflow details
 workflowRoutes.get("/:id", async (c) => {
 	try {
+		const user = getAuthUser(c);
 		const id = c.req.param("id");
 
-		const workflow = await db.select().from(workflows).where(eq(workflows.id, id)).limit(1);
+		const workflow = await db
+			.select()
+			.from(workflows)
+			.where(eq(workflows.id, id))
+			.limit(1);
 
 		if (workflow.length === 0) {
 			return c.json(
@@ -75,6 +88,17 @@ workflowRoutes.get("/:id", async (c) => {
 					error: "Workflow not found",
 				},
 				404
+			);
+		}
+
+		// Check ownership
+		if (workflow[0].ownerId !== user.userId) {
+			return c.json(
+				{
+					success: false,
+					error: "Unauthorized",
+				},
+				403
 			);
 		}
 
@@ -98,13 +122,14 @@ workflowRoutes.get("/:id", async (c) => {
 // POST /workflows - Create new workflow
 workflowRoutes.post("/", async (c) => {
 	try {
+		const user = getAuthUser(c);
 		const body = await c.req.json();
 
 		const schema = z.object({
 			name: z.string().min(1),
 			description: z.string().optional(),
 			definition: z.object({
-				nodes: z.record(z.any()),
+				nodes: z.array(z.any()),
 				edges: z.array(z.any()),
 				viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
 			}),
@@ -115,9 +140,10 @@ workflowRoutes.post("/", async (c) => {
 		const result = await db
 			.insert(workflows)
 			.values({
+				ownerId: user.userId,
 				name: validated.name,
 				description: validated.description || "",
-				definition: JSON.stringify(validated.definition),
+				definition: validated.definition,
 				status: "draft",
 			})
 			.returning();
@@ -145,6 +171,7 @@ workflowRoutes.post("/", async (c) => {
 // PUT /workflows/:id - Update workflow
 workflowRoutes.put("/:id", async (c) => {
 	try {
+		const user = getAuthUser(c);
 		const id = c.req.param("id");
 		const body = await c.req.json();
 
@@ -153,7 +180,7 @@ workflowRoutes.put("/:id", async (c) => {
 			description: z.string().optional(),
 			definition: z
 				.object({
-					nodes: z.record(z.any()),
+					nodes: z.array(z.any()),
 					edges: z.array(z.any()),
 					viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
 				})
@@ -163,11 +190,53 @@ workflowRoutes.put("/:id", async (c) => {
 
 		const validated = schema.parse(body);
 
+		// Get current workflow to check if definition changed
+		const currentWorkflow = await db
+			.select()
+			.from(workflows)
+			.where(eq(workflows.id, id))
+			.limit(1);
+
+		if (currentWorkflow.length === 0) {
+			return c.json(
+				{
+					success: false,
+					error: "Workflow not found",
+				},
+				404
+			);
+		}
+
+		// Check ownership
+		if (currentWorkflow[0].ownerId !== user.userId) {
+			return c.json(
+				{
+					success: false,
+					error: "Unauthorized",
+				},
+				403
+			);
+		}
+
 		const updates: any = {};
+		let newVersion = currentWorkflow[0].version;
 
 		if (validated.name) updates.name = validated.name;
 		if (validated.description) updates.description = validated.description;
-		if (validated.definition) updates.definition = JSON.stringify(validated.definition);
+		if (validated.definition) {
+			updates.definition = validated.definition;
+			// Increment version when definition changes
+			newVersion = currentWorkflow[0].version + 1;
+			updates.version = newVersion;
+
+			// Create version history entry
+			await db.insert(workflowVersions).values({
+				workflowId: id,
+				version: newVersion,
+				definition: validated.definition,
+				changeDescription: `Version ${newVersion}`,
+			});
+		}
 		if (validated.status) updates.status = validated.status;
 
 		updates.updatedAt = new Date();
@@ -177,16 +246,6 @@ workflowRoutes.put("/:id", async (c) => {
 			.set(updates)
 			.where(eq(workflows.id, id))
 			.returning();
-
-		if (result.length === 0) {
-			return c.json(
-				{
-					success: false,
-					error: "Workflow not found",
-				},
-				404
-			);
-		}
 
 		return c.json({
 			success: true,
@@ -208,11 +267,17 @@ workflowRoutes.put("/:id", async (c) => {
 // DELETE /workflows/:id - Delete workflow
 workflowRoutes.delete("/:id", async (c) => {
 	try {
+		const user = getAuthUser(c);
 		const id = c.req.param("id");
 
-		const result = await db.delete(workflows).where(eq(workflows.id, id)).returning();
+		// Get workflow to check ownership
+		const workflow = await db
+			.select()
+			.from(workflows)
+			.where(eq(workflows.id, id))
+			.limit(1);
 
-		if (result.length === 0) {
+		if (workflow.length === 0) {
 			return c.json(
 				{
 					success: false,
@@ -221,6 +286,22 @@ workflowRoutes.delete("/:id", async (c) => {
 				404
 			);
 		}
+
+		// Check ownership
+		if (workflow[0].ownerId !== user.userId) {
+			return c.json(
+				{
+					success: false,
+					error: "Unauthorized",
+				},
+				403
+			);
+		}
+
+		const result = await db
+			.delete(workflows)
+			.where(eq(workflows.id, id))
+			.returning();
 
 		return c.json({
 			success: true,
@@ -336,8 +417,8 @@ workflowRoutes.post("/:id/run", async (c) => {
 			);
 		}
 
-		// Parse workflow definition
-		const definition = JSON.parse(workflow[0].definition);
+		// Get workflow definition (already parsed from JSONB)
+		const definition = workflow[0].definition;
 
 		// Create workflow run record
 		const runId = crypto.randomUUID();

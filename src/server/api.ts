@@ -1,30 +1,25 @@
 /**
- * Hono Server
+ * API Router
  *
- * Main entry point for the backend API server.
- * Combines:
- * - Authentication routes
- * - Workflow API routes
- * - Execution engine integration
- * - Database connection
+ * Main API router that combines all routes and exports RPC types
+ * This enables type-safe frontend API client generation
  */
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
-
 import { authRoutes } from "./routes/auth";
 import { workflowRoutes } from "./routes/workflows";
+import { modelsRoutes } from "./routes/models";
+import { nodesRoutes } from "./routes/nodes";
 import { authMiddleware } from "./auth/middleware";
 
 // ============================================================================
-// SERVER SETUP
+// API SETUP
 // ============================================================================
 
 const app = new Hono();
 
-// Middleware
-app.use(logger());
+// CORS middleware
 app.use(
 	cors({
 		origin: "*",
@@ -37,20 +32,32 @@ app.use(
 // ROUTES
 // ============================================================================
 
-// Auth routes (public)
-app.route("/api/auth", authRoutes);
-
-// Protected routes
-app.use("/api/workflows/*", authMiddleware);
-app.route("/api/workflows", workflowRoutes);
-
-// Health check
+// Health check (public)
 app.get("/health", (c) => {
 	return c.json({
 		status: "ok",
 		timestamp: new Date().toISOString(),
+		uptime: process.uptime(),
+		environment: process.env.NODE_ENV || "development",
 	});
 });
+
+// Auth routes (public)
+app.route("/auth", authRoutes);
+
+// Models routes (public)
+app.route("/models", modelsRoutes);
+
+// Nodes routes (public)
+app.route("/nodes", nodesRoutes);
+
+// Protected workflow routes
+app.use("/workflows/*", authMiddleware);
+app.route("/workflows", workflowRoutes);
+
+// ============================================================================
+// ERROR HANDLING
+// ============================================================================
 
 // 404 handler
 app.notFound((c) => {
@@ -80,4 +87,5 @@ app.onError((err, c) => {
 // EXPORT
 // ============================================================================
 
-export default app;
+export type ApiRouter = typeof app;
+export const apiRouter = app;

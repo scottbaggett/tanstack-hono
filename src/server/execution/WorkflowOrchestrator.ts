@@ -14,11 +14,12 @@ import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Embeddings } from "@langchain/core/embeddings";
 import type { Tool } from "@langchain/core/tools";
 
-import type { WorkflowDefinition, INodeExecutionData, ExecutionEvent } from "../../types/workflow";
+import type { WorkflowDefinition } from "../../types/workflow";
+import type { INodeExecutionData } from "../../types/execution";
 import type { StreamEvent } from "../../types/execution";
 import { nodeLoader } from "../nodes/Node";
 import { ExecuteFunctions } from "./ExecuteFunctions";
-import { resolveInputs, validateInputs } from "./InputResolver";
+import { resolveInputs } from "./InputResolver";
 
 // ============================================================================
 // TYPES
@@ -203,7 +204,7 @@ export class WorkflowOrchestrator {
 				throw new Error(`Node type "${nodeType}" does not support execute mode`);
 			}
 
-			const result = await nodeInstance.execute(executeFunctions);
+			await nodeInstance.execute(executeFunctions);
 
 			this.config.logger.info(`[${nodeId}] Execution successful`);
 
