@@ -38,73 +38,137 @@ PostgreSQL Database
 - **webhook** - Handle incoming webhooks
 - **poll** - Periodic polling for new data
 
-### 2. Execution Context API (`src/types/execution.ts`)
+### 2. Execution Context API - Three Layers (`src/types/execution.ts`)
 
-**IExecuteFunctions** - Passed to nodes during execution
+**Layer 1: Core** (`IExecuteFunctionsCore`)
+- Node parameters, input/output, logging, events
+- Framework-independent, required by all nodes
+- 14 core methods
 
-Provides access to:
-- Node parameters
-- Input data from previous nodes
-- LangChain models, embeddings, tools
-- Secrets
+**Layer 2: Primitives** (`IExecuteFunctionsPrimitives`)
+- `httpRequest()` - HTTP requests with timeout
+- `executeSandboxedCode()` - Python, JavaScript, Bash execution
+- `readFile()` / `writeFile()` - Workspace-scoped file I/O
+
+**Layer 3: LangChain** (`IExecuteFunctionsLangChain`)
+- `getLangchainModel()` - Access LLMs
+- `getLangchainEmbeddings()` - Access embeddings
+- `getLangchainTools()` - Get tools for agents
+
+See [EXECUTION_CONTEXT.md](./EXECUTION_CONTEXT.md) for details.
+
+### 3. Execution Context Implementation (`src/server/execution/ExecuteFunctions.ts`)
+
+**Full implementation of all three layers**:
+- Parameter and input/output management
+- LangChain model/embeddings/tools access
+- HTTP requests with timeout and auto-JSON parsing
+- Sandboxed code execution (JS/Python/Bash)
+- File I/O with workspace security
 - Logging and event emission
+- Dynamic input discovery
 
-### 3. Workflow Orchestrator (`src/server/execution/WorkflowOrchestrator.ts`)
+### 4. Workflow Orchestrator (`src/server/execution/WorkflowOrchestrator.ts`)
 
 **Responsibilities**:
 1. Load workflow definition
 2. Topological sort (Kahn's algorithm) for execution order
 3. Execute nodes in dependency order
 4. Manage execution state
-5. Emit events for streaming/logging
-6. Handle errors
+5. Resolve inputs using InputResolver
+6. Collect outputs and events
+7. Handle errors
 
 **Execution Flow**:
 ```
-Load Workflow
+Load Workflow Definition
     ↓
-Topological Sort
+Validate (topological sort checks for cycles)
     ↓
-For Each Node in Order:
-  - Prepare Input Data
+For Each Node in Dependency Order:
+  - Resolve Inputs (edges + {{variables}})
   - Create ExecuteFunctions Context
   - Call node.execute(context)
   - Collect Outputs & Events
     ↓
-Return Results + Events
+Return Results + Events + History
 ```
 
-### 4. Input Resolver (`src/server/execution/InputResolver.ts`)
+### 5. Input Resolver (`src/server/execution/InputResolver.ts`)
 
 **Features**:
 - Extract {{variable}} placeholders from node config
 - Resolve variables using connected edge values
+- Handle nested object resolution
 - Auto-expose dynamic inputs
 - Validate required inputs
+- Support both edge connections and template variables
 
-See [Dynamic IO](./DYNAMIC_IO.md) for details.
+See [DYNAMIC_IO.md](./DYNAMIC_IO.md) for details.
 
-### 5. Data Type System (`src/types/datatypes.ts`)
+### 6. Data Type Handler (`src/server/execution/DataTypeHandler.ts`)
 
-**Supports**:
+**Utilities for rich data types**:
+- `toTypedValue()` - Convert to TypedValue with type info
+- `serializeOutputData()` - Prepare for database storage
+- `deserializeOutputData()` - Load from database
+- `validateDataType()` - Type checking and conversion
+- `summarizeData()` - Human-readable logging
+- `validateOutputHandles()` - Verify node output matches declaration
+
+### 7. Data Type System (`src/types/datatypes.ts`)
+
+**Supports 20+ types**:
 - Primitives: string, number, float, integer, boolean
 - Structured: json, csv, pdb, xml, yaml
 - Binary: buffer, images (png, jpg, webp, gif, svg)
 - Collections: array, object
+- Custom: custom:* for domain-specific types
 
-**Serialization**: Each type knows how to serialize/deserialize
+**TypedValue format**:
+```typescript
+{
+  dataType: "image:png" | "csv" | "string" | ...
+  value: actual data
+  metadata?: { ... }
+}
+```
 
-See [Data Types](./DATATYPES.md) for details.
+See [DATATYPES.md](./DATATYPES.md) for details.
 
-### 6. Database (`src/server/db/schema.ts`)
+### 8. REST API (`src/server/routes/workflows.ts`)
+
+**Endpoints**:
+- `GET /api/workflows` - List workflows
+- `GET /api/workflows/:id` - Get workflow
+- `POST /api/workflows` - Create workflow
+- `PUT /api/workflows/:id` - Update workflow
+- `DELETE /api/workflows/:id` - Delete workflow
+- `GET /api/workflows/:id/runs` - List runs
+- `GET /api/workflows/:id/runs/:runId` - Get run details
+- `POST /api/workflows/:id/run` - Execute workflow
+- `GET /api/workflows/:id/runs/:runId/events` - Stream events (SSE)
+
+See [API.md](./API.md) for full reference.
+
+### 9. Database (`src/server/db/schema.ts`)
 
 **Core Tables**:
 - `users` - Platform users
-- `workflows` - Workflow definitions (JSONB)
-- `workflow_runs` - Execution instances
-- `node_executions` - Individual node execution records
-- `execution_events` - Event stream for replay/debugging
+- `workflows` - Workflow definitions (JSONB nodes/edges)
+- `workflow_runs` - Execution instances with status
+- `node_executions` - Individual node results (inputs/outputs)
+- `execution_events` - Event stream for replay (type, timestamp, data)
 - `node_definitions` - Registered node types
+
+### 10. Server (`src/server/index.ts`)
+
+**Hono server setup**:
+- Middleware (logging, CORS)
+- API route registration
+- Health check endpoint
+- Error handling
+- 404 handler
 
 ## Data Flow
 
@@ -169,13 +233,114 @@ Node emits event
 
 ## Key Design Decisions
 
-### 1. LangChain as Engine
+### 1. Three-Layer Execution Context (Critical for Flexibility)
 
-**Why**:
-- Nodes don't need to know about external services
-- LangChain handles complexity (LLMs, chains, agents, tools)
-- Clean separation of concerns
-- Streaming support built-in
+**The Problem**: Relying solely on LangChain for all node execution would create vendor lock-in and limit flexibility.
+
+**The Solution**: Three independent layers allow nodes to use only what they need:
+
+```
+Layer 1: Core (IExecuteFunctionsCore)
+├─ Node parameters & configuration
+├─ Input/output management
+├─ Logging & event emission
+├─ Secrets access
+└─ Metadata (runId, nodeId, etc.)
+
+Layer 2: Primitives (IExecuteFunctionsPrimitives extends Layer 1)
+├─ httpRequest() - Any REST API
+├─ executeSandboxedCode() - Python, JavaScript, Bash
+├─ readFile() / writeFile() - File I/O
+└─ All independent of any AI framework
+
+Layer 3: LangChain (IExecuteFunctionsLangChain extends Layer 2)
+├─ getLangchainModel() - LLMs and chat models
+├─ getLangchainEmbeddings() - Embedding models
+├─ getLangchainTools() - Tools for agents
+└─ Optional - only used when needed
+```
+
+**Why This Matters**:
+
+1. **No Lock-In**: A simple transformer node never needs LangChain
+   ```typescript
+   class TextTransformNode extends Node {
+     async execute(context: IExecuteFunctionsCore) {
+       // Only basic I/O - works without LangChain
+       const input = context.getInputValue("text");
+       context.setOutput("text", [input.toUpperCase()]);
+     }
+   }
+   ```
+
+2. **Platform Agnostic**: Any API integration works without frameworks
+   ```typescript
+   class APICallerNode extends Node {
+     async execute(context: IExecuteFunctionsPrimitives) {
+       // Uses httpRequest() - no external framework needed
+       const response = await context.httpRequest({
+         url: "https://api.example.com/data",
+         method: "GET"
+       });
+       context.setOutputData({ result: [response.data] });
+     }
+   }
+   ```
+
+3. **Code Execution**: Run arbitrary Python/JavaScript/Bash
+   ```typescript
+   class PythonNode extends Node {
+     async execute(context: IExecuteFunctionsPrimitives) {
+       // Sandboxed code execution - no framework dependency
+       const result = await context.executeSandboxedCode({
+         language: "python",
+         code: "import pandas as pd; ...",
+         requirements: ["pandas", "numpy"]
+       });
+       context.setOutputData({ output: [result.output] });
+     }
+   }
+   ```
+
+4. **Optional LangChain**: Use when you need AI, skip when you don't
+   ```typescript
+   class LLMNode extends Node {
+     async execute(context: IExecuteFunctionsLangChain) {
+       // Only uses LangChain when needed
+       const model = context.getLangchainModel("gpt-4");
+       // ... LangChain-specific logic
+     }
+   }
+   ```
+
+5. **Future-Proof**: Add new frameworks without breaking existing nodes
+   ```typescript
+   // Could add DSPy support in future
+   export interface IExecuteFunctionsDSPy extends IExecuteFunctionsPrimitives {
+     getDSPyModel(name?: string): DSPyModel
+     getDSPyProgram(name?: string): DSPyProgram
+   }
+
+   // Existing LangChain nodes still work ✅
+   // Existing API/Python nodes still work ✅
+   // New DSPy nodes use new methods ✅
+   ```
+
+**Real-World Workflow Example**:
+```
+[REST API Call] ──────┐
+                       │
+[Python Script] ───────┼─→ [LLM Agent] ─→ [Slack Notification]
+                       │
+[Database Query] ──────┘
+
+- REST API: Uses Layer 1 + 2 (httpRequest)
+- Python: Uses Layer 1 + 2 (executeSandboxedCode)
+- LLM: Uses Layer 1 + 2 + 3 (getLangchainModel)
+- Slack: Uses Layer 1 + 2 (httpRequest)
+
+All nodes coexist in same workflow, each using only what they need.
+```
 
 ### 2. Topological Sort for Execution
 
@@ -262,9 +427,64 @@ See [Dynamic IO](./DYNAMIC_IO.md) and `DynamicAgentNode.ts`.
 - Node isolation: Nodes can't access other node's data directly
 - Input validation: All user inputs validated
 - Error handling: Errors logged, not exposed to users
+- Sandboxed code: Python/JavaScript/Bash run in isolated processes
+- Workspace scoping: File I/O restricted to project directory
+
+## Beyond LangChain: Framework Flexibility
+
+### The Core Philosophy
+
+This platform is **not a LangChain wrapper**. LangChain is one tool among many. The three-layer execution context ensures we can:
+
+1. **Support multiple frameworks** - Add DSPy, OpenAI Swarm, or any framework without breaking existing nodes
+2. **Enable non-framework patterns** - HTTP calls, Python scripts, file processing work standalone
+3. **Mix and match** - A single workflow uses LangChain for AI, HTTP for APIs, Python for data processing
+4. **Future-proof** - When new frameworks emerge, add them as new layers, existing nodes keep working
+
+### Layer Addition Example: Adding OpenAI Swarm
+
+```typescript
+// Current: Layer 3 is LangChain
+export interface IExecuteFunctionsLangChain extends IExecuteFunctionsPrimitives {
+  getLangchainModel(modelName?: string): BaseLanguageModel
+  // ... other LangChain methods
+}
+
+// Future: Add Layer 3B for Swarm
+export interface IExecuteFunctionsSwarm extends IExecuteFunctionsPrimitives {
+  getSwarmAgent(name?: string): SwarmAgent
+  getSwarmSubAgent(name?: string): SubAgent
+}
+
+// Extend main interface
+export interface IExecuteFunctions
+  extends IExecuteFunctionsLangChain, IExecuteFunctionsSwarm {
+}
+
+// Result:
+// - LangChain nodes still work ✅
+// - API nodes still work ✅
+// - Python nodes still work ✅
+// - New Swarm nodes can be created ✅
+// - No existing code changes ✅
+```
+
+### Why This Matters
+
+Many platforms make the mistake of tightly coupling to a single framework:
+- Becomes obsolete when better frameworks emerge
+- Forces rewriting existing workflows
+- Limits architectural flexibility
+
+Our approach:
+- **Agnostic by design** - Framework is pluggable, not core
+- **Composable** - Mix frameworks in single workflow
+- **Evolutionary** - Add new frameworks without breaking changes
+- **Practical** - Use the best tool for each job
 
 ## See Also
 
 - [Dynamic IO System](./DYNAMIC_IO.md) - {{variable}} inputs/outputs
 - [Data Types](./DATATYPES.md) - Rich data type support
 - [API Reference](./API.md) - REST API endpoints
+- [Execution Context](./EXECUTION_CONTEXT.md) - Three-layer API details
