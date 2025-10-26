@@ -22,18 +22,19 @@ export const users = pgTable(
 		email: varchar("email", { length: 255 }).notNull().unique(),
 		username: varchar("username", { length: 100 }).notNull().unique(),
 		fullName: varchar("full_name", { length: 255 }),
+		passwordHash: text("password_hash"),
 		isActive: boolean("is_active").default(true),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.default(sql`now()`)
 			.notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true })
 			.default(sql`now()`)
-			.onUpdateNow(),
+			.$onUpdate(() => sql`now()`),
 	},
-	(table) => ({
-		emailIdx: index("users_email_idx").on(table.email),
-		usernameIdx: index("users_username_idx").on(table.username),
-	})
+	(table) => [
+		index("users_email_idx").on(table.email),
+		index("users_username_idx").on(table.username),
+	]
 );
 
 // ============================================================================
@@ -44,22 +45,52 @@ export const workflows = pgTable(
 	"workflows",
 	{
 		id: uuid("id").primaryKey().defaultRandom(),
-		ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
+		ownerId: uuid("owner_id").references(() => users.id, {
+			onDelete: "cascade",
+		}),
 		name: varchar("name", { length: 255 }).notNull(),
 		description: text("description"),
 		// Workflow definition includes nodes, edges, viewport, and metadata
 		definition: jsonb("definition").notNull(),
+		// Version tracking
+		version: integer("version").default(1).notNull(),
+		status: varchar("status", { length: 50 }).default("draft").notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.default(sql`now()`)
 			.notNull(),
 		updatedAt: timestamp("updated_at", { withTimezone: true })
 			.default(sql`now()`)
-			.onUpdateNow(),
+			.$onUpdate(() => sql`now()`),
 	},
-	(table) => ({
-		ownerIdx: index("workflows_owner_id_idx").on(table.ownerId),
-		nameIdx: index("workflows_name_idx").on(table.name),
-	})
+	(table) => [
+		index("workflows_owner_id_idx").on(table.ownerId),
+		index("workflows_name_idx").on(table.name),
+		index("workflows_version_idx").on(table.version),
+	]
+);
+
+// ============================================================================
+// WORKFLOW VERSIONS TABLE
+// ============================================================================
+
+export const workflowVersions = pgTable(
+	"workflow_versions",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		workflowId: uuid("workflow_id")
+			.references(() => workflows.id, { onDelete: "cascade" })
+			.notNull(),
+		version: integer("version").notNull(),
+		definition: jsonb("definition").notNull(),
+		changeDescription: text("change_description"),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.default(sql`now()`)
+			.notNull(),
+	},
+	(table) => [
+		index("workflow_versions_workflow_id_idx").on(table.workflowId),
+		index("workflow_versions_version_idx").on(table.version),
+	]
 );
 
 // ============================================================================
@@ -73,11 +104,11 @@ export const workflowRuns = pgTable(
 		workflowId: uuid("workflow_id")
 			.references(() => workflows.id, { onDelete: "cascade" })
 			.notNull(),
-		ownerId: uuid("owner_id").references(() => users.id, { onDelete: "cascade" }),
+		ownerId: uuid("owner_id").references(() => users.id, {
+			onDelete: "cascade",
+		}),
 		// Status: pending, running, completed, failed
-		status: varchar("status", { length: 20 })
-			.default("pending")
-			.notNull(),
+		status: varchar("status", { length: 20 }).default("pending").notNull(),
 		// Input parameters passed to the workflow
 		inputs: jsonb("inputs"),
 		// Final output/results
@@ -93,12 +124,13 @@ export const workflowRuns = pgTable(
 		totalTokensUsed: integer("total_tokens_used"),
 		durationMs: integer("duration_ms"),
 	},
-	(table) => ({
-		workflowIdx: index("workflow_runs_workflow_id_idx").on(table.workflowId),
-		ownerIdx: index("workflow_runs_owner_id_idx").on(table.ownerId),
-		statusIdx: index("workflow_runs_status_idx").on(table.status),
-		startedIdx: index("workflow_runs_started_at_idx").on(table.startedAt),
-	})
+	(table) => [
+		index("workflow_runs_workflow_id_idx").on(table.workflowId),
+		index("workflow_runs_owner_id_idx").on(table.ownerId),
+		index("workflow_runs_status_idx").on(table.status),
+		index("workflow_runs_started_at_idx").on(table.startedAt),
+		index("workflow_runs_completed_at_idx").on(table.completedAt),
+	],
 );
 
 // ============================================================================
@@ -117,9 +149,7 @@ export const nodeExecutions = pgTable(
 		// Node type (e.g., "text-input", "llm", "output")
 		nodeType: varchar("node_type", { length: 100 }).notNull(),
 		// Status: pending, running, completed, failed, skipped
-		status: varchar("status", { length: 20 })
-			.default("pending")
-			.notNull(),
+		status: varchar("status", { length: 20 }).default("pending").notNull(),
 		// Input data passed to the node
 		inputs: jsonb("inputs"),
 		// Output data produced by the node
@@ -132,11 +162,11 @@ export const nodeExecutions = pgTable(
 		// Error information
 		errorMessage: text("error_message"),
 	},
-	(table) => ({
-		runIdx: index("node_executions_run_id_idx").on(table.runId),
-		nodeIdIdx: index("node_executions_node_id_idx").on(table.nodeId),
-		statusIdx: index("node_executions_status_idx").on(table.status),
-	})
+	(table) => [
+		index("node_executions_run_id_idx").on(table.runId),
+		index("node_executions_node_id_idx").on(table.nodeId),
+		index("node_executions_status_idx").on(table.status),
+	]
 );
 
 // ============================================================================
@@ -161,12 +191,12 @@ export const executionEvents = pgTable(
 			.default(sql`now()`)
 			.notNull(),
 	},
-	(table) => ({
-		runIdx: index("execution_events_run_id_idx").on(table.runId),
-		eventTypeIdx: index("execution_events_event_type_idx").on(table.eventType),
-		nodeIdx: index("execution_events_node_id_idx").on(table.nodeId),
-		timestampIdx: index("execution_events_timestamp_idx").on(table.timestamp),
-	})
+	(table) => [
+		index("execution_events_run_id_idx").on(table.runId),
+		index("execution_events_event_type_idx").on(table.eventType),
+		index("execution_events_node_id_idx").on(table.nodeId),
+		index("execution_events_timestamp_idx").on(table.timestamp),
+	]
 );
 
 // ============================================================================
@@ -201,10 +231,10 @@ export const nodeDefinitions = pgTable(
 			.default(sql`now()`)
 			.notNull(),
 	},
-	(table) => ({
-		nodeTypeIdx: index("node_definitions_node_type_idx").on(table.nodeType),
-		categoryIdx: index("node_definitions_category_idx").on(table.category),
-	})
+	(table) => [
+		index("node_definitions_node_type_idx").on(table.nodeType),
+		index("node_definitions_category_idx").on(table.category),
+	]
 );
 
 // ============================================================================
