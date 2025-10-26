@@ -1,111 +1,114 @@
-# TanStack Router + Hono SSR Template
+# AI Workflow Builder
 
-A modern, production-ready full-stack React application template combining **TanStack Router** with **Hono** for server-side rendering. This setup delivers fast, SEO-friendly applications with excellent developer experience.
+A **TypeScript-powered AI workflow builder** platform with a modern full-stack architecture. Build, execute, and monitor complex workflows combining APIs, Python/JavaScript scripts, and LLM agents—all through an intuitive interface.
 
-[![CI](https://github.com/bskimball/tanstack-hono/actions/workflows/ci.yml/badge.svg)](https://github.com/bskimball/tanstack-hono/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## 🏃‍♂️ Quick Start
+## 🚀 Quick Start
 
-### Option 1: Using the Setup Script (Recommended)
+### Prerequisites
+
+- Node.js 18+
+- Docker (for PostgreSQL)
+- pnpm (recommended)
+
+### 1. Start PostgreSQL
 
 ```bash
-# Clone the template
-npx degit bskimball/tanstack-hono my-app
-
-# Navigate to your project
-cd my-app
-
-# Run the interactive setup script
-bash scripts/setup.sh
+docker run -d --name workflow-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=workflow_builder \
+  -p 5432:5432 \
+  postgres:16-alpine
 ```
 
-The setup script will:
-- Update project name in package.json
-- Create .env file from .env.example
-- Install dependencies (optional)
-- Initialize git repository (optional)
-
-### Option 2: Manual Setup
+### 2. Setup Environment
 
 ```bash
-# Clone the template
-npx degit bskimball/tanstack-hono my-app
-
-# Navigate to your project
-cd my-app
-
-# Copy environment file
 cp .env.example .env
-
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your app running!
-
-**Health Check**: [http://localhost:3000/api/health](http://localhost:3000/api/health)
-
-## 🚀 Features
-
-- **🗺 TanStack Router**: Type-safe, file-based routing with powerful data loading
-- **⚡ Hono SSR**: Ultra-fast server-side rendering with minimal overhead
-- **🔥 Vite**: Lightning-fast development with Hot Module Replacement
-- **📘 TypeScript**: Full type safety across client and server
-- **🎨 Tailwind CSS**: Modern utility-first CSS framework
-- **🧹 Biome**: Fast linting, formatting, and code quality
-- **🧪 Vitest**: Fast unit testing with great DX
-
-## 🤖 AI Workflow Builder (In Development)
-
-This repository now includes a **TypeScript-powered AI workflow builder** inspired by N8N, with:
-
-- **Modular Node System**: Extensible node architecture with versioning for backward compatibility
-- **Rich Data Types**: Support for 20+ data types including images, CSV, PDB, and binary data
-- **Dynamic I/O**: `{{variable}}` placeholders for flexible, template-based workflows
-- **Layered Execution Context**: Three-layer API supporting Core, Platform Primitives, and LangChain
-- **LangChain Integration**: First-class support for AI models, embeddings, and tools
-- **Platform Primitives**: HTTP requests, sandboxed code execution (Python, JavaScript, Bash), and file I/O
-- **Real-time Streaming**: Server-Sent Events for execution progress and events
-- **Topological Sort**: Dependency-based node execution order
-
-**Documentation**: Start with [docs/README.md](./docs/README.md) for comprehensive guides.
-
-Key files:
-- `src/server/nodes/Node.ts` - Base node class and registry
-- `src/server/execution/WorkflowOrchestrator.ts` - Execution engine with topological sort
-- `src/server/execution/ExecuteFunctions.ts` - Execution context implementation
-- `src/types/execution.ts` - Three-layer execution context API
-- `docs/` - Complete documentation and guides
-
-## 📁 Architecture
-
+Edit `.env` and set (or leave defaults):
 ```
-src/
-├── components/
-│   └── Header.tsx            # Reusable UI components
-├── routes/                   # File-based routing (auto-generated)
-│   ├── __root.tsx            # Root layout component
-│   ├── index.tsx             # Home page route
-│   ├── about.tsx             # About page route
-│   └── -test.ts              # Test route utilities
-├── entry-client.tsx          # Client-side hydration entry
-├── entry-server.tsx          # Hono server with SSR setup
-├── router.tsx                # Router configuration
-└── styles.css                # Global styles
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/workflow_builder
+JWT_SECRET=your-secret-key-change-in-production
+JWT_EXPIRY=7d
 ```
 
-## 🛠 Development
+### 3. Install & Setup
 
 ```bash
-npm run dev    # Start development server
-npm run build  # Build for production
-npm start      # Start production server
-npm run test   # Run tests
-npm run check  # Lint and format code
+pnpm install
+pnpm run db:push
+pnpm run dev
+```
+
+Open **[http://localhost:5173](http://localhost:5173)** → Sign up → Start building workflows!
+
+**API Health**: [http://localhost:5173/api/health](http://localhost:5173/api/health)
+
+## ✨ Core Features
+
+### Workflow Engine
+- **📊 Topological Sort**: Automatic dependency resolution and execution ordering
+- **🔀 Dynamic Routing**: Connect nodes with flexible {{variable}} placeholders
+- **🎯 20+ Data Types**: Seamless handling of strings, numbers, images, CSV, JSON, and more
+- **📡 Real-time Events**: Server-Sent Events for live execution progress
+
+### Node System
+- **🧩 Modular Design**: Versioned, extensible node architecture
+- **🔗 Three Execution Modes**: execute, webhook, poll
+- **🛡️ Type Safety**: Full TypeScript support across all nodes
+
+### Execution Capabilities
+- **🤖 LangChain Integration**: First-class support for AI models and agents
+- **🌐 HTTP Requests**: Call any REST API with automatic error handling
+- **🐍 Code Execution**: Python, JavaScript, Bash in sandboxed environments
+- **📁 File I/O**: Read/write files with workspace security
+
+### Authentication
+- **🔐 JWT Auth**: Secure token-based authentication
+- **🔑 Password Hashing**: Bcrypt for secure password storage
+- **🛡️ Protected Routes**: All API endpoints require authentication
+
+### Frontend
+- **⚡ TanStack Router**: Type-safe file-based routing
+- **🎨 Shadcn/ui**: Beautiful, accessible component library
+- **📝 Login/Signup**: Built-in authentication UI
+- **🔐 Route Protection**: Automatic redirection for unauthenticated users
+
+## 🏗️ Architecture
+
+```
+Frontend (React + TanStack Router)
+         ↓
+    Hono API Server
+         ↓
+  WorkflowOrchestrator (Topological Sort)
+         ↓
+    [Node Execution Layer]
+         ↓
+  ┌─────────────────────┐
+  │ Layer 1: Core       │ (Parameter access, I/O, logging)
+  ├─────────────────────┤
+  │ Layer 2: Primitives │ (HTTP, code execution, file I/O)
+  ├─────────────────────┤
+  │ Layer 3: LangChain  │ (Models, embeddings, tools)
+  └─────────────────────┘
+         ↓
+PostgreSQL Database
+```
+
+## 🛠 Development Commands
+
+```bash
+pnpm run dev           # Start dev server
+pnpm run build         # Build for production
+pnpm run db:studio    # Open database UI (Drizzle Studio)
+pnpm run db:push      # Push schema to database
+pnpm run check        # Lint and type check
+pnpm run test         # Run tests
 ```
 
 
