@@ -1,0 +1,146 @@
+@import "tailwindcss";
+@plugin '@tailwindcss/typography';
+@import "tw-animate-css";
+@import "./colors.css";
+@import "./editor.css";
+@import "./node-palettes.css";
+
+@custom-variant dark (&:is(.dark *));
+
+body {
+	@apply m-0;
+	font-family:
+		-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu",
+		"Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}
+
+code {
+	font-family:
+		source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+@theme inline {
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-chart-1: var(--chart-1);
+	--color-chart-2: var(--chart-2);
+	--color-chart-3: var(--chart-3);
+	--color-chart-4: var(--chart-4);
+	--color-chart-5: var(--chart-5);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-ring: var(--sidebar-ring);
+	--text-xxs: 10px;
+}
+
+:root {
+	--radius: 0.625rem;
+	--background: white;
+	--foreground: black;
+	--card: var(--color-surface-3);
+	--card-foreground: var(--foreground);
+	--popover: var(--color-surface-1);
+	--popover-foreground: var(--foreground);
+	--primary: var(--color-surface-12);
+	--primary-foreground: var(--color-surface-1);
+	--secondary: var(--color-surface-3);
+	--secondary-foreground: var(--color-surface-12);
+	--muted: var(--color-surface-5);
+	--muted-foreground: var(--color-surface-10);
+	--accent: var(--color-surface-4);
+	--accent-foreground: var(--color-surface-12);
+	--destructive: var(--red-9);
+	--destructive-foreground: var(--red-11);
+	--border: var(--color-surface-6);
+	--input: var(--color-surface-5);
+	--ring: var(--color-surface-8);
+	--chart-1: oklch(0.646 0.222 41.116);
+	--chart-2: oklch(0.6 0.118 184.704);
+	--chart-3: oklch(0.398 0.07 227.392);
+	--chart-4: oklch(0.828 0.189 84.429);
+	--chart-5: oklch(0.769 0.188 70.08);
+	--sidebar: var(--color-surface-2);
+	--sidebar-foreground: var(--foreground);
+	--sidebar-primary: var(--primary);
+	--sidebar-primary-foreground: var(--primary-foreground);
+	--sidebar-accent: var(--accent);
+	--sidebar-accent-foreground: var(--accent-foreground);
+	--sidebar-border: var(--border);
+	--sidebar-ring: var(--ring);
+}
+
+.dark {
+	--background: black;
+	--foreground: white;
+}
+
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	body {
+		@apply bg-background text-foreground;
+	}
+
+	/* For Chrome, Safari, and Opera */
+	.no-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	/* For IE, Edge, and Firefox */
+	.no-scrollbar {
+		-ms-overflow-style: none; /* IE and Edge */
+		scrollbar-width: none; /* Firefox */
+	}
+}
+
+.gradient-text {
+	background: linear-gradient(
+		90deg,
+		var(--color-surface-2) 0%,
+		var(--color-surface-10) 50%,
+		var(--color-surface-2) 100%
+	);
+	background-size: 200% auto;
+	background-clip: text;
+	-webkit-background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	animation: gradientShift 1s linear infinite;
+}
+
+@keyframes gradientShift {
+	0% {
+		background-position: 0% center;
+	}
+	100% {
+		background-position: 200% center;
+	}
+}
