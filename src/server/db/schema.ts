@@ -137,6 +137,58 @@ export const workflowRuns = pgTable(
 // NODE EXECUTIONS TABLE
 // ============================================================================
 
+/**
+ * Internal trace data for agent node executions
+ * Captures the full step-by-step execution of an agent's reasoning loop
+ */
+export interface InternalTraceData {
+	/** All steps executed during the agent loop */
+	steps: InternalStep[];
+	/** Total number of iterations the agent went through */
+	iterationCount: number;
+	/** Final state when agent stopped */
+	finalState: "success" | "max_iterations" | "no_progress" | "error";
+	/** Whether the agent was halted (hit max iterations or no progress) */
+	halted: boolean;
+	/** Reason for halting, if applicable */
+	haltReason?: string;
+}
+
+/**
+ * A single step in the agent's execution trace
+ * Can represent agent planning, tool execution, or final answer
+ */
+export interface InternalStep {
+	/** Which iteration this step belongs to */
+	iteration: number;
+	/** Timestamp when this step occurred (Unix ms) */
+	timestamp: number;
+	/** Type of step */
+	type: "agent_plan" | "tool_call" | "tool_result" | "agent_finish";
+
+	// Agent planning step
+	/** The agent's reasoning or planning log */
+	agentLog?: string;
+
+	// Tool execution step
+	/** Name of the tool being called */
+	toolName?: string;
+	/** Unique ID for this tool call */
+	toolCallId?: string;
+	/** Input parameters passed to the tool */
+	toolInput?: unknown;
+	/** Output returned by the tool */
+	toolOutput?: unknown;
+	/** Error message if tool failed */
+	toolError?: string;
+	/** How long the tool took to execute (ms) */
+	toolDurationMs?: number;
+
+	// Final answer step
+	/** The agent's final output/answer */
+	finalOutput?: string;
+}
+
 export const nodeExecutions = pgTable(
 	"node_executions",
 	{
@@ -154,6 +206,9 @@ export const nodeExecutions = pgTable(
 		inputs: jsonb("inputs"),
 		// Output data produced by the node
 		outputs: jsonb("outputs"),
+		// Agent-specific: Internal trace of agent loop iterations
+		// Contains full step-by-step trace of agent reasoning, tool calls, and results
+		internalTrace: jsonb("internal_trace").$type<InternalTraceData>(),
 		// Metrics
 		tokensUsed: integer("tokens_used"),
 		// Execution timing

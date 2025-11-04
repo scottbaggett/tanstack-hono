@@ -13,6 +13,7 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Embeddings } from "@langchain/core/embeddings";
 import type { Tool } from "@langchain/core/tools";
+import { BufferMemory } from "langchain/memory";
 
 import type { WorkflowDefinition } from "../../types/workflow";
 import type { INodeExecutionData } from "../../types/execution";
@@ -27,6 +28,7 @@ import type {
 } from "../types/agent";
 import { handleEngineRequest } from "./requestHandler";
 import type { IExecutionContext } from "../../types/interfaces";
+import type { InternalTraceData, InternalStep } from "../db/schema";
 
 // ============================================================================
 // TYPES
@@ -60,6 +62,8 @@ export interface NodeExecutionResult {
 	durationMs: number;
 	startTime: number;
 	endTime: number;
+	/** Agent-specific: Internal trace of agent loop iterations */
+	internalTrace?: InternalTraceData;
 }
 
 /**
@@ -88,7 +92,52 @@ export class WorkflowOrchestrator {
 	private allEvents: StreamEvent[] = [];
 	private errors: Array<{ nodeId?: string; error: Error }> = [];
 
-	constructor(private config: OrchestrationConfig) {}
+	/**
+	 * Conversation memory scoped to this workflow run
+	 * Shared across all agent nodes in the workflow
+	 * Created at run start, destroyed at run end (not persisted)
+	 */
+	private conversationMemory?: BufferMemory;
+
+	constructor(private config: OrchestrationConfig) {
+		// Initialize memory if any agent node has memory input connected
+		this.conversationMemory = this.initializeMemoryIfNeeded();
+	}
+
+	/**
+	 * Check if any agent node has a memory input connected
+	 * If so, create a BufferMemory instance for this run
+	 */
+	private initializeMemoryIfNeeded(): BufferMemory | undefined {
+		const { nodes } = this.config.definition;
+		const { edges } = this.config.definition;
+
+		// Check if any agent node has a memory connection
+		const hasMemoryConnection = Object.values(nodes).some((node) => {
+			// Check if this is an agent node
+			if (node.data?.nodeType !== "agent") return false;
+
+			// Check if any edge targets this node's memory input
+			return edges.some(
+				(edge) =>
+					edge.target === node.id &&
+					edge.targetHandle === "memory",
+			);
+		});
+
+		if (hasMemoryConnection) {
+			this.config.logger.info(
+				`[ORCHESTRATOR] Initializing conversation memory for run ${this.config.runId}`,
+			);
+
+			return new BufferMemory({
+				returnMessages: true,
+				memoryKey: "chat_history",
+			});
+		}
+
+		return undefined;
+	}
 
 	/**
 	 * Execute the workflow
@@ -237,6 +286,10 @@ export class WorkflowOrchestrator {
 			if (nodeType === "agent") {
 				// Agent nodes use ExecutionContext
 				const abortController = new AbortController();
+				const agentExecutionSteps: InternalStep[] = [];
+				let currentIteration = 0;
+				const maxIterations = (nodeParameters.maxIterations as number) || 10;
+
 				const context = this.createExecutionContext(
 					executeFunctions,
 					undefined,
@@ -247,22 +300,57 @@ export class WorkflowOrchestrator {
 				// Handle agent execution loop
 				// If the node returns an EngineRequest, we need to execute tools and resume
 				while (this.isEngineRequest(result)) {
+					currentIteration++;
+
 					// Check for abort before continuing
 					if (abortController.signal.aborted) {
 						throw new Error(`Agent execution cancelled for node ${nodeId}`);
 					}
 
+					// Check for max iterations
+					if (currentIteration > maxIterations) {
+						this.config.logger.warn(
+							`[${nodeId}] Agent hit max iterations (${maxIterations})`,
+						);
+						break;
+					}
+
 					this.config.logger.info(
-						`[${nodeId}] Agent returned EngineRequest with ${result.actions.length} tool calls`,
+						`[${nodeId}] Agent iteration ${currentIteration}: ${result.actions.length} tool calls`,
 					);
 
+					// Collect agent planning step
+					agentExecutionSteps.push({
+						iteration: currentIteration,
+						timestamp: Date.now(),
+						type: "agent_plan",
+						agentLog: `Agent planning ${result.actions.length} tool call(s)`,
+					});
+
 					// Execute tools via request handler
+					const toolStartTime = Date.now();
 					const response = await handleEngineRequest(result, {
 						emit: (event) => {
 							this.config.logger.debug(`[${nodeId}] Agent event:`, event);
 						},
 						signal: abortController.signal,
 					});
+
+					// Collect tool execution steps
+					for (const action of result.actions) {
+						const toolResult = response.results.find((r) => r.id === action.id);
+						agentExecutionSteps.push({
+							iteration: currentIteration,
+							timestamp: Date.now(),
+							type: "tool_call",
+							toolName: action.tool,
+							toolCallId: action.id,
+							toolInput: action.input,
+							toolOutput: toolResult?.output,
+							toolError: toolResult?.error?.message,
+							toolDurationMs: toolResult?.durationMs,
+						});
+					}
 
 					this.config.logger.info(`[${nodeId}] Tools executed, resuming agent`);
 
@@ -279,6 +367,47 @@ export class WorkflowOrchestrator {
 					);
 					result = await nodeInstance.execute(resumeContext as any);
 				}
+
+				// Collect final step
+				const finalOutput = result[0]?.[0]?.json?.output || "No output";
+				agentExecutionSteps.push({
+					iteration: currentIteration + 1,
+					timestamp: Date.now(),
+					type: "agent_finish",
+					finalOutput: String(finalOutput),
+				});
+
+				// Store internal trace
+				const internalTrace: InternalTraceData = {
+					steps: agentExecutionSteps,
+					iterationCount: currentIteration,
+					finalState: currentIteration > maxIterations ? "max_iterations" : "success",
+					halted: currentIteration > maxIterations,
+					haltReason: currentIteration > maxIterations ? "max_iterations" : undefined,
+				};
+
+				// Collect outputs and store with trace
+				const outputs = executeFunctions.getCollectedOutputs();
+				const events = executeFunctions.getCollectedEvents();
+				this.state[nodeId] = outputs;
+
+				const endTime = Date.now();
+				this.nodeResults.set(nodeId, {
+					nodeId,
+					nodeType,
+					status: "success",
+					inputs: inputData as Record<string, unknown>,
+					outputs,
+					internalTrace, // NEW: Store agent's internal trace
+					events,
+					durationMs: endTime - startTime,
+					startTime,
+					endTime,
+				});
+
+				this.allEvents.push(...events);
+				this.config.logger.debug(`[${nodeId}] Agent execution complete with trace`);
+				return; // Early return after agent handling
 			} else {
 				// Regular nodes use ExecuteFunctions
 				result = await nodeInstance.execute(executeFunctions as any);
@@ -372,7 +501,7 @@ export class WorkflowOrchestrator {
 			evaluatedProperties: executeFunctions.getNodeParameters(), // Already evaluated
 			credentials: {}, // TODO: Extract credentials from executeFunctions
 			signal: signal || new AbortController().signal,
-			engineResponse, // Add engineResponse if resuming agent
+			engineResponse: resumeData, // Add engineResponse if resuming agent
 
 			// Execution tracking (stub for future multi-run/item-based)
 			runIndex: 0,
