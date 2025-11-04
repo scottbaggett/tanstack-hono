@@ -2,6 +2,7 @@
 	"include": ["**/*.ts", "**/*.tsx"],
 	"compilerOptions": {
 		"target": "ES2022",
+		"downlevelIteration": true,
 		"jsx": "react-jsx",
 		"jsxImportSource": "react",
 		"allowSyntheticDefaultImports": true,

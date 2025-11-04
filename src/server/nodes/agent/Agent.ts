@@ -11,10 +11,8 @@ import type {
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
 	NodeExecutionData,
-	NodePort,
 } from '@/types/interfaces';
 import { executeAgent } from './execute';
-import { getAgentInputs } from './inputs';
 import { agentProperties } from './properties';
 
 const baseDescription: INodeTypeBaseDescription = {
@@ -68,6 +66,7 @@ export class Agent implements INodeType {
 	}
 
 	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+		// @ts-expect-error - Agent can return EngineRequest for tool execution (P0 extension)
 		return await executeAgent(context);
 	}
 }

@@ -5,31 +5,31 @@
  * Allows creating, editing, and connecting nodes
  */
 
-import { useCallback, useState, useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
-	ReactFlow,
-	Background,
-	Controls,
-	MiniMap,
 	addEdge,
+	Background,
 	type Connection,
-	useNodesState,
-	useEdgesState,
-	type Node,
+	Controls,
 	type Edge,
+	MiniMap,
+	type Node,
+	ReactFlow,
+	useEdgesState,
+	useNodesState,
 } from "@xyflow/react";
+import { useCallback, useEffect, useState } from "react";
 import "@xyflow/react/dist/style.css";
+import { useNodeRegistry } from "@/hooks/use-node-registry";
+import {
+	useCreateWorkflow,
+	useUpdateWorkflow,
+	useWorkflow,
+} from "@/hooks/use-workflows";
 import { CanvasToolbar } from "./CanvasToolbar";
+import { NodeEditorModal } from "./NodeEditorModal";
 import { NodePanel } from "./NodePanel";
 import { WorkflowNode } from "./nodes/WorkflowNode";
-import { NodeEditorModal } from "./NodeEditorModal";
-import {
-	useWorkflow,
-	useUpdateWorkflow,
-	useCreateWorkflow,
-} from "@/hooks/use-workflows";
-import { useNodeRegistry } from "@/hooks/use-node-registry";
 
 interface CanvasProps {
 	workflowId?: string;
@@ -41,7 +41,10 @@ const nodeTypes = {
 	workflow: WorkflowNode,
 };
 
-export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: CanvasProps) {
+export function Canvas({
+	workflowId: initialWorkflowId,
+	selectedNodeId,
+}: CanvasProps) {
 	const navigate = useNavigate();
 	const [workflowId, setWorkflowId] = useState(initialWorkflowId);
 	const { data: workflow } = useWorkflow(workflowId || null);
@@ -59,7 +62,7 @@ export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: Canvas
 
 	// Find the selected node from selectedNodeId (after nodes are initialized)
 	const selectedNodeFromId = selectedNodeId
-		? nodes.find(n => n.id === selectedNodeId) || null
+		? nodes.find((n) => n.id === selectedNodeId) || null
 		: null;
 
 	// Edges are stored as arrays
@@ -71,7 +74,9 @@ export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: Canvas
 
 	const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 	const [showConfig, setShowConfig] = useState(false);
-	const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
+	const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(
+		null
+	);
 
 	// Sync nodes and edges when workflow loads
 	useEffect(() => {
@@ -130,7 +135,7 @@ export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: Canvas
 		return () => {
 			if (timer) clearTimeout(timer);
 		};
-	}, [nodes, edges, workflowId]); // Only depend on nodes, edges, and workflowId
+	}, [nodes, edges, workflowId, autoSaveTimer, updateWorkflow]); // Only depend on nodes, edges, and workflowId
 
 	// Handle node property updates
 	const handleUpdateNodeData = useCallback(
@@ -313,8 +318,10 @@ export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: Canvas
 				<NodePanel />
 
 				{/* Canvas (Center) */}
-				<div
-					className="flex-1 overflow-hidden"
+				<section
+					className="flex-1 overflow-hidden cursor-grab"
+					aria-label="Canvas"
+					tabIndex={-1}
 					onDragOver={(e) => e.preventDefault()}
 					onDrop={handleNodeDrop}
 				>
@@ -357,7 +364,7 @@ export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: Canvas
 						<Controls />
 						<MiniMap />
 					</ReactFlow>
-				</div>
+				</section>
 			</div>
 
 			{/* Node Editor Modal */}
