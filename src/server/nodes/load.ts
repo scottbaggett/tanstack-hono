@@ -14,6 +14,11 @@ import { IfElse } from './control/IfElse';
 import { Webhook } from './trigger/Webhook';
 import { nodeRegistry } from './registry';
 
+// Agent tools
+import { calculatorTool } from '../tools/calculator';
+import { searchTool } from '../tools/search';
+import { registerTool } from '../execution/requestHandler';
+
 /**
  * Register all node types
  */
@@ -109,11 +114,18 @@ export function loadNodes(): void {
 	});
 	console.log('✓ Registered webhook trigger node');
 
+	// Register agent tools
+	registerTool(calculatorTool);
+	console.log('✓ Registered calculator tool');
+
+	registerTool(searchTool);
+	console.log('✓ Registered search tool');
+
 	// TODO: Register other node types here
 	// - LLM nodes
-	// - Tool nodes
 	// - Memory nodes
-	// - etc.
+	// - Output parsers
+	// - Additional tools
 }
 
 // Auto-load on import
