@@ -20,6 +20,13 @@ import type { StreamEvent } from "../../types/execution";
 import { nodeLoader } from "../nodes/Node";
 import { ExecuteFunctions } from "./ExecuteFunctions";
 import { resolveInputs } from "./InputResolver";
+import type {
+	EngineRequest,
+	EngineResponse,
+	RequestResponseMetadata,
+} from "../types/agent";
+import { handleEngineRequest } from "./requestHandler";
+import type { IExecutionContext } from "../../types/interfaces";
 
 // ============================================================================
 // TYPES
@@ -90,18 +97,24 @@ export class WorkflowOrchestrator {
 		const startTime = Date.now();
 
 		try {
-			this.config.logger.info(`[ORCHESTRATOR] Starting workflow: ${this.config.workflowId}`);
+			this.config.logger.info(
+				`[ORCHESTRATOR] Starting workflow: ${this.config.workflowId}`,
+			);
 
 			// Get execution order using topological sort
 			const executionOrder = this.getExecutionOrder();
-			this.config.logger.info(`[ORCHESTRATOR] Execution order: ${executionOrder.join(" -> ")}`);
+			this.config.logger.info(
+				`[ORCHESTRATOR] Execution order: ${executionOrder.join(" -> ")}`,
+			);
 
 			// Execute each node
 			for (const nodeId of executionOrder) {
 				const node = this.config.definition.nodes[nodeId];
 
 				if (!node) {
-					const error = new Error(`Node ${nodeId} not found in workflow definition`);
+					const error = new Error(
+						`Node ${nodeId} not found in workflow definition`,
+					);
 					this.errors.push({ nodeId, error });
 					continue;
 				}
@@ -109,7 +122,10 @@ export class WorkflowOrchestrator {
 				try {
 					await this.executeNode(nodeId, node);
 				} catch (error) {
-					this.config.logger.error(`[ORCHESTRATOR] Node ${nodeId} execution failed:`, error);
+					this.config.logger.error(
+						`[ORCHESTRATOR] Node ${nodeId} execution failed:`,
+						error,
+					);
 					this.errors.push({
 						nodeId,
 						error: error instanceof Error ? error : new Error(String(error)),
@@ -137,7 +153,10 @@ export class WorkflowOrchestrator {
 		} catch (error) {
 			const endTime = Date.now();
 
-			this.config.logger.error(`[ORCHESTRATOR] Workflow execution failed:`, error);
+			this.config.logger.error(
+				`[ORCHESTRATOR] Workflow execution failed:`,
+				error,
+			);
 
 			return {
 				workflowId: this.config.workflowId,
@@ -161,6 +180,8 @@ export class WorkflowOrchestrator {
 
 	/**
 	 * Execute a single node
+	 *
+	 * For agent nodes, this may involve multiple iterations of tool execution
 	 */
 	private async executeNode(nodeId: string, nodeData: any): Promise<void> {
 		const startTime = Date.now();
@@ -168,7 +189,9 @@ export class WorkflowOrchestrator {
 		const nodeVersion = nodeData.data?.nodeVersion || 1;
 		const nodeParameters = nodeData.data?.nodeInputs || {};
 
-		this.config.logger.info(`[${nodeId}] Starting execution (type: ${nodeType})`);
+		this.config.logger.info(
+			`[${nodeId}] Starting execution (type: ${nodeType})`,
+		);
 
 		// Get node implementation
 		const nodeInstance = nodeLoader.getCurrentNodeType(nodeType);
@@ -190,21 +213,76 @@ export class WorkflowOrchestrator {
 			this.config.runId,
 			nodeParameters,
 			inputData,
+			{}, // nodeCredentials - TODO: Extract from node config
 			this.state,
 			this.config.langchainModels,
 			this.config.langchainEmbeddings,
 			this.config.langchainTools,
 			this.config.secrets,
-			this.config.logger
+			this.config.logger,
 		);
 
 		try {
 			// Execute the node
 			if (!nodeInstance.execute) {
-				throw new Error(`Node type "${nodeType}" does not support execute mode`);
+				throw new Error(
+					`Node type "${nodeType}" does not support execute mode`,
+				);
 			}
 
-			await nodeInstance.execute(executeFunctions);
+			// Execute node
+			// Agent nodes expect ExecutionContext, other nodes use ExecuteFunctions
+			let result: any;
+
+			if (nodeType === "agent") {
+				// Agent nodes use ExecutionContext
+				const abortController = new AbortController();
+				const context = this.createExecutionContext(
+					executeFunctions,
+					undefined,
+					abortController.signal,
+				);
+				result = await nodeInstance.execute(context as any);
+
+				// Handle agent execution loop
+				// If the node returns an EngineRequest, we need to execute tools and resume
+				while (this.isEngineRequest(result)) {
+					// Check for abort before continuing
+					if (abortController.signal.aborted) {
+						throw new Error(`Agent execution cancelled for node ${nodeId}`);
+					}
+
+					this.config.logger.info(
+						`[${nodeId}] Agent returned EngineRequest with ${result.actions.length} tool calls`,
+					);
+
+					// Execute tools via request handler
+					const response = await handleEngineRequest(result, {
+						emit: (event) => {
+							this.config.logger.debug(`[${nodeId}] Agent event:`, event);
+						},
+						signal: abortController.signal,
+					});
+
+					this.config.logger.info(`[${nodeId}] Tools executed, resuming agent`);
+
+					// Check for abort before resuming
+					if (abortController.signal.aborted) {
+						throw new Error(`Agent execution cancelled for node ${nodeId}`);
+					}
+
+					// Resume agent with tool results
+					const resumeContext = this.createExecutionContext(
+						executeFunctions,
+						response,
+						abortController.signal,
+					);
+					result = await nodeInstance.execute(resumeContext as any);
+				}
+			} else {
+				// Regular nodes use ExecuteFunctions
+				result = await nodeInstance.execute(executeFunctions as any);
+			}
 
 			this.config.logger.info(`[${nodeId}] Execution successful`);
 
@@ -256,9 +334,72 @@ export class WorkflowOrchestrator {
 	}
 
 	/**
+	 * Type guard to check if result is an EngineRequest
+	 */
+	private isEngineRequest(
+		result: any,
+	): result is EngineRequest<RequestResponseMetadata> {
+		return (
+			result &&
+			typeof result === "object" &&
+			"actions" in result &&
+			"metadata" in result &&
+			Array.isArray(result.actions)
+		);
+	}
+
+	/**
+	 * Create ExecutionContext from ExecuteFunctions (adapter pattern)
+	 *
+	 * This bridges the gap between our legacy ExecuteFunctions interface
+	 * and the modern ExecutionContext used by agent nodes.
+	 */
+	private createExecutionContext(
+		executeFunctions: ExecuteFunctions,
+		resumeData?: any,
+		signal?: AbortSignal,
+	): IExecutionContext {
+		// Access private fields via any cast (temporary solution)
+		const ef = executeFunctions as any;
+
+		// Build ExecutionContext with helper methods
+		const context: IExecutionContext = {
+			nodeId: ef.nodeId,
+			nodeType: ef.nodeType,
+			version: ef.nodeVersion,
+			inputs: executeFunctions.getInputData(),
+			properties: executeFunctions.getNodeParameters(),
+			evaluatedProperties: executeFunctions.getNodeParameters(), // Already evaluated
+			credentials: {}, // TODO: Extract credentials from executeFunctions
+			signal: signal || new AbortController().signal,
+			engineResponse, // Add engineResponse if resuming agent
+
+			// Execution tracking (stub for future multi-run/item-based)
+			runIndex: 0,
+			itemIndex: 0,
+
+			// Helper methods (delegate to ExecuteFunctions)
+			getInputData: () => {
+				const inputData = executeFunctions.getInputData();
+				return Object.values(inputData).flat() as any[];
+			},
+			getInputByHandle: (handle: string) => {
+				return executeFunctions.getInputByHandle(handle) as any;
+			},
+			getNodeParameter: <T = any>(name: string, defaultValue?: T): T => {
+				return executeFunctions.getNodeParameter(name, defaultValue) as T;
+			},
+		};
+
+		return context;
+	}
+
+	/**
 	 * Get input data for a node from connected nodes and {{variable}} resolution
 	 */
-	private prepareInputData(nodeId: string): Record<string, INodeExecutionData[]> {
+	private prepareInputData(
+		nodeId: string,
+	): Record<string, INodeExecutionData[]> {
 		const node = this.config.definition.nodes[nodeId];
 		const nodeInputs = node.data?.nodeInputs || {};
 
@@ -289,7 +430,9 @@ export class WorkflowOrchestrator {
 					const outputData = sourceOutputs[sourceHandle];
 
 					if (outputData !== undefined) {
-						inputData[targetHandle] = Array.isArray(outputData) ? outputData : [outputData];
+						inputData[targetHandle] = Array.isArray(outputData)
+							? outputData
+							: [outputData];
 					}
 				}
 			}

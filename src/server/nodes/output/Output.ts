@@ -6,11 +6,11 @@
  */
 
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
+	INodeExecutionData,
 } from '@/types/interfaces';
 
 const baseDescription: INodeTypeBaseDescription = {
@@ -61,7 +61,7 @@ export class Output implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		const label = (context.evaluatedProperties.label as string) || 'result';
 		const input = context.inputs.input || {};
 

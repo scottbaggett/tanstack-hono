@@ -8,19 +8,22 @@
  * - Collecting results
  */
 
-import type { WorkflowDefinition, NodeExecutionData } from "@/types/interfaces";
+import type {
+	IWorkflowDefinition,
+	INodeExecutionData,
+} from "@/types/interfaces";
 import { nodeRegistry } from "@/server/nodes/registry";
 import { buildExecutionContext } from "./context";
 
 interface ExecutionResult {
 	success: boolean;
-	results?: Record<string, NodeExecutionData[][]>; // Keyed by node ID
+	results?: Record<string, INodeExecutionData[][]>; // Keyed by node ID
 	error?: string;
 	executedNodes: string[]; // In order of execution
 }
 
 interface NodeState {
-	results: NodeExecutionData[][];
+	results: INodeExecutionData[][];
 	completed: boolean;
 	error?: string;
 }
@@ -30,8 +33,8 @@ interface NodeState {
  * Returns nodes in execution order based on their connections
  */
 function topologicalSort(
-	nodes: WorkflowDefinition["nodes"],
-	edges: WorkflowDefinition["edges"],
+	nodes: IWorkflowDefinition["nodes"],
+	edges: IWorkflowDefinition["edges"],
 ): string[] {
 	const nodeIds = new Set(nodes.map((n) => n.id));
 	const visited = new Set<string>();
@@ -74,7 +77,7 @@ function topologicalSort(
  */
 function getNodeInputs(
 	nodeId: string,
-	edges: WorkflowDefinition["edges"],
+	edges: IWorkflowDefinition["edges"],
 	nodeResults: Map<string, NodeState>,
 ): Record<string, any> {
 	const inputs: Record<string, any> = {};
@@ -126,7 +129,7 @@ function getNodeInputs(
  * @param pinnedData - Pre-computed outputs to use instead of executing nodes
  */
 export async function executeWorkflow(
-	definition: WorkflowDefinition,
+	definition: IWorkflowDefinition,
 	initialInputs?: Record<string, any>,
 	signal?: AbortSignal,
 	pinnedData?: Record<string, any>,
@@ -161,7 +164,7 @@ export async function executeWorkflow(
 		// Check for cancellation
 		if (signal?.aborted) {
 			// Build results from nodeResults map for early return
-			const earlyResults: Record<string, NodeExecutionData[][]> = {};
+			const earlyResults: Record<string, INodeExecutionData[][]> = {};
 			for (const [id, state] of nodeResults.entries()) {
 				earlyResults[id] = state.results;
 			}
@@ -262,7 +265,7 @@ export async function executeWorkflow(
 	}
 
 	// Convert results map to object
-	const results: Record<string, NodeExecutionData[][]> = {};
+	const results: Record<string, INodeExecutionData[][]> = {};
 	let hasErrors = false;
 
 	for (const [nodeId, state] of nodeResults.entries()) {
@@ -286,7 +289,7 @@ export async function executeWorkflow(
 export function getWorkflowOutput(
 	results: ExecutionResult["results"],
 	executedNodes: string[],
-): NodeExecutionData[][] | undefined {
+): INodeExecutionData[][] | undefined {
 	if (!results || executedNodes.length === 0) {
 		return undefined;
 	}

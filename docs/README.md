@@ -2,9 +2,43 @@
 
 ## Start Here
 
+👉 **[P0_CHARTER.md](./P0_CHARTER.md)** - Mission, principles, and success criteria
 👉 **[INDEX.md](./INDEX.md)** - Navigation and quick reference
 
 ## Core Documents
+
+### 🏗️ Architecture
+
+**[architecture/EXECUTION_ENGINE.md](./architecture/EXECUTION_ENGINE.md)** ⭐
+**The heart of the platform.** Deep dive into workflow execution, agent loops, state management, and core execution architecture.
+
+**Read this to understand**:
+- How workflows execute end-to-end
+- How agents iteratively call tools (EngineRequest/Response pattern)
+- State management and error handling
+- Performance and security considerations
+
+**[architecture/README.md](./architecture/README.md)**
+High-level system architecture overview, layers, and core abstractions.
+
+### 🤖 Agents
+
+**[agents/TRACEABILITY_REQUIREMENTS.md](./agents/TRACEABILITY_REQUIREMENTS.md)** ⚠️ **CRITICAL**
+**Non-negotiable requirements for agent transparency and debuggability.** Addresses the "Inception Problem" - how to make the agent's internal loop visible and debuggable. Must read before implementing agent features.
+
+**[agents/EXECUTION_LOOP_COMPLETE.md](./agents/EXECUTION_LOOP_COMPLETE.md)**
+Complete documentation of the agent execution loop implementation.
+
+**[agents/EXECUTION_CONTEXT.md](./agents/EXECUTION_CONTEXT.md)**
+Deep dive into ExecutionContext architecture and comparison with n8n.
+
+**[agents/TESTING_STRATEGY.md](./agents/TESTING_STRATEGY.md)**
+Comprehensive test plan for agent execution (unit, integration, E2E).
+
+**[agents/IMPLEMENTATION_PLAN.md](./agents/IMPLEMENTATION_PLAN.md)**
+Roadmap for agent features (P0 → P3).
+
+---
 
 ### [ARCHITECTURE.md](./ARCHITECTURE.md)
 System design, component overview, data flow, and design decisions.

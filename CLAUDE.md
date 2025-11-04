@@ -2,6 +2,9 @@
 
 We are building a **TanStack-Hono workflow automation platform** with AI agent capabilities, inspired by n8n's architecture.
 
+# Docs (Must Read)
+- See @docs/READMME
+
 ### Current Phase: Agent System Implementation (P0+)
 
 **Status**:

@@ -6,11 +6,11 @@
  */
 
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
+	INodeExecutionData,
 } from '@/types/interfaces';
 import { executeAgent } from './execute';
 import { agentProperties } from './properties';
@@ -65,8 +65,9 @@ export class Agent implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
-		// @ts-expect-error - Agent can return EngineRequest for tool execution (P0 extension)
+	async execute(
+		context: IExecutionContext
+	): Promise<INodeExecutionData[][] | import('@/server/types/agent').EngineRequest<import('@/server/types/agent').RequestResponseMetadata>> {
 		return await executeAgent(context);
 	}
 }

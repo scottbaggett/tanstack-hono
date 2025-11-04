@@ -7,11 +7,11 @@
  */
 
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
+	INodeExecutionData,
 } from '@/types/interfaces';
 
 const baseDescription: INodeTypeBaseDescription = {
@@ -226,7 +226,7 @@ export class HttpRequest implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		const method =
 			(context.evaluatedProperties.method as string)?.toUpperCase() || 'GET';
 		const url = context.evaluatedProperties.url as string;

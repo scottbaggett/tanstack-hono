@@ -7,11 +7,11 @@
  */
 
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
+	INodeExecutionData,
 } from "@/types/interfaces";
 
 const baseDescription: INodeTypeBaseDescription = {
@@ -128,7 +128,7 @@ export class Webhook implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		// For webhook triggers, the execution is handled by the webhook route
 		// This method is called when manually executing or testing the node
 		// In production, webhook data comes from the HTTP request

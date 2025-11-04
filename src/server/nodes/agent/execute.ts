@@ -5,39 +5,43 @@
  * Supports basic tool calling and deterministic IDs
  */
 
-import type { ExecutionContext, NodeExecutionData } from '@/types/interfaces';
+import type { IExecutionContext, INodeExecutionData } from "@/types/interfaces";
 import type {
 	EngineRequest,
 	EngineResponse,
 	RequestResponseMetadata,
 	AgentOptions,
-} from '@/server/types/agent';
+} from "@/server/types/agent";
 import {
 	createAgentGraph,
 	buildInitialState,
 	buildResumedState,
 	type AgentGraphState,
-} from '@/server/agents/graph';
-import { generateToolCallId } from '@/server/utils/ids';
-import { createEventEmitter } from '@/server/observability/events';
-import { getChatModel, getTools, getOptionalMemory } from '@/server/utils/langchain';
+} from "@/server/agents/graph";
+import { generateToolCallId } from "@/server/utils/ids";
+import { createEventEmitter } from "@/server/observability/events";
+import {
+	getChatModel,
+	getTools /* , getOptionalMemory */,
+} from "@/server/utils/langchain";
 
 /**
  * Main agent execution function
  * Returns either final results or an EngineRequest for tool execution
  */
 export async function executeAgent(
-	context: ExecutionContext,
+	context: IExecutionContext,
 	response?: EngineResponse<RequestResponseMetadata>,
-): Promise<NodeExecutionData[][] | EngineRequest<RequestResponseMetadata>> {
+): Promise<INodeExecutionData[][] | EngineRequest<RequestResponseMetadata>> {
 	const { nodeId, inputs, evaluatedProperties, signal } = context;
 
 	// Extract options from evaluated properties
 	const systemPrompt =
-		(evaluatedProperties.systemPrompt as string) || 'You are a helpful AI assistant.';
-	const promptType = evaluatedProperties.promptType || 'define';
+		(evaluatedProperties.systemPrompt as string) ||
+		"You are a helpful AI assistant.";
+	const promptType = evaluatedProperties.promptType || "define";
 	const userPrompt =
-		promptType === 'define'
+		promptType === "define"
 			? (evaluatedProperties.userPrompt as string)
 			: (inputs.text as string);
 	const maxIterations = (evaluatedProperties.maxIterations as number) || 5;
@@ -51,13 +55,13 @@ export async function executeAgent(
 
 	// Check for cancellation
 	if (signal?.aborted) {
-		throw new Error('Agent execution cancelled');
+		throw new Error("Agent execution cancelled");
 	}
 
 	// Get real LangChain components from connections
 	const model = await getChatModel(context);
 	const langchainTools = await getTools(context);
-	const memory = await getOptionalMemory(context);
+	// const memory = await getOptionalMemory(context); // TODO: Implement memory support
 
 	// Build agent options
 	const options: AgentOptions = {
@@ -72,7 +76,7 @@ export async function executeAgent(
 		const emitter = createEventEmitter();
 
 		// Get execution ID and iteration count
-		const executionId = `exec_${Date.now().toString(36)}_${crypto.randomUUID().split('-')[0]}`;
+		const executionId = `exec_${Date.now().toString(36)}_${crypto.randomUUID().split("-")[0]}`;
 		const iterationCount = response?.metadata?.iterationCount ?? 0;
 
 		// Build LangGraph with real components
@@ -113,7 +117,7 @@ export async function executeAgent(
 
 					return {
 						id: toolCallId,
-						type: 'ai_tool' as const,
+						type: "ai_tool" as const,
 						nodeName: `tool_${toolCall.tool}`, // TODO: Map to actual node name
 						tool: toolCall.tool,
 						input: toolCall.toolInput,
@@ -121,8 +125,8 @@ export async function executeAgent(
 							itemIndex: 0,
 							iteration: iterationCount + 1,
 							attempt: 0,
-							source: 'agent' as const,
-							stepHash: '', // TODO: Generate step hash
+							source: "agent" as const,
+							stepHash: "", // TODO: Generate step hash
 						},
 					};
 				}),
@@ -139,7 +143,7 @@ export async function executeAgent(
 			};
 
 			emitter.emit({
-				t: 'engine.request',
+				t: "engine.request",
 				requestId: `req_${Date.now().toString(36)}`,
 				actions: actions.map((a) => ({
 					id: a.id,
@@ -153,16 +157,16 @@ export async function executeAgent(
 
 		// Return final output
 		emitter.emit({
-			t: 'agent.finish',
+			t: "agent.finish",
 			iteration: iterationCount + 1,
-			output: finalState.finalOutput || 'No output',
-			finalState: 'success',
+			output: finalState.finalOutput || "No output",
+			finalState: "success",
 		});
 
-		const result: NodeExecutionData = {
+		const result: INodeExecutionData = {
 			json: {
-				status: 'success',
-				output: finalState.finalOutput || 'No output',
+				status: "success",
+				output: finalState.finalOutput || "No output",
 				iterations: iterationCount + 1,
 				systemPrompt,
 				userPrompt,
@@ -172,11 +176,12 @@ export async function executeAgent(
 		return [[result]];
 	} catch (error) {
 		// Error handling
-		const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+		const errorMessage =
+			error instanceof Error ? error.message : "Unknown error";
 
-		const result: NodeExecutionData = {
+		const result: INodeExecutionData = {
 			json: {
-				status: 'error',
+				status: "error",
 				error: errorMessage,
 				systemPrompt,
 				userPrompt,

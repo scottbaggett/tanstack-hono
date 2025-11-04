@@ -16,22 +16,32 @@ import type { TypedValue, SerializedValue } from "./datatypes";
 // ============================================================================
 
 /**
- * Data flowing between nodes
+ * Data flowing between nodes (TypedValue-based system)
  *
  * Can be:
  * - TypedValue: Value with explicit type information (used during execution)
  * - unknown: Inferred type (converted to TypedValue automatically)
  *
  * Supports: strings, numbers, floats, JSON, CSV, PDB, buffers, images, etc
+ *
+ * NOTE: This is distinct from INodeExecutionData in interfaces.ts which is
+ * the n8n-style structured execution data with metadata. This type represents
+ * raw data flowing through the TypedValue system.
  */
-export type INodeExecutionData = TypedValue | unknown;
+export type NodeFlowData = TypedValue | unknown;
+
+/**
+ * @deprecated Use NodeFlowData instead. Will be removed in Phase 2.
+ * This alias exists for backward compatibility during migration.
+ */
+export type INodeExecutionData = NodeFlowData;
 
 /**
  * Structured output from a node
  * Maps output handle names to arrays of execution data
  */
 export type INodeOutputData = {
-	[handleName: string]: INodeExecutionData[];
+	[handleName: string]: NodeFlowData[];
 };
 
 /**
@@ -120,7 +130,7 @@ export interface IExecuteFunctionsCore {
 	 *
 	 * @returns Input data mapped by handle name
 	 */
-	getInputData(): Record<string, INodeExecutionData[]>;
+	getInputData(): Record<string, NodeFlowData[]>;
 
 	/**
 	 * Get input data from a specific input handle
@@ -128,12 +138,12 @@ export interface IExecuteFunctionsCore {
 	 * @param handleName - Name of the input handle
 	 * @returns Array of execution data from that input
 	 */
-	getInputByHandle(handleName: string): INodeExecutionData[] | undefined;
+	getInputByHandle(handleName: string): NodeFlowData[] | undefined;
 
 	/**
 	 * Helper: Get the first item from a specific input handle
 	 */
-	getInputValue(handleName: string): INodeExecutionData | undefined;
+	getInputValue(handleName: string): NodeFlowData | undefined;
 
 	// === Output ===
 
@@ -151,7 +161,7 @@ export interface IExecuteFunctionsCore {
 	 * @param handleName - Name of the output handle
 	 * @param data - The output data
 	 */
-	setOutput(handleName: string, data: INodeExecutionData[]): void;
+	setOutput(handleName: string, data: NodeFlowData[]): void;
 
 	// === Secrets ===
 

@@ -6,12 +6,12 @@
  */
 
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
-	NodePort,
+	INodeExecutionData,
+	INodePort,
 } from '@/types/interfaces';
 
 const baseDescription: INodeTypeBaseDescription = {
@@ -62,7 +62,7 @@ export class TextInput implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		const text = (context.evaluatedProperties.text as string) || '';
 
 		return [

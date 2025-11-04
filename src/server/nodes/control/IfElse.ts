@@ -7,11 +7,11 @@
  */
 
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
+	INodeExecutionData,
 } from '@/types/interfaces';
 import { evaluateExpression } from '@/server/lib/expressions';
 import { buildExpressionContext } from '@/server/execution/context';
@@ -66,7 +66,7 @@ export class IfElse implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		const condition = (context.evaluatedProperties.condition as string) || 'true';
 
 		// Get input data to pass through
@@ -96,7 +96,7 @@ export class IfElse implements INodeType {
 		const conditionResult = Boolean(evaluation.value);
 
 		// Prepare output data (pass through input data)
-		const outputData: NodeExecutionData = {
+		const outputData: INodeExecutionData = {
 			json: {
 				...inputJson,
 				_condition: conditionResult,

@@ -8,11 +8,11 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import type {
-	ExecutionContext,
+	IExecutionContext,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	NodeExecutionData,
+	INodeExecutionData,
 } from '@/types/interfaces';
 
 const execAsync = promisify(exec);
@@ -66,7 +66,7 @@ export class ExecuteCommand implements INodeType {
 		};
 	}
 
-	async execute(context: ExecutionContext): Promise<NodeExecutionData[][]> {
+	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		const command = (context.evaluatedProperties.command as string) || 'echo "No command"';
 		const timeout = (context.evaluatedProperties.timeout as number) || 5000;
 

@@ -8,7 +8,7 @@
  * - Preparing context with workflow state
  */
 
-import type { ExecutionContext, INodeTypeDescription } from '@/types/interfaces';
+import type { IExecutionContext, INodeTypeDescription } from '@/types/interfaces';
 import { evaluateProperties } from '@/server/lib/expressions';
 import type { ExpressionContext } from '@/server/lib/expressions';
 import type { INodeCredentialsDetails } from '@/types/credentials';

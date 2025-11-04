@@ -23,6 +23,11 @@ export interface WorkflowViewport {
 
 /**
  * A complete workflow definition
+ *
+ * @deprecated Use IWorkflowDefinition from interfaces.ts instead.
+ * This legacy type uses Record<string, WorkflowNode> for nodes, while the
+ * canonical type uses IWorkflowNode[] for better type safety.
+ * Will be removed in Phase 2 cleanup.
  */
 export interface WorkflowDefinition {
 	nodes: Record<string, WorkflowNode>;
@@ -134,6 +139,11 @@ export interface NodeTypeDefinition {
 
 /**
  * Context provided during node execution
+ *
+ * @deprecated This legacy context is too simple for modern execution needs.
+ * For agent nodes, use IExecutionContext from interfaces.ts.
+ * For regular nodes, use IExecuteFunctions from execution.ts.
+ * Will be removed in Phase 2 cleanup.
  */
 export interface NodeExecutionContext {
 	nodeId: string;

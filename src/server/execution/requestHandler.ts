@@ -59,6 +59,10 @@ export interface HandleRequestOptions {
 	continueOnFail?: boolean;
 	/** Organization ID (for allowlist checks) */
 	orgId?: string;
+	/** Event emitter for observability */
+	emit?: (event: IAgentEvent) => void;
+	/** Abort signal for cancellation */
+	signal?: AbortSignal;
 }
 
 /**

@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import type { IWorkflowDefinition } from "@/types/interfaces";
 
 // ============================================================================
 // COMMON TYPES
@@ -61,9 +62,30 @@ export type AuthResponse = z.infer<typeof AuthResponseSchema>;
 // WORKFLOW TYPES
 // ============================================================================
 
-export const WorkflowDefinitionSchema = z.record(z.unknown());
+/**
+ * Zod schema for workflow definition validation
+ *
+ * Note: This is a simplified schema for API validation.
+ * The full TypeScript type is IWorkflowDefinition from interfaces.ts
+ * TODO: Create proper Zod schemas matching IWorkflowNode and IWorkflowEdge
+ */
+export const WorkflowDefinitionSchema = z.object({
+	nodes: z.record(z.any()), // TODO: Proper IWorkflowNode schema
+	edges: z.array(z.any()), // TODO: Proper IWorkflowEdge schema
+	viewport: z
+		.object({
+			x: z.number(),
+			y: z.number(),
+			zoom: z.number(),
+		})
+		.optional(),
+});
 
-export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
+/**
+ * WorkflowDefinition type for API validation
+ * For full type-safe usage, import IWorkflowDefinition from @/types/interfaces
+ */
+export type WorkflowDefinition = IWorkflowDefinition;
 
 export const WorkflowSchema = z.object({
 	id: z.string(),

@@ -10,18 +10,18 @@
 // ============================================================================
 
 export type ConnectionType =
-	| 'main' // Standard data flow
-	| 'ai_languageModel' // LLM/Chat model
-	| 'ai_tool' // Tool/function
-	| 'ai_memory' // Memory/context
-	| 'ai_outputParser' // Output formatter
-	| 'data'; // Generic data
+	| "main" // Standard data flow
+	| "ai_languageModel" // LLM/Chat model
+	| "ai_tool" // Tool/function
+	| "ai_memory" // Memory/context
+	| "ai_outputParser" // Output formatter
+	| "data"; // Generic data
 
 // ============================================================================
 // NODE PORTS (INPUTS/OUTPUTS)
 // ============================================================================
 
-export interface NodePort {
+export interface INodePort {
 	id: string;
 	displayName: string;
 	type: ConnectionType;
@@ -44,7 +44,7 @@ export interface DynamicInputContext {
 	connectedInputs?: Record<string, boolean>; // Which inputs are connected
 }
 
-export type DynamicInputs = (context: DynamicInputContext) => NodePort[];
+export type DynamicInputs = (context: DynamicInputContext) => INodePort[];
 
 // ============================================================================
 // NODE TYPE DESCRIPTION
@@ -65,14 +65,21 @@ export interface INodeTypeBaseDescription {
 	};
 }
 
-export interface NodeProperty {
+export interface INodeProperty {
 	displayName: string;
 	name: string;
-	type: 'string' | 'number' | 'boolean' | 'json' | 'select' | 'notice' | 'callout';
+	type:
+		| "string"
+		| "number"
+		| "boolean"
+		| "json"
+		| "select"
+		| "notice"
+		| "callout";
 	default: unknown;
 	description?: string;
 	placeholder?: string;
-	options?: Array<{ name: string; value: unknown, description?: string }>;
+	options?: Array<{ name: string; value: unknown; description?: string }>;
 	noDataExpression?: boolean;
 	displayOptions?: {
 		show?: Record<string, unknown[]>;
@@ -89,7 +96,7 @@ export interface INodeTypeDescription extends INodeTypeBaseDescription {
 	// Most nodes have 1 input and 1 output (default)
 	maxInputs?: number; // Default: 1, set to 0 for start nodes
 	maxOutputs?: number; // Default: 1
-	properties: NodeProperty[];
+	properties: INodeProperty[];
 	// Credential requirements
 	credentials?: Array<{
 		name: string; // Credential type (e.g., "httpBasicAuth")
@@ -97,7 +104,7 @@ export interface INodeTypeDescription extends INodeTypeBaseDescription {
 	}>;
 	hints?: Array<{
 		message: string;
-		type: 'warning' | 'info';
+		type: "warning" | "info";
 		location: string;
 		whenToDisplay: string;
 		displayCondition?: string;
@@ -108,7 +115,7 @@ export interface INodeTypeDescription extends INodeTypeBaseDescription {
 // NODE EXECUTION
 // ============================================================================
 
-export interface ExecutionContext {
+export interface IExecutionContext {
 	nodeId: string;
 	nodeType: string;
 	version: number;
@@ -118,12 +125,39 @@ export interface ExecutionContext {
 	credentials?: Record<string, Record<string, any>>; // Decrypted credentials by type
 	previousData?: any[];
 	signal?: AbortSignal; // For cancellation
+
+	// Execution tracking (for multi-run and item-based execution)
+	runIndex?: number; // Current run iteration (for loops/retries)
+	itemIndex?: number; // Current item being processed (for batch operations)
+
+	// Agent-specific: Response from tool execution for resumption
+	engineResponse?: import("@/server/types/agent").EngineResponse<
+		import("@/server/types/agent").RequestResponseMetadata
+	>;
+
+	// Helper methods (when implemented)
+	getInputData?(): INodeExecutionData[];
+	getInputByHandle?(handle: string): INodeExecutionData[] | undefined;
+	getNodeParameter?<T = any>(name: string, defaultValue?: T): T;
 }
 
-export interface NodeExecutionData {
+export interface INodeExecutionData {
 	json?: Record<string, any>; // Main output data
 	binary?: Record<string, Buffer>; // Binary data
 	pairedItem?: number | number[]; // Link to input item
+	error?: Error; // Error object if execution failed
+
+	// Advanced n8n-like features
+	metadata?: {
+		subExecution?: {
+			workflowId: string;
+			executionId: string;
+		};
+		// Additional metadata for tracing, custom data, etc.
+		[key: string]: any;
+	};
+	evaluationData?: Record<string, any>; // Data from expression evaluation
+	sendMessage?: string; // For chat/agent nodes
 }
 
 // ============================================================================
@@ -133,15 +167,22 @@ export interface NodeExecutionData {
 export interface INodeType {
 	description: INodeTypeDescription;
 	execute(
-		context: ExecutionContext,
-	): Promise<NodeExecutionData[][]> | NodeExecutionData[][];
+		context: IExecutionContext,
+	):
+		| Promise<
+				| INodeExecutionData[][]
+				| import("@/server/types/agent").EngineRequest<
+						import("@/server/types/agent").RequestResponseMetadata
+				  >
+		  >
+		| INodeExecutionData[][];
 }
 
 // ============================================================================
 // WORKFLOW NODE (INSTANCE IN CANVAS)
 // ============================================================================
 
-export interface WorkflowNode {
+export interface IWorkflowNode {
 	id: string;
 	type: string; // References node type name (e.g., "agent")
 	version: number; // Node version (e.g., 1)
@@ -149,10 +190,13 @@ export interface WorkflowNode {
 		x: number;
 		y: number;
 	};
-	credentials?: Record<string, {
-		id: string; // Credential instance ID
-		name: string; // Display name
-	}>;
+	credentials?: Record<
+		string,
+		{
+			id: string; // Credential instance ID
+			name: string; // Display name
+		}
+	>;
 	data: {
 		label?: string; // Custom label
 		inputs?: Record<string, any>; // Values from connected nodes
@@ -161,7 +205,7 @@ export interface WorkflowNode {
 	};
 }
 
-export interface WorkflowEdge {
+export interface IWorkflowEdge {
 	id: string;
 	source: string; // Source node ID
 	target: string; // Target node ID
@@ -170,9 +214,9 @@ export interface WorkflowEdge {
 	data?: Record<string, unknown>;
 }
 
-export interface WorkflowDefinition {
-	nodes: WorkflowNode[];
-	edges: WorkflowEdge[];
+export interface IWorkflowDefinition {
+	nodes: IWorkflowNode[];
+	edges: IWorkflowEdge[];
 	viewport?: {
 		x: number;
 		y: number;
