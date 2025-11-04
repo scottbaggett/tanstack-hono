@@ -403,7 +403,6 @@ export class HttpRequest implements INodeType {
 				statusCode: response.status,
 				statusText: response.statusText,
 				body: responseData,
-				text: responseText,
 			};
 
 			if (includeHeaders) {

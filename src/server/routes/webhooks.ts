@@ -13,11 +13,13 @@ const app = new Hono();
 
 /**
  * Webhook endpoint - receives HTTP requests and triggers workflows
- * POST /webhook/:path - Generic webhook endpoint
- * GET /webhook/:path - GET webhook endpoint
+ * POST /webhook/* - Generic webhook endpoint
+ * GET /webhook/* - GET webhook endpoint
  */
-app.all("/webhook/:path", async (c) => {
-	const path = c.req.param("path");
+app.all("/webhook/*", async (c) => {
+	// Get the full path after /webhook/
+	const fullPath = c.req.path;
+	const path = fullPath.replace(/^\/api\/webhook\//, "").replace(/^\/webhook\//, "");
 	const method = c.req.method;
 
 	try {

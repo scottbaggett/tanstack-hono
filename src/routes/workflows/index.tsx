@@ -67,7 +67,7 @@ function WorkflowsPage() {
 						Manage and execute your AI workflow pipelines
 					</p>
 				</div>
-				<Link to="/canvas">
+				<Link to="/workflow/new">
 					<Button size="lg">
 						<LucideIcon name="plus" className="mr-2 h-4 w-4" />
 						Create Workflow
@@ -80,7 +80,8 @@ function WorkflowsPage() {
 				<Alert variant="destructive" className="mb-6">
 					<LucideIcon name="alert-circle" className="h-4 w-4" />
 					<AlertDescription>
-						Failed to load workflows: {error instanceof Error ? error.message : "Unknown error"}
+						Failed to load workflows:{" "}
+						{error instanceof Error ? error.message : "Unknown error"}
 						<Button
 							variant="outline"
 							size="sm"
@@ -111,26 +112,28 @@ function WorkflowsPage() {
 			)}
 
 			{/* Empty State */}
-			{!isLoading && !error && (!data || !data.workflows || data.workflows.length === 0) && (
-				<div className="text-center py-12">
-					<div className="mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4">
-						<LucideIcon
-							name="workflow"
-							className="h-12 w-12 text-muted-foreground"
-						/>
+			{!isLoading &&
+				!error &&
+				(!data || !data.workflows || data.workflows.length === 0) && (
+					<div className="text-center py-12">
+						<div className="mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4">
+							<LucideIcon
+								name="workflow"
+								className="h-12 w-12 text-muted-foreground"
+							/>
+						</div>
+						<h3 className="text-2xl font-semibold mb-2">No workflows yet</h3>
+						<p className="text-muted-foreground mb-6 max-w-md mx-auto">
+							Get started by creating your first AI workflow pipeline
+						</p>
+						<Link to="/workflow/new">
+							<Button size="lg">
+								<LucideIcon name="plus" className="mr-2 h-4 w-4" />
+								Create Your First Workflow
+							</Button>
+						</Link>
 					</div>
-					<h3 className="text-2xl font-semibold mb-2">No workflows yet</h3>
-					<p className="text-muted-foreground mb-6 max-w-md mx-auto">
-						Get started by creating your first AI workflow pipeline
-					</p>
-					<Link to="/canvas">
-						<Button size="lg">
-							<LucideIcon name="plus" className="mr-2 h-4 w-4" />
-							Create Your First Workflow
-						</Button>
-					</Link>
-				</div>
-			)}
+				)}
 
 			{/* Workflows Grid */}
 			{!isLoading && data && data.workflows && data.workflows.length > 0 && (
@@ -181,8 +184,8 @@ function WorkflowsPage() {
 										{/* Actions */}
 										<div className="flex gap-2">
 											<Link
-												to="/canvas"
-												search={{ workflowId: workflow.id }}
+												to="/workflow/$workflowId"
+												params={{ workflowId: workflow.id }}
 												className="flex-1"
 											>
 												<Button variant="default" size="sm" className="w-full">

@@ -72,7 +72,7 @@ export interface NodeProperty {
 	default: unknown;
 	description?: string;
 	placeholder?: string;
-	options?: Array<{ name: string; value: unknown }>;
+	options?: Array<{ name: string; value: unknown, description?: string }>;
 	noDataExpression?: boolean;
 	displayOptions?: {
 		show?: Record<string, unknown[]>;

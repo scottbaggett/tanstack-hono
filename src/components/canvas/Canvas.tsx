@@ -33,6 +33,7 @@ import { useNodeRegistry } from "@/hooks/use-node-registry";
 
 interface CanvasProps {
 	workflowId?: string;
+	selectedNodeId?: string;
 }
 
 // Define available node types
@@ -40,7 +41,7 @@ const nodeTypes = {
 	workflow: WorkflowNode,
 };
 
-export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
+export function Canvas({ workflowId: initialWorkflowId, selectedNodeId }: CanvasProps) {
 	const navigate = useNavigate();
 	const [workflowId, setWorkflowId] = useState(initialWorkflowId);
 	const { data: workflow } = useWorkflow(workflowId || null);
@@ -56,6 +57,11 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 
 	const [nodes, setNodes, onNodesChange] = useNodesState<Node>(initialNodes);
 
+	// Find the selected node from selectedNodeId (after nodes are initialized)
+	const selectedNodeFromId = selectedNodeId
+		? nodes.find(n => n.id === selectedNodeId) || null
+		: null;
+
 	// Edges are stored as arrays
 	const initialEdges = Array.isArray(workflow?.definition?.edges)
 		? (workflow.definition.edges as Edge[])
@@ -65,6 +71,7 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 
 	const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 	const [showConfig, setShowConfig] = useState(false);
+	const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null);
 
 	// Sync nodes and edges when workflow loads
 	useEffect(() => {
@@ -86,6 +93,44 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 		setNodes,
 		setEdges,
 	]);
+
+	// Auto-save workflow when nodes or edges change
+	useEffect(() => {
+		// Skip auto-save if workflow hasn't loaded yet
+		if (!workflowId) return;
+
+		// Skip auto-save during initial load
+		if (nodes.length === 0 && edges.length === 0) return;
+
+		// Clear existing timer
+		if (autoSaveTimer) {
+			clearTimeout(autoSaveTimer);
+		}
+
+		// Set new timer to save after 1 second of inactivity
+		const timer = setTimeout(async () => {
+			try {
+				await updateWorkflow.mutateAsync({
+					workflowId,
+					definition: {
+						nodes,
+						edges,
+						viewport: { x: 0, y: 0, zoom: 1 },
+					},
+				});
+				console.log("Workflow auto-saved");
+			} catch (error) {
+				console.error("Auto-save failed:", error);
+			}
+		}, 1000);
+
+		setAutoSaveTimer(timer);
+
+		// Cleanup timer on unmount
+		return () => {
+			if (timer) clearTimeout(timer);
+		};
+	}, [nodes, edges, workflowId]); // Only depend on nodes, edges, and workflowId
 
 	// Handle node property updates
 	const handleUpdateNodeData = useCallback(
@@ -174,8 +219,8 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 					setWorkflowId(result.id);
 					// Navigate to the workflow URL so it persists on refresh
 					await navigate({
-						to: "/canvas",
-						search: { workflowId: result.id },
+						to: "/workflow/$workflowId",
+						params: { workflowId: result.id },
 					});
 				}
 			} else {
@@ -281,10 +326,28 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 						onConnect={onConnect}
 						nodeTypes={nodeTypes}
 						onNodeDoubleClick={(_, node) => {
-							setSelectedNode(node);
-							setShowConfig(true);
+							// Navigate to node modal using search params
+							if (workflowId) {
+								navigate({
+									to: "/workflow/$workflowId",
+									params: { workflowId },
+									search: { nodeId: node.id },
+								});
+							} else {
+								// If no workflowId yet, just set the selected node locally
+								setSelectedNode(node);
+								setShowConfig(true);
+							}
 						}}
 						onPaneClick={() => {
+							// Clear nodeId from URL when clicking pane
+							if (workflowId && selectedNodeId) {
+								navigate({
+									to: "/workflow/$workflowId",
+									params: { workflowId },
+									search: {},
+								});
+							}
 							setSelectedNode(null);
 							setShowConfig(false);
 						}}
@@ -298,11 +361,19 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 			</div>
 
 			{/* Node Editor Modal */}
-			{showConfig && selectedNode && (
+			{((showConfig && selectedNode) || selectedNodeFromId) && (
 				<NodeEditorModal
-					selectedNode={selectedNode}
+					selectedNode={(selectedNodeFromId || selectedNode)!}
 					onClose={() => {
 						setShowConfig(false);
+						// Clear nodeId from URL
+						if (workflowId && selectedNodeId) {
+							navigate({
+								to: "/workflow/$workflowId",
+								params: { workflowId },
+								search: {},
+							});
+						}
 					}}
 					onUpdateNode={handleUpdateNodeData}
 					workflowEdges={

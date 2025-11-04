@@ -105,7 +105,25 @@ export function ParametersPanel({
 	const hasCredentials = credentialRequirements.length > 0;
 	const hasProperties = propertyDefinitions.length > 0;
 
-	if (!hasCredentials && !hasProperties) {
+	// Check if this is a webhook node
+	const isWebhookNode = nodeId === "webhook";
+
+	// Generate webhook URL if this is a webhook node
+	const webhookUrl = isWebhookNode
+		? (() => {
+				const path = currentPropertyValues.path || selectedNode.id;
+				const baseUrl = window.location.origin;
+				return `${baseUrl}/api/webhook/${path}`;
+		  })()
+		: null;
+
+	const handleCopyWebhookUrl = () => {
+		if (webhookUrl) {
+			navigator.clipboard.writeText(webhookUrl);
+		}
+	};
+
+	if (!hasCredentials && !hasProperties && !isWebhookNode) {
 		return (
 			<div className="p-4">
 				<div className="text-center py-8">
@@ -118,6 +136,35 @@ export function ParametersPanel({
 	return (
 		<div className="flex flex-col h-full p-4">
 			<div className="flex-1 overflow-y-auto space-y-6 mb-4 no-scrollbar">
+				{/* Webhook URL Section (for webhook nodes) */}
+				{isWebhookNode && webhookUrl && (
+					<div className="space-y-4">
+						<div>
+							<h3 className="text-lg font-semibold">Webhook URL</h3>
+							<p className="text-xs text-surface-11 mt-1">
+								Send HTTP requests to this URL to trigger the workflow
+							</p>
+						</div>
+						<div className="space-y-2">
+							<div className="flex items-center gap-2">
+								<div className="flex-1 bg-surface-3 px-3 py-2 rounded text-xs font-mono text-surface-12 overflow-x-auto whitespace-nowrap">
+									{webhookUrl}
+								</div>
+								<button
+									onClick={handleCopyWebhookUrl}
+									className="px-3 py-2 bg-surface-4 hover:bg-surface-5 rounded text-xs font-medium transition-colors"
+									title="Copy to clipboard"
+								>
+									Copy
+								</button>
+							</div>
+							<p className="text-xs text-surface-10">
+								Method: {(currentPropertyValues.httpMethod as string) || "POST"}
+							</p>
+						</div>
+					</div>
+				)}
+
 				{/* Credentials Section */}
 				{hasCredentials && (
 					<div className="space-y-4">

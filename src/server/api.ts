@@ -13,6 +13,7 @@ import { modelsRoutes } from "./routes/models";
 import { nodesRoutes } from "./routes/nodes";
 import { nodeExecuteRoutes } from "./routes/node-execute";
 import credentialsRoutes from "./routes/credentials";
+import { webhookRoutes } from "./routes/webhooks";
 import { authMiddleware } from "./auth/middleware";
 
 // ============================================================================
@@ -75,6 +76,9 @@ app.route("/node-execute", nodeExecuteRoutes);
 
 // Credential routes (public for now, will be protected later)
 app.route("/credentials", credentialsRoutes);
+
+// Webhook routes (public - receives external requests)
+app.route("/", webhookRoutes);
 
 // Test workflow route (public - for testing)
 app.get("/test-workflow", (c) => {
