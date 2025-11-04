@@ -5,22 +5,7 @@
  * Includes capabilities, parameter ranges, and provider information
  */
 
-export interface ParamConfig {
-	type: "int" | "float" | "enum" | "bool";
-	min?: number;
-	max?: number;
-	range?: [number, number];
-	values?: string[]; // For enum type
-	default?: unknown;
-}
-
-export interface ModelConfig {
-	provider: "openai" | "anthropic" | "google";
-	supports_temp: boolean;
-	valid_params?: Record<string, ParamConfig>;
-}
-
-export type ModelRegistry = Record<string, ModelConfig>;
+import type { ModelConfig, ModelRegistry } from "./types";
 
 export const MODEL_REGISTRY: ModelRegistry = {
 	// OpenAI GPT-5 series
@@ -232,11 +217,136 @@ export const MODEL_REGISTRY: ModelRegistry = {
 };
 
 /**
+ * Get model configuration by name
+ */
+export function getModel(modelName: string): ModelConfig | null {
+	return MODEL_REGISTRY[modelName] || null;
+}
+
+/**
+ * Get all models for a specific provider
+ */
+export function getModelsByProvider(provider: string) {
+	return Object.entries(MODEL_REGISTRY)
+		.filter(([_, config]) => config.provider === provider)
+		.map(([name, config]) => ({ name, ...config }));
+}
+
+/**
+ * Get all available model names
+ */
+export function getModelNames(): string[] {
+	return Object.keys(MODEL_REGISTRY);
+}
+
+/**
+ * Validate model parameters against the model's configuration
+ */
+export function validateModelParams(
+	modelName: string,
+	params: Record<string, unknown>,
+): { valid: boolean; errors: string[] } {
+	const model = getModel(modelName);
+	if (!model) {
+		return { valid: false, errors: [`Model "${modelName}" not found`] };
+	}
+
+	const errors: string[] = [];
+
+	for (const [paramName, paramValue] of Object.entries(params)) {
+		// Skip temperature check if model doesn't support it
+		if (paramName === "temperature" && !model.supports_temp) {
+			errors.push(
+				`Model "${modelName}" does not support temperature parameter`,
+			);
+			continue;
+		}
+
+		const paramConfig = model.valid_params?.[paramName];
+		if (!paramConfig) {
+			errors.push(
+				`Parameter "${paramName}" is not valid for model "${modelName}"`,
+			);
+			continue;
+		}
+
+		// Type validation
+		switch (paramConfig.type) {
+			case "int": {
+				if (typeof paramValue !== "number" || !Number.isInteger(paramValue)) {
+					errors.push(`Parameter "${paramName}" must be an integer`);
+					break;
+				}
+				if (paramConfig.min !== undefined && paramValue < paramConfig.min) {
+					errors.push(`Parameter "${paramName}" must be >= ${paramConfig.min}`);
+				}
+				if (paramConfig.max !== undefined && paramValue > paramConfig.max) {
+					errors.push(`Parameter "${paramName}" must be <= ${paramConfig.max}`);
+				}
+				break;
+			}
+			case "float": {
+				if (typeof paramValue !== "number") {
+					errors.push(`Parameter "${paramName}" must be a number`);
+					break;
+				}
+				if (paramConfig.range) {
+					const [min, max] = paramConfig.range;
+					if (paramValue < min || paramValue > max) {
+						errors.push(
+							`Parameter "${paramName}" must be between ${min} and ${max}`,
+						);
+					}
+				}
+				break;
+			}
+			case "bool": {
+				if (typeof paramValue !== "boolean") {
+					errors.push(`Parameter "${paramName}" must be a boolean`);
+				}
+				break;
+			}
+			case "enum": {
+				if (!paramConfig.values?.includes(String(paramValue))) {
+					errors.push(
+						`Parameter "${paramName}" must be one of: ${paramConfig.values?.join(", ")}`,
+					);
+				}
+				break;
+			}
+		}
+	}
+
+	return { valid: errors.length === 0, errors };
+}
+
+/**
+ * Get default parameters for a model
+ */
+export function getModelDefaults(modelName: string): Record<string, unknown> {
+	const model = getModel(modelName);
+	if (!model) {
+		return {};
+	}
+
+	const defaults: Record<string, unknown> = {};
+	if (model.valid_params) {
+		for (const [paramName, paramConfig] of Object.entries(model.valid_params)) {
+			if (paramConfig.default !== undefined) {
+				defaults[paramName] = paramConfig.default;
+			}
+		}
+	}
+
+	return defaults;
+}
+
+/**
  * Helper to check if a model supports a specific parameter
  */
 export function modelSupportsParam(
 	config: ModelConfig | null | undefined,
-	paramName: string
+	paramName: string,
 ): boolean {
 	if (!config) return false;
 
@@ -251,7 +361,7 @@ export function modelSupportsParam(
  * Helper to get temperature range for a model
  */
 export function getTemperatureRange(
-	config: ModelConfig | null | undefined
+	config: ModelConfig | null | undefined,
 ): [number, number] {
 	if (!config?.supports_temp) return [0, 1];
 
