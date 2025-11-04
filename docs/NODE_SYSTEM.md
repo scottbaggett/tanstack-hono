@@ -39,29 +39,27 @@ The workflow builder uses a comprehensive node system that allows you to compose
 
 ### Input Nodes
 - **Text Input** (`text-input`) - Accept text from user
-  - Outputs: text, length, wordCount
+  - Returns structured data with text, length, and wordCount properties
 
 ### Output Nodes
 - **Text Output** (`text-output`) - Display text as final result
-  - Inputs: text
+  - Processes incoming data and displays output
 
 ### Transform Nodes
 - **String Transform** (`string-transform`) - Transform text (uppercase, lowercase, etc.)
-  - Inputs: text, operation
-  - Outputs: result
+  - Transforms input data and returns result with metadata
 
 - **Delay** (`delay`) - Wait for specified milliseconds
-  - Inputs: milliseconds
-  - Outputs: None (passes through)
+  - Delays execution and passes through data
 
 ## Node Structure
 
 Every node has a standardized structure:
 
 ```typescript
-interface NodeDefinition {
+interface INodeTypeDescription {
   // Unique identifier
-  id: string;
+  name: string;
 
   // Display name in UI
   displayName: string;
@@ -70,14 +68,10 @@ interface NodeDefinition {
   description?: string;
 
   // Category for grouping
-  category: string;
+  group: string[];
 
   // Icon name (lucide-react)
   icon: string;
-
-  // Input/Output handles
-  inputs: NodeInput[];
-  outputs: NodeOutput[];
 
   // Configuration properties
   properties: NodeProperty[];
@@ -86,6 +80,11 @@ interface NodeDefinition {
   mode?: "execute" | "webhook" | "poll";
 }
 ```
+
+**Key Simplification**: Nodes no longer declare input/output field arrays. Instead:
+- Nodes have generic connection points
+- Data flows through `INodeExecutionData[][]` structure
+- Each node's `execute()` method returns this standardized format
 
 ## Using Nodes in the Frontend
 
@@ -152,19 +151,13 @@ function NodeDetails({ nodeId }: { nodeId: string }) {
     <div>
       <h3>{nodeDefinition.displayName}</h3>
       <p>{nodeDefinition.description}</p>
+      <p>Category: {nodeDefinition.group?.join(", ")}</p>
 
-      <h4>Inputs:</h4>
-      {nodeDefinition.inputs.map((input) => (
-        <div key={input.name}>
-          <strong>{input.displayName}</strong> ({input.type})
-          {input.required && <span>*</span>}
-        </div>
-      ))}
-
-      <h4>Outputs:</h4>
-      {nodeDefinition.outputs.map((output) => (
-        <div key={output.name}>
-          <strong>{output.displayName}</strong> ({output.type})
+      <h4>Properties:</h4>
+      {nodeDefinition.properties.map((prop) => (
+        <div key={prop.name}>
+          <strong>{prop.displayName}</strong> ({prop.type})
+          {prop.required && <span>*</span>}
         </div>
       ))}
     </div>
@@ -202,48 +195,78 @@ When a workflow runs:
 
 1. **Topological Sort** - Nodes are ordered by their dependencies
 2. **Sequential Execution** - Nodes execute in dependency order
-3. **Data Flow** - Output from one node feeds into the next
+3. **Data Flow** - Each node returns `INodeExecutionData[][]` which flows to connected nodes
 4. **Error Handling** - If a node fails, execution stops with error message
+
+### Data Structure
+
+```typescript
+interface INodeExecutionData {
+  json: IDataObject;        // Main structured data (any JSON-serializable data)
+  binary?: IBinaryKeyData;  // Optional binary data (images, files, etc.)
+  pairedItem?: number | number[]; // Links to input items
+}
+```
+
+**Important**: All data types flow through this structure:
+- Strings, numbers, objects, arrays go in the `json` property
+- Binary data (buffers, images) go in the `binary` property
+- Nodes return arrays of arrays: `INodeExecutionData[][]`
+  - Outer array: multiple outputs (branches)
+  - Inner array: multiple items per output
 
 ## Creating Custom Nodes
 
-### Backend: Extend BaseNode
+### Backend: Implement INodeType
 
 ```typescript
-import { BaseNode, NodeBuilder } from "@/server/nodes/base";
+import type { INodeType, INodeTypeDescription, ExecutionContext } from "@/types/interfaces";
 
-class CustomNode extends BaseNode {
-  async execute(inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const input = inputs.data as string;
-    // Process input
-    return {
-      result: processedData,
-    };
+export class CustomNode implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: "Custom Node",
+    name: "customNode",
+    group: ["transform"],
+    version: 1,
+    description: "My custom node that processes data",
+    icon: "zap",
+    properties: [
+      {
+        displayName: "Operation",
+        name: "operation",
+        type: "options",
+        options: [
+          { name: "Process", value: "process" },
+          { name: "Transform", value: "transform" }
+        ],
+        default: "process"
+      }
+    ]
+  };
+
+  async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+    const items = context.getInputData();
+    const operation = context.getNodeParameter("operation", 0) as string;
+
+    const returnData: INodeExecutionData[] = [];
+
+    for (const item of items) {
+      // Access input data via $json
+      const inputData = item.json;
+
+      // Process the data
+      const processedData = processData(inputData, operation);
+
+      // Return in INodeExecutionData format
+      returnData.push({
+        json: processedData,
+        // binary: item.binary  // Pass through binary data if needed
+      });
+    }
+
+    return [returnData];
   }
 }
-
-// Register with NodeBuilder
-new NodeBuilder("custom-node")
-  .displayName("Custom Node")
-  .category("custom")
-  .description("My custom node")
-  .icon("zap")
-  .input({
-    name: "data",
-    description: "Input data",
-    type: "string",
-    required: true,
-  })
-  .output({
-    name: "result",
-    description: "Processed result",
-    type: "string",
-  })
-  .execute(async (inputs) => {
-    // Implementation
-    return { result: "..." };
-  })
-  .register(CustomNode);
 ```
 
 ### Frontend: Use in Canvas
@@ -251,8 +274,9 @@ new NodeBuilder("custom-node")
 Once registered on the backend, the node:
 1. Automatically appears in the NodePanel
 2. Can be dragged onto the canvas
-3. Shows proper input/output handles
+3. Shows generic connection points (no pre-defined input/output handles)
 4. Can be connected to other nodes
+5. Data structure is determined at runtime based on execution
 
 ## Node Categories
 
@@ -328,18 +352,25 @@ Returns nodes in a specific category.
 
 ## Data Types
 
-Nodes support multiple data types for inputs/outputs:
+All data flows through the `INodeExecutionData` structure:
 
-- `string` - Text data
-- `number` - Numeric values
-- `boolean` - True/false values
-- `float` - Decimal numbers
-- `json` - JSON objects/arrays
-- `csv` - CSV formatted data
-- `image:png` - PNG images
-- `image:jpg` - JPEG images
-- `pdf` - PDF documents
-- `any` - Accept any type
+### JSON Property (Main Data)
+The `json` property holds all JSON-serializable data:
+- Strings: `{ json: { text: "Hello" } }`
+- Numbers: `{ json: { count: 42, temperature: 98.6 } }`
+- Booleans: `{ json: { isActive: true } }`
+- Objects: `{ json: { user: { name: "Alice", age: 30 } } }`
+- Arrays: `{ json: { items: [1, 2, 3] } }`
+- Mixed structures: `{ json: { name: "Report", data: [...], meta: {...} } }`
+
+### Binary Property (Optional)
+The `binary` property holds non-JSON data:
+- Images (PNG, JPEG, etc.)
+- PDF documents
+- Audio/video files
+- Any Buffer data
+
+**Important**: `$json` is NOT a data type indicator - it's the accessor/selector for the `json` property in expressions. All data types flow through the `json` or `binary` properties.
 
 ## Node Properties
 

@@ -56,9 +56,9 @@ The node system has been significantly enhanced with:
 The visual representation of a node on the canvas. Features:
 
 - **Dynamic Color Palettes**: Uses CSS variables from `@src/styles/node-palettes.css`
-- **Input/Output Handles**: Each input and output is rendered as a connection point
+- **Generic Connection Points**: Nodes show simple connection handles (no pre-defined types)
 - **Selection Highlighting**: Selected nodes show border glow
-- **Responsive Layout**: Adapts to number of inputs/outputs
+- **Responsive Layout**: Adapts to content and execution state
 
 **Data Structure**:
 ```typescript
@@ -69,18 +69,11 @@ interface NodeData {
   description?: string;    // Node description
   icon?: string;          // Lucide icon name
   color?: string;         // Color palette name (e.g., "standard-blue")
-  inputs?: Array<{
-    name: string;
-    displayName: string;
-    type: string;
-  }>;
-  outputs?: Array<{
-    name: string;
-    displayName: string;
-    type: string;
-  }>;
+  // No inputs/outputs arrays - connections are generic
 }
 ```
+
+**Key Change**: Connection handles are no longer based on pre-defined input/output arrays. Instead, nodes connect generically and data structure is validated at runtime.
 
 ### NodePanel.tsx
 
@@ -121,90 +114,124 @@ Main editor component orchestrating all pieces:
 ### 1. Text Input (`text-input`)
 - **Category**: input
 - **Icon**: type
-- **Outputs**:
-  - `text` (string) - The input text
-  - `length` (number) - Text length
-  - `wordCount` (number) - Word count
-- **Properties**: None
+- **Returns**: `INodeExecutionData[][]` with structure:
+  ```typescript
+  [{
+    json: {
+      text: string,      // The input text
+      length: number,    // Text length
+      wordCount: number  // Word count
+    }
+  }]
+  ```
+- **Properties**: Text input field
 
 ### 2. Text Output (`text-output`)
 - **Category**: output
 - **Icon**: send
-- **Inputs**:
-  - `text` (string) - Text to output
+- **Accepts**: Any `INodeExecutionData` from connected nodes
+- **Returns**: Processes and displays the incoming data
 - **Properties**: None
 
 ### 3. String Transform (`string-transform`)
 - **Category**: processing
 - **Icon**: zap
-- **Inputs**:
-  - `text` (string, required) - Text to transform
-  - `operation` (string, required) - Operation to apply
-    - Options: uppercase, lowercase, reverse, trim, capitalize
-- **Outputs**:
-  - `result` (string) - Transformed text
-  - `originalLength` (number) - Original text length
-  - `resultLength` (number) - Result length
+- **Accepts**: Data with text property in `$json`
+- **Returns**: `INodeExecutionData[][]` with structure:
+  ```typescript
+  [{
+    json: {
+      result: string,          // Transformed text
+      originalLength: number,  // Original text length
+      resultLength: number     // Result length
+    }
+  }]
+  ```
+- **Properties**:
+  - `operation`: Options (uppercase, lowercase, reverse, trim, capitalize)
 
 ### 4. Delay (`delay`)
 - **Category**: control
 - **Icon**: clock
-- **Inputs**:
-  - `delayMs` (number, default: 1000) - Delay in milliseconds
-  - `value` (any) - Value to pass through
-- **Outputs**:
-  - `value` (any) - The passed-through value
-  - `delayedAt` (string) - ISO timestamp of completion
+- **Accepts**: Any `INodeExecutionData`
+- **Returns**: Same data after delay with added timestamp
+- **Properties**:
+  - `delayMs`: Number (default: 1000) - Delay in milliseconds
 
 ## Adding New Nodes
 
 ### Backend: Create Node Definition
 
-Use the `NodeBuilder` fluent API in `src/server/nodes/builtin.ts`:
+Implement the `INodeType` interface:
 
 ```typescript
-import { BaseNode, NodeBuilder, nodeRegistry } from "./base";
+import type { INodeType, INodeTypeDescription, ExecutionContext, INodeExecutionData } from "@/types/interfaces";
 
-class CustomNode extends BaseNode {
-  async execute(inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
-    const data = inputs.data as string;
-    return {
-      result: processedData,
-    };
+export class CustomNode implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: "Custom Node",
+    name: "customNode",
+    group: ["transform"],
+    version: 1,
+    description: "My custom node that processes data",
+    icon: "zap",
+    properties: [
+      {
+        displayName: "Processing Mode",
+        name: "mode",
+        type: "options",
+        options: [
+          { name: "Fast", value: "fast" },
+          { name: "Thorough", value: "thorough" }
+        ],
+        default: "fast",
+        description: "How to process the data"
+      }
+    ]
+  };
+
+  async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+    // Get input data
+    const items = context.getInputData();
+    const mode = context.getNodeParameter("mode", 0) as string;
+
+    const returnData: INodeExecutionData[] = [];
+
+    // Process each item
+    for (const item of items) {
+      // Access data via $json property
+      const inputData = item.json;
+
+      // Process the data
+      const processedData = processData(inputData, mode);
+
+      // Return in standard format
+      returnData.push({
+        json: processedData,
+        binary: item.binary  // Pass through binary data if present
+      });
+    }
+
+    // Return as array of arrays
+    return [returnData];
   }
 }
-
-new NodeBuilder("custom-node")
-  .displayName("Custom Node")
-  .category("transform")
-  .description("My custom node")
-  .icon("zap")
-  .input({
-    name: "data",
-    displayName: "Input Data",
-    description: "The input data",
-    type: "string",
-    required: true,
-  })
-  .output({
-    name: "result",
-    displayName: "Result",
-    type: "string",
-  })
-  .execute(async (inputs) => {
-    const data = inputs.data as string;
-    return { result: processData(data) };
-  })
-  .register(CustomNode);
 ```
+
+**Key Points**:
+- No `input()` or `output()` declarations needed
+- Access incoming data via `item.json`
+- Return data in `INodeExecutionData` format
+- Always return `INodeExecutionData[][]` (array of arrays)
 
 ### Frontend: Uses Registry Automatically
 
 Once registered on the backend, nodes:
 1. Appear in the NodePanel automatically
 2. Can be dragged onto the canvas
-3. Show proper inputs/outputs
+3. Show generic connection handles
 4. Can be configured via NodeConfigPanel
+5. Data structure is inspected at runtime using InputExplorer
 
 ## Color Palettes
 
@@ -406,12 +433,19 @@ Nodes use these CSS variables via Tailwind's `var()` function for full consisten
 3. Inspect element to see applied CSS variables
 4. Ensure dark mode class is set on root element
 
+### Data not flowing between nodes
+1. Check that nodes are connected properly
+2. Verify upstream node returns `INodeExecutionData[][]` format
+3. Inspect execution output in browser console
+4. Use InputExplorer to see actual data structure
+5. Ensure downstream node accesses data via `item.json`
+
 ## Next Steps
 
-1. **Validation** - Implement input validation on connections
+1. **Runtime Inspection** - Enhance InputExplorer to show $json structure
 2. **Execution** - Connect to backend workflow execution
-3. **Error Handling** - Display node errors in UI
+3. **Error Handling** - Display node errors in UI with context
 4. **History** - Add undo/redo functionality
 5. **Advanced Nodes** - LLM, API, webhook nodes
-6. **Node Groups** - Collapse multiple nodes into groups
+6. **Expression Support** - Enable `{{ NodeName.$json.field }}` syntax
 7. **Comments** - Add notes to nodes

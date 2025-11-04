@@ -1,349 +1,290 @@
-# Execution Context API: Layered Architecture
+# Execution Context API: Simplified Data Flow
 
 ## Overview
 
-The `IExecuteFunctions` context is designed with three distinct layers, allowing different types of nodes to use only what they need, while maintaining flexibility for future framework integration.
+The execution context provides nodes with access to input data, parameters, and platform capabilities. The system uses a simplified data model where all data flows through the `INodeExecutionData` structure.
 
-## The Three Layers
+## INodeExecutionData Structure
 
-### Layer 1: Core Orchestrator Capabilities
-
-**Interface**: `IExecuteFunctionsCore`
-
-Fundamental workflow platform capabilities - **framework-independent**.
+**Core Concept**: All data in the workflow system flows through this standardized structure:
 
 ```typescript
-// Node Configuration
-getNodeParameter(name: string): unknown
-getNodeParameters(): Record<string, unknown>
-
-// Input/Output
-getInputData(): Record<string, INodeExecutionData[]>
-getInputByHandle(handleName: string): INodeExecutionData[] | undefined
-getInputValue(handleName: string): INodeExecutionData | undefined
-
-setOutputData(outputData: INodeOutputData): void
-setOutput(handleName: string, data: INodeExecutionData[]): void
-
-// Secrets (encrypted access)
-getSecret(secretName: string): Promise<string | undefined>
-
-// Logging
-log(level: "info" | "warn" | "error", message: string): void
-logInfo(message: string): void
-logWarn(message: string): void
-logError(message: string): void
-
-// Events
-emitStreamEvent(type: StreamEventType, data: Record<string, unknown>): void
-emitEvent(event: StreamEvent): void
-
-// Metadata
-getRunId(): string
-getNodeId(): string
-getNodeType(): string
-getNodeVersion(): number
-```
-
-**Stability**: This API is stable and unlikely to change. All nodes rely on these methods.
-
-**Use Cases**:
-- Parameter access
-- Data flow (inputs/outputs)
-- Logging and monitoring
-- Event emission
-
----
-
-### Layer 2: Platform-Provided Execution Primitives
-
-**Interface**: `IExecuteFunctionsPrimitives`
-
-Higher-level capabilities provided by our platform (not by external frameworks).
-
-```typescript
-// HTTP/Network - Make secure API calls
-httpRequest(options: {
-  url: string
-  method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH"
-  headers?: Record<string, string>
-  body?: unknown
-  timeout?: number
-}): Promise<{
-  status: number
-  headers: Record<string, string>
-  data: unknown
-  text: string
-}>
-
-// Code Execution - Run sandboxed code
-executeSandboxedCode(options: {
-  language: "python" | "javascript" | "bash"
-  code: string
-  timeout?: number
-  environment?: Record<string, string>
-  requirements?: string[]  // e.g., ["pandas", "numpy"] for Python
-  input?: Record<string, unknown>
-}): Promise<{
-  success: boolean
-  output: unknown
-  stderr?: string
-  duration: number
-}>
-
-// File System (within allowed paths)
-readFile(path: string): Promise<string | Buffer>
-writeFile(path: string, data: string | Buffer): Promise<void>
-```
-
-**Stability**: These are newer, but designed to be stable. They provide alternatives to framework-specific approaches.
-
-**Use Cases**:
-- Simple data transformers
-- API callers (without LangChain)
-- Python/JavaScript script nodes
-- File processing
-- Any node that doesn't need LangChain
-
-**Example**: A node that calls a REST API without LangChain
-```typescript
-async execute(context: IExecuteFunctionsPrimitives) {
-  const url = context.getNodeParameter("url");
-  const response = await context.httpRequest({
-    url,
-    method: "GET"
-  });
-  context.setOutputData({
-    result: [response.data]
-  });
+interface INodeExecutionData {
+  json: IDataObject;        // Main structured data (any JSON-serializable value)
+  binary?: IBinaryKeyData;  // Optional binary data (images, files, buffers)
+  pairedItem?: number | number[]; // Links output to input items
 }
 ```
 
----
+### The json Property
 
-### Layer 3: AI Framework Integration - LangChain
+The `json` property is the **primary data container** and holds all JSON-serializable data:
+- Strings: `{ json: { text: "Hello" } }`
+- Numbers: `{ json: { count: 42, price: 99.99 } }`
+- Booleans: `{ json: { isActive: true } }`
+- Objects: `{ json: { user: { name: "Alice", age: 30 } } }`
+- Arrays: `{ json: { items: [1, 2, 3] } }`
+- Complex structures: `{ json: { metadata: {...}, results: [...] } }`
 
-**Interface**: `IExecuteFunctionsLangChain`
+**Important**: `$json` in expressions is the **accessor** for this property, NOT a type indicator.
 
-LangChain-specific capabilities for AI-powered nodes.
+### The binary Property (Optional)
 
+The `binary` property holds non-JSON data:
+- Image buffers
+- PDF documents
+- Audio/video files
+- Any binary data
+
+### Return Format
+
+Nodes always return `INodeExecutionData[][]`:
 ```typescript
-// LLM/Chat Models
-getLangchainModel(modelName?: string): BaseLanguageModel
-getLangchainEmbeddings(embeddingsName?: string): Embeddings
-
-// Tools & Agents
-getLangchainTools(): Tool[]
-getLangchainTool(toolName: string): Tool | undefined
-
-// Future: Memory, etc.
-// getConversationMemory(): BaseMemory
-```
-
-**Stability**: Most stable for AI-specific operations. Can be extended with additional frameworks without breaking existing nodes.
-
-**Use Cases**:
-- LLM call nodes
-- Agent nodes
-- RAG/embedding nodes
-- Tool-using nodes
-- Any complex AI workflow
-
-**Example**: An LLM agent node
-```typescript
-async execute(context: IExecuteFunctionsLangChain) {
-  const prompt = context.getNodeParameter("prompt");
-  const model = context.getLangchainModel("gpt-4");
-  const tools = context.getLangchainTools();
-
-  const agent = await AgentExecutor.fromAgentAndTools({
-    agent: createOpenAIToolsAgent(model, tools, prompt),
-    tools
-  });
-
-  const result = await agent.invoke({ input: prompt });
-  context.setOutputData({
-    response: [result]
-  });
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  // Process data
+  return [
+    [
+      { json: { result: "processed" } },
+      { json: { result: "more data" } }
+    ]
+  ];
 }
 ```
 
----
+**Structure Explained**:
+- Outer array: Multiple outputs (for branching workflows)
+- Inner array: Multiple items per output (batch processing)
 
-## Node Usage Patterns
+## Execution Context Methods
 
-### Pattern 1: Simple Data Transformer (Core Only)
+### Accessing Input Data
+
+Nodes receive data from connected upstream nodes:
 
 ```typescript
-// Only needs parameter access and input/output
-async execute(context: IExecuteFunctionsCore) {
-  const input = context.getInputValue("text");
-  const output = String(input).toUpperCase();
-  context.setOutput("text", [output]);
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  // Get all input items
+  const items = context.getInputData();
+
+  // items is INodeExecutionData[]
+  for (const item of items) {
+    // Access the json property
+    const data = item.json;
+
+    // data now contains the actual values
+    console.log(data.text, data.count, data.user);
+
+    // Access binary data if present
+    if (item.binary) {
+      const imageBuffer = item.binary.image;
+    }
+  }
+}
+
+```
+
+### Accessing Node Parameters
+
+Get configuration values from the node's properties:
+
+```typescript
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  // Get a specific parameter
+  const mode = context.getNodeParameter("mode", 0) as string;
+  const temperature = context.getNodeParameter("temperature", 0) as number;
+
+  // Use in processing
+  if (mode === "strict") {
+    // strict processing
+  }
 }
 ```
 
-### Pattern 2: API Caller (Core + Primitives)
+### Returning Data
+
+Always return data in `INodeExecutionData[][]` format:
 
 ```typescript
-// Needs HTTP without LangChain
-async execute(context: IExecuteFunctionsPrimitives) {
-  const endpoint = context.getNodeParameter("endpoint");
-  const response = await context.httpRequest({
-    url: endpoint,
-    method: "POST",
-    body: { data: context.getInputValue("data") }
-  });
-  context.setOutputData({
-    response: [response.data]
-  });
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  const items = context.getInputData();
+  const returnData: INodeExecutionData[] = [];
+
+  for (const item of items) {
+    const processed = processData(item.json);
+
+    // Build return item
+    returnData.push({
+      json: processed,                // Required: main data
+      binary: item.binary,           // Optional: pass through or modify
+      pairedItem: item.pairedItem    // Optional: link to input
+    });
+  }
+
+  // Return as array of arrays
+  return [returnData];
 }
 ```
 
-### Pattern 3: Python Script (Core + Primitives)
+**Key Points**:
+- Always return `INodeExecutionData[][]`
+- Put main data in the `json` property
+- Binary data goes in the `binary` property
+- Outer array is for multiple outputs (usually just one: `[returnData]`)
+- Inner array is for multiple items
+
+## Complete Node Example
+
+Here's a full example showing the simplified data flow:
 
 ```typescript
-// Execute arbitrary Python
-async execute(context: IExecuteFunctionsPrimitives) {
-  const code = context.getNodeParameter("code");
-  const result = await context.executeSandboxedCode({
-    language: "python",
-    code,
-    requirements: ["pandas", "numpy"],
-    input: { data: context.getInputValue("data") }
-  });
-  context.setOutputData({
-    output: [result.output]
-  });
+import type { INodeType, INodeTypeDescription, ExecutionContext, INodeExecutionData } from "@/types/interfaces";
+
+export class TextTransformer implements INodeType {
+  description: INodeTypeDescription = {
+    displayName: "Text Transformer",
+    name: "textTransformer",
+    group: ["transform"],
+    version: 1,
+    description: "Transform text to uppercase or lowercase",
+    properties: [
+      {
+        displayName: "Operation",
+        name: "operation",
+        type: "options",
+        options: [
+          { name: "Uppercase", value: "upper" },
+          { name: "Lowercase", value: "lower" }
+        ],
+        default: "upper"
+      }
+    ]
+  };
+
+  async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+    // 1. Get input data from connected nodes
+    const items = context.getInputData();
+
+    // 2. Get node configuration
+    const operation = context.getNodeParameter("operation", 0) as string;
+
+    // 3. Process each item
+    const returnData: INodeExecutionData[] = [];
+
+    for (const item of items) {
+      // Access the json property
+      const inputText = item.json.text as string;
+
+      // Transform
+      const result = operation === "upper"
+        ? inputText.toUpperCase()
+        : inputText.toLowerCase();
+
+      // Return in INodeExecutionData format
+      returnData.push({
+        json: {
+          text: result,
+          originalLength: inputText.length,
+          operation: operation
+        },
+        // Pass through binary data if any
+        binary: item.binary
+      });
+    }
+
+    // 4. Return as array of arrays
+    return [returnData];
+  }
 }
 ```
 
-### Pattern 4: LLM Agent (All Layers)
+**What Happens**:
+1. Node receives `INodeExecutionData[]` from `getInputData()`
+2. Accesses data via `item.json.text`
+3. Processes the data
+4. Returns new `INodeExecutionData[][]` with result in `json` property
+5. Downstream nodes access this via `{{ TextTransformer.$json.text }}`
 
+## Data Flow in Practice
+
+### Example Workflow: Text Input → Transform → Output
+
+**1. Text Input Node** executes first:
 ```typescript
-// Full power of LangChain
-async execute(context: IExecuteFunctionsLangChain) {
-  const prompt = context.getNodeParameter("prompt");
-  const model = context.getLangchainModel("gpt-4");
-  const tools = context.getLangchainTools();
+return [[{
+  json: {
+    text: "hello world",
+    length: 11,
+    wordCount: 2
+  }
+}]];
+```
 
-  const agent = await AgentExecutor.fromAgentAndTools({
-    agent: createOpenAIToolsAgent(model, tools, prompt),
-    tools
-  });
+**2. Transform Node** receives this data:
+```typescript
+const items = context.getInputData();
+// items[0].json = { text: "hello world", length: 11, wordCount: 2 }
 
-  const result = await agent.invoke({ input: prompt });
-  context.setOutputData({
-    response: [result]
-  });
+const text = items[0].json.text as string;
+const result = text.toUpperCase();
+
+return [[{
+  json: {
+    text: "HELLO WORLD",
+    originalLength: 11
+  }
+}]];
+```
+
+**3. Output Node** receives transformed data:
+```typescript
+const items = context.getInputData();
+// items[0].json = { text: "HELLO WORLD", originalLength: 11 }
+
+// Display the result
+console.log(items[0].json.text); // "HELLO WORLD"
+```
+
+**4. Expressions can reference any upstream node**:
+```
+{{ TextInput.$json.text }}        // "hello world"
+{{ Transform.$json.text }}        // "HELLO WORLD"
+{{ Transform.$json.originalLength }}  // 11
+```
+
+## Runtime Data Inspection
+
+The **InputExplorer** tool shows the actual `INodeExecutionData` structure:
+
+1. Run a workflow
+2. Click on any node
+3. View the execution output showing the `json` and `binary` properties
+4. Use this to build correct expressions
+
+Example InputExplorer output:
+```json
+{
+  "json": {
+    "text": "HELLO WORLD",
+    "originalLength": 11,
+    "operation": "upper"
+  },
+  "binary": null
 }
 ```
 
----
+You can then access: `{{ NodeName.$json.text }}`, `{{ NodeName.$json.originalLength }}`, etc.
 
-## Design Benefits
+## Key Takeaways
 
-### 1. Flexibility
-
-Nodes only depend on what they need:
-- Simple nodes don't pay the cost of LangChain
-- New frameworks can be added without breaking existing nodes
-- Clear separation of concerns
-
-### 2. Future-Proofing
-
-Adding support for new frameworks is non-breaking:
-
-```typescript
-// Could add this layer in the future
-export interface IExecuteFunctionsDSPy extends IExecuteFunctionsPrimitives {
-  getDSPyModel(name?: string): DSPyModel
-  // ...
-}
-
-// Existing nodes still work unchanged
-```
-
-### 3. Stability
-
-Core layer is very unlikely to change. New capabilities go into higher layers.
-
-### 4. Clarity
-
-Each layer has a clear purpose and responsibility.
-
----
-
-## Implementation Notes
-
-### ExecuteFunctions Class
-
-The `ExecuteFunctions` implementation provides all three layers:
-
-```typescript
-export class ExecuteFunctions implements IExecuteFunctions {
-  // Implements Core + Primitives + LangChain
-  // Subclasses or interfaces could restrict to specific layers
-}
-```
-
-### Type Safety
-
-Nodes can declare which layers they need:
-
-```typescript
-// Only needs core
-async execute(context: IExecuteFunctionsCore) { }
-
-// Needs primitives
-async execute(context: IExecuteFunctionsPrimitives) { }
-
-// Full context
-async execute(context: IExecuteFunctions) { }
-```
-
----
-
-## Future Extensions
-
-### Example: Adding a New Framework
-
-```typescript
-// LAYER 3B: AI FRAMEWORK INTEGRATION - DSPY (hypothetical future)
-export interface IExecuteFunctionsDSPy extends IExecuteFunctionsPrimitives {
-  getDSPyModel(name?: string): DSPyModel
-  getDSPyProgram(name?: string): DSPyProgram
-}
-
-// Extend main interface
-export interface IExecuteFunctions
-  extends IExecuteFunctionsLangChain, IExecuteFunctionsDSPy {
-}
-
-// Existing LangChain nodes: no changes needed
-// New DSPy nodes: use getDSPyModel()
-```
-
-### Example: Adding Primitives
-
-```typescript
-// Add database query capability
-export interface IExecuteFunctionsPrimitives {
-  // ... existing ...
-
-  // New
-  queryDatabase(options: {
-    query: string
-    params?: unknown[]
-  }): Promise<unknown[]>
-}
-```
-
----
+1. **Single Data Structure**: All data flows through `INodeExecutionData`
+2. **json Property**: Holds all JSON-serializable data (strings, numbers, objects, arrays)
+3. **binary Property**: Optional, holds non-JSON data (buffers, images)
+4. **No Type Validation**: Connections are generic; validation happens at runtime
+5. **$json Accessor**: Used in expressions to access the json property
+6. **Graceful Handling**: Missing fields return undefined rather than throwing errors
 
 ## See Also
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - Overall system design
-- [DYNAMIC_IO.md](./DYNAMIC_IO.md) - Variable template system
-- `src/types/execution.ts` - Full type definitions
-- `src/server/execution/ExecuteFunctions.ts` - Implementation
+- [Node System](./NODE_SYSTEM.md) - Node architecture overview
+- [Expressions](./EXPRESSIONS.md) - Using $json in expressions
+- [Data Types](./DATATYPES.md) - Understanding json vs binary properties

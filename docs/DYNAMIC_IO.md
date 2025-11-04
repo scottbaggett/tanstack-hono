@@ -1,181 +1,291 @@
-# Dynamic Inputs and Outputs
+# Data Flow and Expressions
 
 ## Overview
 
-Nodes automatically expose connectible inputs/outputs based on configuration templates and output structure.
+The workflow system uses a simplified data flow model where nodes connect generically and data is accessed at runtime through expressions.
 
-**Key Pattern**: Use `{{variable}}` in node config → automatic input discovery and resolution.
+**Key Concepts**:
+- No pre-defined input/output field arrays
+- All data flows through `INodeExecutionData` structure
+- Expressions use `{{ NodeName.$json.property }}` syntax
+- Runtime inspection reveals actual data structure
 
-## {{variable}} Syntax
+## Connection Model
 
-### Basic Usage
-
+### Old Model (Complex)
 ```typescript
-// Node configuration
-{
-  prompt: "User: {{userName}}, Age: {{userAge}}"
-}
-
-// Automatically exposes inputs: ["userName", "userAge"]
-```
-
-### Execution
-
-1. **Extract**: Find all `{{variable}}` in config → `["userName", "userAge"]`
-2. **Connect**: Upstream nodes connect outputs to these dynamic inputs
-3. **Resolve**: At execution time, replace `{{variable}}` with actual values
-4. **Execute**: Node receives resolved prompt
-
-### Example
-
-```
-TextInput ("Alice") → DynamicAgent (prompt: "Hello {{name}}")
-                      Output: "Hello Alice"
-```
-
-## Implementation
-
-### In Node Configuration
-
-```typescript
-properties: [
-  {
-    displayName: "Prompt",
-    name: "prompt",
-    type: "string",
-    default: "User: {{name}}, Email: {{email}}"
-  }
+// Nodes declared specific inputs/outputs
+inputs: [
+  { name: "text", type: "string", displayName: "Text" },
+  { name: "count", type: "number", displayName: "Count" }
+]
+outputs: [
+  { name: "result", type: "string", displayName: "Result" }
 ]
 ```
 
-No need to define inputs separately. They're auto-discovered.
+Problems:
+- Required pre-declaring all fields
+- Type contracts at connection time
+- Limited flexibility
+- Complex validation
 
-### In Node Execution
-
+### New Model (Simplified)
 ```typescript
-async execute(context: IExecuteFunctions) {
-  const promptTemplate = context.getNodeParameter("prompt");
-  const inputs = context.getInputData();
+// No input/output declarations
+// Nodes just implement execute()
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  const items = context.getInputData();
 
-  // inputs.name and inputs.email are automatically available
-  // from connected upstream nodes
+  // Access whatever properties exist
+  const text = items[0].json.text;
+  const count = items[0].json.count;
 
-  const resolvedPrompt = promptTemplate
-    .replace("{{name}}", inputs.name?.[0])
-    .replace("{{email}}", inputs.email?.[0]);
+  // Return any structure
+  return [[{
+    json: { result: processData(text, count) }
+  }]];
 }
 ```
 
-### Dynamic Input Discovery
+Benefits:
+- No field declarations needed
+- Generic connections
+- Flexible data structures
+- Runtime validation
+
+## Data Structure
+
+All data flows through `INodeExecutionData`:
 
 ```typescript
-const dynamicInputs = context.getDynamicInputHandles();
-// Returns: ["name", "email"]
-// These become connectible in the UI
+interface INodeExecutionData {
+  json: IDataObject;        // Main data (any JSON-serializable value)
+  binary?: IBinaryKeyData;  // Optional binary data
+}
 ```
 
-## Dynamic Outputs
+### Example Data Flow
 
-### JSON Properties as Outputs
-
-When a node outputs structured JSON, each property becomes a connectible output:
-
+**Node 1** returns:
 ```typescript
-// Node outputs
+[[{
+  json: {
+    text: "Hello World",
+    count: 42,
+    metadata: { source: "input" }
+  }
+}]]
+```
+
+**Node 2** receives and accesses:
+```typescript
+const items = context.getInputData();
+const text = items[0].json.text;          // "Hello World"
+const count = items[0].json.count;         // 42
+const source = items[0].json.metadata.source; // "input"
+```
+
+**Node 3** can reference via expressions:
+```
+{{ Node1.$json.text }}                    // "Hello World"
+{{ Node1.$json.count }}                   // 42
+{{ Node1.$json.metadata.source }}         // "input"
+```
+
+## Expression Syntax
+
+### Basic Pattern
+
+```
+{{ NodeName.$json.propertyPath }}
+```
+
+**Components**:
+- `NodeName`: Name or ID of an upstream node
+- `$json`: Accessor for the json property
+- `propertyPath`: Dot notation path to the desired value
+
+### Examples
+
+```
+// Simple property access
+{{ TextInput.$json.message }}
+
+// Nested property access
+{{ APICall.$json.data.user.email }}
+
+// Array access
+{{ DataFetcher.$json.items[0].title }}
+
+// Multiple expressions in one string
+"User {{ UserNode.$json.name }} has {{ UserNode.$json.itemCount }} items"
+```
+
+## Runtime Data Discovery
+
+### Using InputExplorer
+
+The InputExplorer tool shows you the actual data structure after execution:
+
+**1. Run the workflow**
+```
+TextInput node executes and produces:
 {
-  name: "Alice",
-  age: 30,
-  email: "alice@example.com"
-}
-
-// Automatically exposes outputs: ["name", "age", "email"]
-```
-
-### Usage
-
-```
-LLMNode (outputs structured JSON)
-  ├→ output.name
-  ├→ output.age
-  └→ output.email
-       ↓
-  Downstream nodes connect to individual properties
-```
-
-## API Reference
-
-### InputResolver Module
-
-```typescript
-import {
-  extractVariables,              // ["var1", "var2"]
-  resolveVariablesInString,      // "{{var1}}" → "value1"
-  extractDynamicInputHandles,    // ["var1", "var2"]
-  extractDynamicOutputHandles,   // ["key1", "key2"]
-  validateInputs                 // Check all required inputs satisfied
-} from '../server/execution/InputResolver';
-```
-
-### IExecuteFunctions
-
-```typescript
-// Get dynamic inputs inferred from node config
-const inputs = context.getDynamicInputHandles();
-```
-
-## Validation
-
-### Check Required Inputs
-
-```typescript
-const validation = validateInputs(
-  nodeInputs,
-  nodeId,
-  edges,
-  state,
-  ["userName", "userAge"]  // Required
-);
-
-if (!validation.valid) {
-  throw new Error(validation.errors.join("\n"));
+  "json": {
+    "text": "Sample input",
+    "length": 12,
+    "wordCount": 2
+  }
 }
 ```
 
-## Best Practices
+**2. View in InputExplorer**
+Click on the node to see its output structure
 
-1. **Naming**: Use descriptive variable names: `{{userName}}` not `{{u}}`
-2. **Documentation**: Document expected variables in node description
-3. **Validation**: Validate required variables are connected
-4. **Error Handling**: Handle unresolved variables gracefully
+**3. Build expressions**
+Now you know the exact property paths:
+- `{{ TextInput.$json.text }}` → "Sample input"
+- `{{ TextInput.$json.length }}` → 12
+- `{{ TextInput.$json.wordCount }}` → 2
 
-## Examples
+### No Guessing Required
 
-### Template Processing
+Unlike the old system where you had to know field names in advance:
+- Execute the workflow first
+- Inspect actual output
+- Use revealed property paths
+- No type errors at connection time
 
-```
-"Generate blog post about {{topic}} for {{audience}}"
-```
+## Handling Dynamic Structures
 
-### Parameterized LLM
+Nodes can return any structure they want:
 
-```
-{
-  prompt: "Analyze: {{data}}",
-  model: "{{selectedModel}}",
-  temperature: {{userTemperature}}
+### Example: Flexible API Response
+
+```typescript
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  const response = await fetch(url);
+  const data = await response.json();
+
+  // Return whatever structure the API provides
+  return [[{
+    json: data  // Could be any shape!
+  }]];
 }
 ```
 
-### Multi-field JSON
+Downstream nodes access with expressions:
+```
+{{ APINode.$json.users[0].name }}
+{{ APINode.$json.pagination.total }}
+{{ APINode.$json.status }}
+```
 
+### Example: Conditional Structures
+
+```typescript
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  const mode = context.getNodeParameter("mode", 0) as string;
+
+  if (mode === "simple") {
+    return [[{ json: { result: "simple data" } }]];
+  } else {
+    return [[{
+      json: {
+        result: "complex data",
+        metadata: {...},
+        details: [...]
+      }
+    }]];
+  }
+}
 ```
-LLM outputs: { name, role, department }
-Each becomes connectible output handle
+
+Both structures are valid - downstream nodes handle gracefully.
+
+## Benefits of This Approach
+
+### 1. Simplicity
+- No input/output field arrays to maintain
+- No type declarations needed
+- Just return data and access it
+
+### 2. Flexibility
+- Nodes can return any structure
+- Structure can vary based on parameters or data
+- No rigid contracts
+
+### 3. Discoverability
+- InputExplorer shows actual data
+- Build expressions from real structures
+- See exactly what's available
+
+### 4. Graceful Degradation
+- Missing fields return undefined
+- No connection-time errors
+- Runtime validation only
+
+### 5. Simpler Mental Model
+- Connect nodes
+- Run workflow
+- Inspect data
+- Use expressions
+
+## Comparison
+
+### Old System (n8n-like with types)
 ```
+1. Declare inputs: [{ name, type }]
+2. Declare outputs: [{ name, type }]
+3. Validate connections based on types
+4. Complex type resolution
+5. Rigid structure
+```
+
+### New System (n8n simplified)
+```
+1. Implement execute()
+2. Return INodeExecutionData[][]
+3. Connect nodes freely
+4. Inspect data at runtime
+5. Access via expressions
+```
+
+## Migrating from Old System
+
+If you have old node definitions:
+
+**Old**:
+```typescript
+inputs: [
+  { name: "data", type: "string" }
+]
+outputs: [
+  { name: "result", type: "string" }
+]
+```
+
+**New**:
+```typescript
+// No declarations needed!
+async execute(context: ExecutionContext): Promise<INodeExecutionData[][]> {
+  const items = context.getInputData();
+  const data = items[0].json.data; // Access directly
+
+  return [[{
+    json: { result: processData(data) }
+  }]];
+}
+```
+
+**Expressions**:
+- Old: `{{ $input.data }}`
+- New: `{{ UpstreamNode.$json.data }}`
 
 ## See Also
 
-- [Architecture](./ARCHITECTURE.md) - Overall system design
-- [Data Types](./DATATYPES.md) - Rich data type support
-- `src/server/execution/InputResolver.ts` - Implementation
-- `src/server/nodes/examples/DynamicAgentNode.ts` - Example node
+- [Expressions](./EXPRESSIONS.md) - Full expression syntax guide
+- [Node System](./NODE_SYSTEM.md) - Node architecture
+- [Execution Context](./EXECUTION_CONTEXT.md) - INodeExecutionData details
+- [Data Types](./DATATYPES.md) - Understanding json vs binary properties
