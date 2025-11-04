@@ -20,6 +20,7 @@ import {
 } from '@/server/agents/graph';
 import { generateToolCallId } from '@/server/utils/ids';
 import { createEventEmitter } from '@/server/observability/events';
+import { getChatModel, getTools, getOptionalMemory } from '@/server/utils/langchain';
 
 /**
  * Main agent execution function
@@ -43,30 +44,20 @@ export async function executeAgent(
 	const temperature = (evaluatedProperties.temperature as number) || 0.7;
 	const enableStreaming = evaluatedProperties.enableStreaming === false; // P0: No streaming yet
 
-	// Get connected inputs
-	const languageModel = inputs.languageModel;
-	const tools = inputs.tools || [];
-	const memory = inputs.memory;
+	// Get connected inputs (unused for now, kept for reference)
+	// const languageModel = inputs.languageModel;
+	// const tools = inputs.tools || [];
+	// const connectedMemory = inputs.memory;
 
 	// Check for cancellation
 	if (signal?.aborted) {
 		throw new Error('Agent execution cancelled');
 	}
 
-	// P0: Mock model and tools (replace with actual LangChain integration)
-	// TODO: Implement getChatModel() to extract from languageModel connection
-	// TODO: Implement getTools() to extract from tools connections
-	const mockModel: any = {
-		invoke: async (messages: any[]) => {
-			// Simulate LLM response
-			return {
-				content: 'The answer to 2+2 is 4.',
-				additional_kwargs: {},
-			};
-		},
-	};
-
-	const mockTools: any[] = [];
+	// Get real LangChain components from connections
+	const model = await getChatModel(context);
+	const langchainTools = await getTools(context);
+	const memory = await getOptionalMemory(context);
 
 	// Build agent options
 	const options: AgentOptions = {
@@ -84,10 +75,10 @@ export async function executeAgent(
 		const executionId = `exec_${Date.now().toString(36)}_${crypto.randomUUID().split('-')[0]}`;
 		const iterationCount = response?.metadata?.iterationCount ?? 0;
 
-		// Build LangGraph
+		// Build LangGraph with real components
 		const graph = createAgentGraph({
-			model: mockModel,
-			tools: mockTools,
+			model,
+			tools: langchainTools as any[], // LangChain tools
 			...options,
 		});
 

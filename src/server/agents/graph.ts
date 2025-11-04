@@ -9,9 +9,9 @@ import { StateGraph, END } from '@langchain/langgraph';
 import type { BaseMessage } from '@langchain/core/messages';
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { Tool } from '@langchain/core/tools';
 import type {
 	AgentGraphState,
-	AgentTool,
 	ToolCallRequest,
 	EngineActionResult,
 	AgentOptions,
@@ -73,7 +73,7 @@ const stateChannels = {
 async function planNode(
 	state: AgentGraphState,
 	model: BaseChatModel,
-	tools: AgentTool[],
+	tools: Tool[],
 ): Promise<Partial<AgentGraphState>> {
 	console.log(`[PLAN] Iteration ${state.iteration + 1}`);
 
@@ -258,7 +258,7 @@ function detectNoProgress(state: AgentGraphState): boolean {
 
 export interface CreateAgentGraphOptions extends AgentOptions {
 	model: BaseChatModel;
-	tools: AgentTool[];
+	tools: Tool[];
 	systemMessage?: string;
 }
 
