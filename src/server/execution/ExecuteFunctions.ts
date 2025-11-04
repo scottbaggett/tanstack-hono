@@ -20,6 +20,8 @@ import type {
 	StreamEventType,
 	StreamEvent,
 } from "../../types/execution";
+import type { INodeCredentialsDetails } from "@/types/credentials";
+import { credentialService } from "../services/credentials";
 import { extractDynamicInputHandles } from "./InputResolver";
 
 /**
@@ -41,6 +43,7 @@ export class ExecuteFunctions implements IExecuteFunctions {
 		private runId: string,
 		private nodeParameters: Record<string, unknown>,
 		private inputData: Record<string, INodeExecutionData[]>,
+		private nodeCredentials: Record<string, INodeCredentialsDetails>,
 		private state: Record<string, unknown>,
 		private langchainModels: Map<string, BaseLanguageModel>,
 		private langchainEmbeddings: Map<string, Embeddings>,
@@ -57,6 +60,31 @@ export class ExecuteFunctions implements IExecuteFunctions {
 
 	getNodeParameters(): Record<string, unknown> {
 		return { ...this.nodeParameters };
+	}
+
+	// === Credentials ===
+
+	async getCredentials(type: string): Promise<Record<string, any>> {
+		const credentialDetails = this.nodeCredentials[type];
+
+		if (!credentialDetails) {
+			throw new Error(
+				`Node "${this.nodeId}" does not have credentials of type "${type}" configured`
+			);
+		}
+
+		const credentialData = await credentialService.getCredentialData(
+			type,
+			credentialDetails.id
+		);
+
+		if (!credentialData) {
+			throw new Error(
+				`Credential "${credentialDetails.name}" (${credentialDetails.id}) not found or inaccessible`
+			);
+		}
+
+		return credentialData;
 	}
 
 	// === Input Data ===

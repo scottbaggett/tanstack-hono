@@ -21,7 +21,7 @@ const baseDescription: INodeTypeBaseDescription = {
 	displayName: 'AI Agent',
 	name: 'agent',
 	icon: 'bot',
-	iconColor: '#404040',
+	iconColor: 'standard-gray',
 	category: 'AI',
 	description: 'Generates an action plan and executes it. Can use external tools.',
 	codex: {
@@ -44,27 +44,15 @@ export class Agent implements INodeType {
 	description: INodeTypeDescription;
 
 	constructor() {
-		// Compute inputs dynamically
-		const computeInputs = (context: any): NodePort[] => {
-			return getAgentInputs(context);
-		};
-
 		this.description = {
 			...baseDescription,
 			version: 1,
 			defaults: {
 				name: 'AI Agent',
-				color: '#404040',
+				color: 'standard-purple',
 			},
-			inputs: computeInputs as any,
-			outputs: [
-				{
-					id: 'main',
-					displayName: 'Output',
-					type: 'main',
-					description: 'Agent output/result',
-				},
-			],
+			maxInputs: 1,   // One input connection
+			maxOutputs: 1,  // One output connection
 			properties: agentProperties,
 			hints: [
 				{

@@ -13,12 +13,22 @@ import type { ParsedExpr } from '@bufbuild/cel-spec/cel/expr/syntax_pb.js';
 // ============================================================================
 
 export interface ExpressionContext {
-	// Input values from connected nodes
-	$input?: Record<string, any>;
-	// Current node's property values
-	$parameter?: Record<string, any>;
+	// Output data from connected input node (single input)
+	json?: Record<string, any>;
+	// Binary data from connected input node
+	binary?: Record<string, any>;
+	// Input context (params from connected node, multiple inputs)
+	input?: {
+		params?: Record<string, any>;
+	};
+	// Multiple inputs (when node has more than one connection)
+	inputs?: Record<string, {
+		json?: Record<string, any>;
+		binary?: Record<string, any>;
+		params?: Record<string, any>;
+	}>;
 	// Current node metadata
-	$node?: {
+	node?: {
 		id: string;
 		type: string;
 		version: number;
@@ -67,6 +77,51 @@ function getCachedExpression(expression: string): CachedExpression {
 // ============================================================================
 
 /**
+ * Convert custom syntax to CEL-compatible bracket notation
+ *
+ * Patterns converted:
+ * - json.field -> json["field"]
+ * - json.field.nested -> json["field"]["nested"]
+ * - binary.key -> binary["key"]
+ * - input.params.field -> input["params"]["field"]
+ * - node.id -> node["id"]
+ * - inputs.nodeId.json.field -> inputs["nodeId"]["json"]["field"]
+ */
+function convertCustomSyntaxToCEL(expression: string): string {
+	// Convert inputs.nodeId.json.field to inputs["nodeId"]["json"]["field"]
+	expression = expression.replace(/\binputs((?:\.\w+)+)/g, (_match, properties) => {
+		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
+		return `inputs${bracketProps}`;
+	});
+
+	// Convert json.field.nested to json["field"]["nested"]
+	expression = expression.replace(/\bjson((?:\.\w+)+)/g, (_match, properties) => {
+		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
+		return `json${bracketProps}`;
+	});
+
+	// Convert binary.field to binary["field"]
+	expression = expression.replace(/\bbinary((?:\.\w+)+)/g, (_match, properties) => {
+		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
+		return `binary${bracketProps}`;
+	});
+
+	// Convert input.params.field to input["params"]["field"]
+	expression = expression.replace(/\binput((?:\.\w+)+)/g, (_match, properties) => {
+		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
+		return `input${bracketProps}`;
+	});
+
+	// Convert node.id to node["id"]
+	expression = expression.replace(/\bnode((?:\.\w+)+)/g, (_match, properties) => {
+		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
+		return `node${bracketProps}`;
+	});
+
+	return expression;
+}
+
+/**
  * Evaluate a CEL expression with the given context
  */
 export function evaluateExpression(
@@ -74,7 +129,9 @@ export function evaluateExpression(
 	context: ExpressionContext,
 ): EvaluationResult {
 	try {
-		const { evaluator } = getCachedExpression(expression);
+		// Convert custom syntax to CEL before evaluating
+		const celExpression = convertCustomSyntaxToCEL(expression);
+		const { evaluator } = getCachedExpression(celExpression);
 		const result = evaluator(context);
 
 		// CEL returns a CelResult which is either the value or a CelError

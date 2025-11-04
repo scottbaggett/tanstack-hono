@@ -101,6 +101,17 @@ export interface IExecuteFunctionsCore {
 	 */
 	getNodeParameters(): Record<string, unknown>;
 
+	// === Credentials ===
+
+	/**
+	 * Get credentials for a specific type
+	 * Credentials are configured per-node and stored encrypted
+	 *
+	 * @param type - Credential type (e.g., "httpBasicAuth", "apiKey")
+	 * @returns The decrypted credential data
+	 */
+	getCredentials(type: string): Promise<Record<string, any>>;
+
 	// === Input Data ===
 
 	/**

@@ -15,7 +15,12 @@ import { logger } from "hono/logger";
 
 import { authRoutes } from "./routes/auth";
 import { workflowRoutes } from "./routes/workflows";
+import { nodesRoutes } from "./routes/nodes";
+import { executeRoutes } from "./routes/execute";
+import { webhookRoutes } from "./routes/webhooks";
 import { authMiddleware } from "./auth/middleware";
+// Load nodes to ensure they are registered
+import "./nodes/load";
 
 // ============================================================================
 // SERVER SETUP
@@ -27,9 +32,33 @@ const app = new Hono();
 app.use(logger());
 app.use(
 	cors({
-		origin: "*",
-		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+		origin: (origin) => {
+			// Allow requests with no origin (e.g., Postman, curl)
+			if (!origin) return true;
+
+			// Allow ngrok URL
+			if (origin === "https://c9492d523d3d.ngrok.app") return true;
+
+			// Allow localhost on any port
+			const url = new URL(origin);
+			if (
+				url.hostname === "localhost" ||
+				url.hostname === "127.0.0.1" ||
+				url.hostname === "0.0.0.0"
+			) {
+				return true;
+			}
+
+			// In development, allow all origins
+			if (process.env.NODE_ENV === "development") {
+				return true;
+			}
+
+			return false;
+		},
+		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 		allowHeaders: ["Content-Type", "Authorization"],
+		credentials: true,
 	})
 );
 
@@ -39,6 +68,55 @@ app.use(
 
 // Auth routes (public)
 app.route("/api/auth", authRoutes);
+
+// Public API routes
+app.route("/api/nodes", nodesRoutes);
+app.route("/api/execute", executeRoutes);
+
+// Webhook routes (public - receives external requests)
+app.route("/api", webhookRoutes);
+
+// Test workflow route (public - for testing with n8n)
+app.get("/api/test-workflow", (c) => {
+	const nodeCount = Number(c.req.query("nodes")) || 3;
+	const status = c.req.query("status") || "idle";
+	const includeData = c.req.query("includeData") === "true";
+
+	const nodes = Array.from({ length: nodeCount }, (_, i) => ({
+		id: `node-${i + 1}`,
+		type: ["trigger", "action", "transform"][i % 3],
+		position: { x: i * 200, y: 100 },
+		data: includeData
+			? {
+					label: `Test Node ${i + 1}`,
+					config: { enabled: true },
+				}
+			: undefined,
+	}));
+
+	const connections = Array.from({ length: Math.max(0, nodeCount - 1) }, (_, i) => ({
+		source: `node-${i + 1}`,
+		target: `node-${i + 2}`,
+		sourceHandle: "output",
+		targetHandle: "input",
+	}));
+
+	return c.json({
+		success: true,
+		workflow: {
+			id: "test-workflow-1",
+			name: "Test Workflow",
+			status,
+			nodes,
+			connections,
+			metadata: {
+				createdAt: new Date().toISOString(),
+				nodeCount,
+				version: "1.0.0",
+			},
+		},
+	});
+});
 
 // Protected routes
 app.use("/api/workflows/*", authMiddleware);

@@ -15,6 +15,7 @@ export const Route = createFileRoute("/login")({
 	component: LoginPage,
 });
 
+// TODO: Replace the API calls with the new API client
 function LoginPage() {
 	const navigate = useNavigate();
 	const [isLogin, setIsLogin] = useState(true);
@@ -49,7 +50,7 @@ function LoginPage() {
 						password: formData.password,
 						username: formData.username,
 						fullName: formData.fullName,
-					};
+				  };
 
 			const response = await fetch(endpoint, {
 				method: "POST",
@@ -84,8 +85,8 @@ function LoginPage() {
 					<CardTitle>{isLogin ? "Sign In" : "Create Account"}</CardTitle>
 					<CardDescription>
 						{isLogin
-							? "Start building your workflows"
-							: "Create a new account to get started"}
+							? "Start building your network"
+							: "Create a new account to start building your network"}
 					</CardDescription>
 				</CardHeader>
 				<CardContent>
@@ -146,7 +147,7 @@ function LoginPage() {
 							/>
 						</div>
 
-						<Button type="submit" className="w-full" disabled={loading} >
+						<Button type="submit" className="w-full" disabled={loading}>
 							{loading ? "Loading..." : isLogin ? "Sign In" : "Create Account"}
 						</Button>
 					</form>

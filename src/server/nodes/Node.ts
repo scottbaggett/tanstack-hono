@@ -46,26 +46,12 @@ export interface INodeTypeDescription {
 		}>;
 	};
 
-	// === Input/Output Handles ===
-	// Inputs: data types that this node accepts
-	inputs?: Array<{
-		displayName: string;
-		name: string;
-		// Data type: "string", "number", "float", "csv", "pdb", "image:png", etc
-		// Can also be "any" to accept any type
-		type: DataTypeId | "any";
-		required?: boolean;
-		description?: string;
-	}>;
-
-	// Outputs: data types that this node produces
-	outputs?: Array<{
-		displayName: string;
-		name: string;
-		// Data type this output handle produces
-		type: DataTypeId | "any";
-		description?: string;
-	}>;
+	// === Connection Points ===
+	// Optional: specify number of input/output connection points for UI
+	// Most nodes have 1 input and 1 output (default)
+	// Start nodes might have 0 inputs, decision nodes might have multiple outputs
+	maxInputs?: number;  // Default: 1
+	maxOutputs?: number; // Default: 1
 
 	// === Properties/Parameters ===
 	properties?: Array<{

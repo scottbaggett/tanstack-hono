@@ -31,7 +31,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 	const filteredNodes = allNodes.filter(
 		(node) =>
 			node.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			node.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+			node.description?.toLowerCase().includes(searchQuery.toLowerCase())
 	);
 
 	// Rebuild categories with filtered nodes
@@ -40,14 +40,14 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 			const filtered = nodes.filter(
 				(node) =>
 					node.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-					node.description?.toLowerCase().includes(searchQuery.toLowerCase()),
+					node.description?.toLowerCase().includes(searchQuery.toLowerCase())
 			);
 			if (filtered.length > 0) {
 				acc[category] = filtered;
 			}
 			return acc;
 		},
-		{} as Record<string, typeof allNodes>,
+		{} as Record<string, typeof allNodes>
 	);
 
 	const toggleCategory = (category: string) => {
@@ -66,6 +66,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 	}
 
 	const categoryOrder = [
+		"AI",
 		"input",
 		"output",
 		"transform",
@@ -75,15 +76,23 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 		"other",
 	];
 
+	// Include all categories that have nodes, ordered by categoryOrder
 	const sortedCategories = categoryOrder.filter(
-		(cat) => filteredCategories[cat],
+		(cat) => filteredCategories[cat]
 	);
 
+	// Add any remaining categories not in the order list
+	Object.keys(filteredCategories).forEach((cat) => {
+		if (!sortedCategories.includes(cat)) {
+			sortedCategories.push(cat);
+		}
+	});
+
 	return (
-		<div className="w-64 bg-editor-panel border-r overflow-y-auto h-full flex flex-col">
+		<div className="w-100 bg-editor-panel border-r overflow-y-auto h-full flex flex-col">
 			{/* Header */}
-			<div className="p-4 border-b border-gray-800">
-				<h2 className="text-lg font-semibold text-white mb-4">Nodes</h2>
+			<div className="p-4 border-b">
+				<h2 className="text-lg font-semiboldmb-4">Nodes</h2>
 				<Input
 					type="text"
 					placeholder="Search nodes..."
@@ -95,7 +104,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 			{/* Node Categories */}
 			<div className="flex-1 overflow-y-auto p-2">
 				{sortedCategories.length === 0 ? (
-					<div className="text-center text-gray-400 py-8">
+					<div className="text-center text-muted-foreground py-8">
 						<p>No nodes found</p>
 						<p className="text-sm">Try adjusting your search</p>
 					</div>
@@ -111,7 +120,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 								<Button
 									variant="ghost"
 									size="sm"
-									className="w-full justify-between text-gray-300 hover:bg-gray-800"
+									className="w-full justify-between text-muted-foreground hover:bg-muted"
 								>
 									<span className="capitalize font-medium">{category}</span>
 									<LucideIcon
@@ -158,7 +167,7 @@ function NodeItem({
 		e.dataTransfer.effectAllowed = "move";
 		e.dataTransfer.setData(
 			"application/json",
-			JSON.stringify({ nodeId: node.id }),
+			JSON.stringify({ nodeId: node.id })
 		);
 		onDrag?.(node.id, e);
 	};
@@ -173,15 +182,15 @@ function NodeItem({
 				{node.icon && (
 					<LucideIcon
 						name={node.icon}
-						className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0"
+						className="h-4 w-4 text-foreground mt-0.5 shrink-0"
 					/>
 				)}
 				<div className="flex-1 min-w-0">
-					<div className="text-sm font-medium text-white truncate">
+					<div className="text-sm font-medium  truncate">
 						{node.displayName}
 					</div>
 					{node.description && (
-						<div className="text-xs text-gray-400 line-clamp-2">
+						<div className="text-xs text-muted-foreground line-clamp-2">
 							{node.description}
 						</div>
 					)}

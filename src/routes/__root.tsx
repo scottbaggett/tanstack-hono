@@ -9,6 +9,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "../lib/query-client";
 import type { RouterContext } from "../routerContext";
 import appCss from "../styles/index.css?url";
+import { ThemeContextProvider } from "../context/ThemeContext";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
 	head: () => ({
@@ -29,6 +30,46 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 			},
 		],
 		scripts: [
+			{
+				children: `(function() {
+					try {
+						const STORAGE_KEY = 'theme';
+						const DEFAULT_THEME = 'system';
+
+						function applyTheme() {
+							const theme = localStorage.getItem(STORAGE_KEY) || DEFAULT_THEME;
+							let resolvedTheme = theme;
+							if (theme === 'system') {
+								const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+								resolvedTheme = mediaQuery.matches ? 'dark' : 'light';
+							}
+							document.documentElement.classList.remove('dark', 'light');
+							document.documentElement.classList.add(resolvedTheme);
+						}
+
+						// Apply theme immediately
+						applyTheme();
+
+						// Listen for system theme changes
+						const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+						mediaQuery.addEventListener('change', () => {
+							const currentTheme = localStorage.getItem(STORAGE_KEY) || DEFAULT_THEME;
+							if (currentTheme === 'system') {
+								applyTheme();
+							}
+						});
+
+						// Listen for localStorage changes from other tabs
+						window.addEventListener('storage', (e) => {
+							if (e.key === STORAGE_KEY) {
+								applyTheme();
+							}
+						});
+					} catch (e) {
+						console.warn('Theme initialization failed:', e);
+					}
+				})();`,
+			},
 			...(!import.meta.env.PROD
 				? [
 						{
@@ -43,7 +84,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 							type: "module",
 							src: "/@vite/client",
 						},
-					]
+				  ]
 				: []),
 			{
 				type: "module",
@@ -54,7 +95,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 		],
 	}),
 	errorComponent: ({ error }) => (
-		<html lang="en" className="dark">
+		<html lang="en">
 			<head>
 				<HeadContent />
 			</head>
@@ -84,15 +125,17 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 
 function RootComponent() {
 	return (
-		<html lang="en" className="dark">
+		<html lang="en" suppressHydrationWarning>
 			<head>
 				<HeadContent />
 			</head>
 			<body>
-				<QueryClientProvider client={queryClient}>
-					<Outlet />
-					<TanStackRouterDevtools position="bottom-left" />
-				</QueryClientProvider>
+				<ThemeContextProvider>
+					<QueryClientProvider client={queryClient}>
+						<Outlet />
+						<TanStackRouterDevtools position="bottom-left" />
+					</QueryClientProvider>
+				</ThemeContextProvider>
 				<Scripts />
 			</body>
 		</html>

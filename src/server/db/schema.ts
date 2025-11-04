@@ -238,6 +238,40 @@ export const nodeDefinitions = pgTable(
 );
 
 // ============================================================================
+// CREDENTIALS TABLE
+// ============================================================================
+
+export const credentials = pgTable(
+	"credentials",
+	{
+		id: uuid("id").primaryKey().defaultRandom(),
+		// Owner of this credential
+		ownerId: uuid("owner_id").references(() => users.id, {
+			onDelete: "cascade",
+		}),
+		// User-defined name for this credential instance
+		name: varchar("name", { length: 255 }).notNull(),
+		// Credential type (e.g., "slackApi", "httpBasicAuth")
+		type: varchar("type", { length: 100 }).notNull(),
+		// Encrypted credential data (AES-256-GCM)
+		// Format: salt:iv:authTag:encrypted (base64)
+		data: text("data").notNull(),
+		// Timestamps
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.default(sql`now()`)
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true })
+			.default(sql`now()`)
+			.$onUpdate(() => sql`now()`),
+	},
+	(table) => [
+		index("credentials_owner_id_idx").on(table.ownerId),
+		index("credentials_type_idx").on(table.type),
+		index("credentials_name_idx").on(table.name),
+	]
+);
+
+// ============================================================================
 // EXPORT TYPES
 // ============================================================================
 
@@ -258,3 +292,6 @@ export type ExecutionEventInsert = typeof executionEvents.$inferInsert;
 
 export type NodeDefinition = typeof nodeDefinitions.$inferSelect;
 export type NodeDefinitionInsert = typeof nodeDefinitions.$inferInsert;
+
+export type Credential = typeof credentials.$inferSelect;
+export type CredentialInsert = typeof credentials.$inferInsert;

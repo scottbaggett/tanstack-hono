@@ -79,6 +79,8 @@ export default defineConfig(({ mode }) => {
 		server: {
 			host,
 			port,
+			allowedHosts: ["localhost:3000", "c9492d523d3d.ngrok.app"],
+
 		},
 		// Ensure proper dev server handling
 		optimizeDeps: {

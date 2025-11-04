@@ -17,20 +17,30 @@ export const nodesRoutes = new Hono();
 nodesRoutes.get("/", (c) => {
 	const nodes = nodeRegistry.getAllDefinitions();
 
-	const nodeDefinitions = nodes.map((node) => ({
-		id: node.name,
-		name: node.name,
-		displayName: node.displayName,
-		description: node.description,
-		category: node.category,
-		icon: node.icon,
-		iconColor: node.iconColor,
-		version: node.version,
-		inputs: Array.isArray(node.inputs) ? node.inputs : [],
-		outputs: node.outputs || [],
-		properties: node.properties || [],
-		codex: node.codex,
-	}));
+	const nodeDefinitions = nodes.map((node) => {
+		// Handle dynamic inputs - if it's a function, call it with empty context
+		let inputs = [];
+		if (typeof node.inputs === 'function') {
+			inputs = node.inputs({ nodeId: 'preview', properties: {}, connectedInputs: {} });
+		} else if (Array.isArray(node.inputs)) {
+			inputs = node.inputs;
+		}
+
+		return {
+			id: node.name,
+			name: node.name,
+			displayName: node.displayName,
+			description: node.description,
+			category: node.category,
+			icon: node.icon,
+			color: node.iconColor,
+			version: node.version,
+			inputs,
+			outputs: node.outputs || [],
+			properties: node.properties || [],
+			codex: node.codex,
+		};
+	});
 
 	// Group by category
 	const byCategory = nodeDefinitions.reduce(
@@ -71,6 +81,14 @@ nodesRoutes.get("/:id", (c) => {
 		);
 	}
 
+	// Handle dynamic inputs
+	let inputs = [];
+	if (typeof node.inputs === 'function') {
+		inputs = node.inputs({ nodeId: 'preview', properties: {}, connectedInputs: {} });
+	} else if (Array.isArray(node.inputs)) {
+		inputs = node.inputs;
+	}
+
 	return c.json({
 		success: true,
 		data: {
@@ -80,9 +98,9 @@ nodesRoutes.get("/:id", (c) => {
 			description: node.description,
 			category: node.category,
 			icon: node.icon,
-			iconColor: node.iconColor,
+			color: node.iconColor,
 			version: node.version,
-			inputs: Array.isArray(node.inputs) ? node.inputs : [],
+			inputs,
 			outputs: node.outputs || [],
 			properties: node.properties || [],
 			codex: node.codex,

@@ -71,6 +71,7 @@ export interface NodeProperty {
 	type: 'string' | 'number' | 'boolean' | 'json' | 'select' | 'notice' | 'callout';
 	default: unknown;
 	description?: string;
+	placeholder?: string;
 	options?: Array<{ name: string; value: unknown }>;
 	noDataExpression?: boolean;
 	displayOptions?: {
@@ -84,9 +85,16 @@ export interface INodeTypeDescription extends INodeTypeBaseDescription {
 		name: string;
 		color: string;
 	};
-	inputs: NodePort[] | DynamicInputs; // Can be static or dynamic
-	outputs: NodePort[];
+	// Simplified connection system (n8n style)
+	// Most nodes have 1 input and 1 output (default)
+	maxInputs?: number; // Default: 1, set to 0 for start nodes
+	maxOutputs?: number; // Default: 1
 	properties: NodeProperty[];
+	// Credential requirements
+	credentials?: Array<{
+		name: string; // Credential type (e.g., "httpBasicAuth")
+		required?: boolean;
+	}>;
 	hints?: Array<{
 		message: string;
 		type: 'warning' | 'info';
@@ -107,6 +115,7 @@ export interface ExecutionContext {
 	inputs: Record<string, any>; // Values from connected inputs
 	properties: Record<string, unknown>; // Raw property values (may contain CEL expressions)
 	evaluatedProperties: Record<string, any>; // Properties with CEL expressions evaluated
+	credentials?: Record<string, Record<string, any>>; // Decrypted credentials by type
 	previousData?: any[];
 	signal?: AbortSignal; // For cancellation
 }
@@ -140,10 +149,15 @@ export interface WorkflowNode {
 		x: number;
 		y: number;
 	};
+	credentials?: Record<string, {
+		id: string; // Credential instance ID
+		name: string; // Display name
+	}>;
 	data: {
 		label?: string; // Custom label
 		inputs?: Record<string, any>; // Values from connected nodes
-		properties?: Record<string, unknown>; // Configuration values
+		properties?: Record<string, unknown>; // Configuration values (legacy)
+		propertyValues?: Record<string, unknown>; // User-entered property values
 	};
 }
 

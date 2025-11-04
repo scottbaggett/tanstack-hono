@@ -1,0 +1,2 @@
+- We are EARLY in the build, do not worry about backward compatibility!
+- dont commit your work until you are asked.

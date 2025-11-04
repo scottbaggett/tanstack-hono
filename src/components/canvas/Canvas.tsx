@@ -5,7 +5,8 @@
  * Allows creating, editing, and connecting nodes
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useEffect } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import {
 	ReactFlow,
 	Background,
@@ -22,8 +23,12 @@ import "@xyflow/react/dist/style.css";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { NodePanel } from "./NodePanel";
 import { WorkflowNode } from "./nodes/WorkflowNode";
-import { NodeConfigPanel } from "./NodeConfigPanel";
-import { useWorkflow, useUpdateWorkflow, useCreateWorkflow } from "@/hooks/use-workflows";
+import { NodeEditorModal } from "./NodeEditorModal";
+import {
+	useWorkflow,
+	useUpdateWorkflow,
+	useCreateWorkflow,
+} from "@/hooks/use-workflows";
 import { useNodeRegistry } from "@/hooks/use-node-registry";
 
 interface CanvasProps {
@@ -36,6 +41,7 @@ const nodeTypes = {
 };
 
 export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
+	const navigate = useNavigate();
 	const [workflowId, setWorkflowId] = useState(initialWorkflowId);
 	const { data: workflow } = useWorkflow(workflowId || null);
 	const updateWorkflow = useUpdateWorkflow();
@@ -60,6 +66,27 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 	const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 	const [showConfig, setShowConfig] = useState(false);
 
+	// Sync nodes and edges when workflow loads
+	useEffect(() => {
+		if (
+			workflow?.definition?.nodes &&
+			Array.isArray(workflow.definition.nodes)
+		) {
+			setNodes(workflow.definition.nodes as Node[]);
+		}
+		if (
+			workflow?.definition?.edges &&
+			Array.isArray(workflow.definition.edges)
+		) {
+			setEdges(workflow.definition.edges as Edge[]);
+		}
+	}, [
+		workflow?.definition?.nodes,
+		workflow?.definition?.edges,
+		setNodes,
+		setEdges,
+	]);
+
 	// Handle node property updates
 	const handleUpdateNodeData = useCallback(
 		(nodeId: string, data: Record<string, unknown>) => {
@@ -72,7 +99,7 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 									...node.data,
 									...data,
 								},
-							}
+						  }
 						: node
 				)
 			);
@@ -86,6 +113,24 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 			setEdges((eds) => addEdge(connection, eds));
 		},
 		[setEdges]
+	);
+
+	// Generate auto-incremented names based on node type
+	const getAutoName = useCallback(
+		(nodeId: string, existingNodes: Node[]): string => {
+			// Extract the display name for the node type
+			const nodeDefinition = nodesRegistry?.nodes?.find((n) => n.id === nodeId);
+			const baseName = nodeDefinition?.displayName || nodeId;
+
+			// Count existing nodes with same base name
+			const count = existingNodes.filter(
+				(n) =>
+					typeof n.data?.name === "string" && n.data.name.startsWith(baseName)
+			).length;
+
+			return count > 0 ? `${baseName} ${count + 1}` : baseName;
+		},
+		[nodesRegistry?.nodes]
 	);
 
 	// Add new node
@@ -127,6 +172,11 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 				});
 				if (result?.id) {
 					setWorkflowId(result.id);
+					// Navigate to the workflow URL so it persists on refresh
+					await navigate({
+						to: "/canvas",
+						search: { workflowId: result.id },
+					});
 				}
 			} else {
 				// Update existing workflow
@@ -142,7 +192,7 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 		} catch (error) {
 			console.error("Failed to save workflow:", error);
 		}
-	}, [workflowId, nodes, edges, updateWorkflow, createWorkflow]);
+	}, [workflowId, nodes, edges, updateWorkflow, createWorkflow, navigate]);
 
 	const handleNodeDrop = useCallback(
 		(event: React.DragEvent) => {
@@ -155,19 +205,30 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 				const { nodeId } = JSON.parse(data);
 
 				// Find the node definition from registry
-				const nodeDefinition = nodesRegistry?.nodes?.find((n) => n.id === nodeId);
+				const nodeDefinition = nodesRegistry?.nodes?.find(
+					(n) => n.id === nodeId
+				);
 
 				if (!nodeDefinition) {
 					console.warn(`Node definition not found for: ${nodeId}`);
 					return;
 				}
 
+				// Generate UUID for this node instance
+				const nodeInstanceId =
+					crypto.randomUUID?.() ||
+					`node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+				// Generate human-readable name
+				const autoName = getAutoName(nodeId, nodes);
+
 				// Create new node at drop position with full definition data
 				const newNode: Node = {
-					id: `${nodeId}-${Date.now()}`,
+					id: nodeInstanceId,
 					type: "workflow",
 					data: {
 						label: nodeDefinition.displayName || nodeId,
+						name: autoName,
 						nodeId,
 						displayName: nodeDefinition.displayName,
 						description: nodeDefinition.description,
@@ -175,10 +236,11 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 						color: nodeDefinition.color,
 						inputs: nodeDefinition.inputs,
 						outputs: nodeDefinition.outputs,
+						properties: nodeDefinition.properties || [],
 					},
 					position: {
 						x: event.clientX - 100,
-						y: event.clientY - 100
+						y: event.clientY - 100,
 					},
 				};
 				setNodes((nds) => [...nds, newNode]);
@@ -186,19 +248,18 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 				console.error("Failed to drop node:", error);
 			}
 		},
-		[setNodes, nodesRegistry?.nodes]
+		[setNodes, nodesRegistry?.nodes, getAutoName, nodes]
 	);
 
 	return (
 		<div className="h-screen w-screen flex flex-col bg-gray-950">
 			{/* Toolbar */}
 			<CanvasToolbar
-				onAddNode={handleAddNode}
-				onDeleteNode={handleDeleteNode}
-				onSave={handleSave}
+				workflowName={workflow?.name || "Untitled Workflow"}
+				workflowId={workflowId}
 				hasSelectedNode={!!selectedNode}
 				isSaving={updateWorkflow.isPending || createWorkflow.isPending}
-				workflowId={workflowId}
+				onSave={handleSave}
 			/>
 
 			{/* Main Layout */}
@@ -219,7 +280,7 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 						onEdgesChange={onEdgesChange}
 						onConnect={onConnect}
 						nodeTypes={nodeTypes}
-						onNodeClick={(_, node) => {
+						onNodeDoubleClick={(_, node) => {
 							setSelectedNode(node);
 							setShowConfig(true);
 						}}
@@ -234,18 +295,28 @@ export function Canvas({ workflowId: initialWorkflowId }: CanvasProps) {
 						<MiniMap />
 					</ReactFlow>
 				</div>
-
-				{/* Node Config Panel (Right) */}
-				{showConfig && (
-					<NodeConfigPanel
-						selectedNode={selectedNode}
-						onUpdateNode={handleUpdateNodeData}
-						onClose={() => {
-							setShowConfig(false);
-						}}
-					/>
-				)}
 			</div>
+
+			{/* Node Editor Modal */}
+			{showConfig && selectedNode && (
+				<NodeEditorModal
+					selectedNode={selectedNode}
+					onClose={() => {
+						setShowConfig(false);
+					}}
+					onUpdateNode={handleUpdateNodeData}
+					workflowEdges={
+						edges as Array<{
+							source: string;
+							target: string;
+							sourceHandle?: string;
+							targetHandle?: string;
+						}>
+					}
+					allNodes={nodes}
+					nodeRegistry={nodesRegistry}
+				/>
+			)}
 		</div>
 	);
 }
