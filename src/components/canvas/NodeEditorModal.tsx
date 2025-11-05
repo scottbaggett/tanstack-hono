@@ -19,6 +19,7 @@ interface NodeEditorModalProps {
 	selectedNode: Node;
 	onClose: () => void;
 	onUpdateNode: (nodeId: string, data: Record<string, unknown>) => void;
+	onExecutionComplete: (nodeId: string, runData: Record<string, unknown>) => void;
 	workflowEdges: Array<{
 		source: string;
 		target: string;
@@ -27,15 +28,18 @@ interface NodeEditorModalProps {
 	}>;
 	allNodes: Node[];
 	nodeRegistry: any;
+	executionCache: Record<string, Record<string, unknown>>;
 }
 
 export function NodeEditorModal({
 	selectedNode,
 	onClose,
 	onUpdateNode,
+	onExecutionComplete,
 	workflowEdges,
 	allNodes,
 	nodeRegistry,
+	executionCache,
 }: NodeEditorModalProps) {
 	const nodeData = selectedNode.data as Record<string, unknown>;
 	const [executionResult, setExecutionResult] = useState<Record<
@@ -46,6 +50,19 @@ export function NodeEditorModal({
 		string,
 		unknown
 	> | null>(null);
+
+	// On mount, check if this node has cached execution data
+	useEffect(() => {
+		// Load this node's execution result for OUTPUT panel
+		const cachedResult = executionCache[selectedNode.id];
+		if (cachedResult && Array.isArray(cachedResult) && cachedResult[0]) {
+			const nodeRun = cachedResult[0];
+			setExecutionResult(nodeRun.error ? { error: nodeRun.error } : nodeRun.data);
+		}
+
+		// Load all execution cache for INPUT panel to show upstream nodes
+		setAllExecutionResults(executionCache);
+	}, [selectedNode.id, executionCache]);
 	const [isExecuting, setIsExecuting] = useState(false);
 	// Track current form values (may differ from saved values)
 	// Initialize with defaults from property definitions, then override with saved values
@@ -145,6 +162,9 @@ export function NodeEditorModal({
 			if (nodeRun) {
 				// Pass the entire nodeRun (contains both data and error)
 				setExecutionResult(nodeRun.error ? { error: nodeRun.error } : nodeRun.data);
+
+				// Update execution cache for visual indicators
+				onExecutionComplete(selectedNode.id, result.runData || {});
 			}
 			setAllExecutionResults(result.runData || {});
 		} catch (error) {
@@ -195,7 +215,7 @@ export function NodeEditorModal({
 					<div className="w-1/4 border-r border-surface-6 overflow-y-auto">
 						<InputExplorer
 							connectedNodes={connectedNodes}
-							executionResults={allExecutionResults}
+							executionResults={allExecutionResults || executionCache}
 						/>
 					</div>
 
@@ -212,11 +232,7 @@ export function NodeEditorModal({
 
 					{/* Right Panel - Test & Output */}
 					<div className="w-1/3 border-l flex flex-col">
-						<OutputPanel
-							isExecuting={isExecuting}
-							onExecute={handleExecute}
-							executionResult={executionResult}
-						/>
+						<OutputPanel executionResult={executionResult} />
 					</div>
 				</div>
 			</div>
