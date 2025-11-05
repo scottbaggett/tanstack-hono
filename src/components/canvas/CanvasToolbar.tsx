@@ -41,6 +41,18 @@ export function CanvasToolbar({
 
 			{/* Right side - Actions */}
 			<div className="flex items-center gap-2">
+				{/* Executions */}
+				{workflowId && (
+					<Link
+						to="/workflow/$workflowId/executions"
+						params={{ workflowId }}
+					>
+						<Button variant="outline" size="sm">
+							<LucideIcon name="play-circle" className="mr-2 h-4 w-4" />
+							Executions
+						</Button>
+					</Link>
+				)}
 				{/* Save */}
 				<Button
 					variant="secondary"

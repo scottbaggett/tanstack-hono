@@ -163,11 +163,11 @@ function NodeItem({
 			type="button"
 			draggable
 			onDragStart={handleDragStart}
-			className="p-3 rounded bg-background shadow-xs border hover:border-surface-8 cursor-grab active:cursor-grabbing transition-colors"
+			className="text-start p-3 rounded bg-background shadow-xs border hover:border-surface-8 cursor-grab active:cursor-grabbing transition-colors"
 		>
 			<div className="flex items-center gap-4 ">
 				<div className="flex-1 min-w-0">
-					<div className="text-base font-bold truncate">{node.displayName}</div>
+					<div className="font-semibold truncate">{node.displayName}</div>
 					{node.description && (
 						<div className="text-xs text-node-muted-foreground line-clamp-2">
 							{node.description}

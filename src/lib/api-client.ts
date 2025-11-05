@@ -20,9 +20,16 @@ const apiURL =
 		? window.location.origin
 		: "http://localhost:3000";
 
+// Pre-compute the client type to help TypeScript infer all routes
+// This pattern from Hono docs helps with IDE performance and type inference
+type PrecomputedClient = ReturnType<typeof hc<ApiRouter>>;
+
 /**
  * Create Hono RPC client with automatic type inference
  * Automatically includes JWT token in all requests
+ *
+ * This uses Hono's RPC feature to get full type safety from the server API router.
+ * Types are automatically inferred from the ApiRouter type.
  *
  * Usage:
  * ```ts
@@ -51,6 +58,13 @@ export function createApiClient() {
 		},
 	});
 }
+
+/**
+ * Type-safe Hono RPC client type
+ * Use this type when you need to reference the client type explicitly
+ * This uses the pre-computed type to ensure all routes are properly typed
+ */
+export type ApiClient = PrecomputedClient;
 
 /**
  * Default RPC client instance

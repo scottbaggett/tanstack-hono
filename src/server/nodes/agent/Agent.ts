@@ -19,7 +19,7 @@ const baseDescription: INodeTypeBaseDescription = {
 	displayName: "AI Agent",
 	name: "agent",
 	icon: "bot",
-	iconColor: "standard-gray",
+	iconColor: "standard-purple",
 	category: "AI",
 	description:
 		"Generates an action plan and executes it. Can use external tools.",
@@ -55,18 +55,11 @@ export class Agent implements INodeType {
 			version: 1,
 			defaults: {
 				name: "AI Agent",
-				color: "standard-purple",
+				color: "flat-gray",
 			},
 			maxInputs: 1, // One input connection for data flow
 			maxOutputs: 1, // One output connection
-			inputs: [], // No specialized inputs - using properties instead
-			outputs: [
-				{
-					displayName: "Output",
-					name: "output",
-					type: "main",
-				},
-			],
+
 			properties: agentProperties,
 			hints: [
 				{

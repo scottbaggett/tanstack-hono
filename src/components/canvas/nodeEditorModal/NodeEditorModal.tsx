@@ -12,9 +12,10 @@ import { useEffect, useState } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
 import { Button } from "@/components/ui/button";
 import type { NodeDefinition } from "@/hooks/use-node-registry";
-import { InputExplorer } from "./panels/InputExplorer";
-import { OutputPanel } from "./panels/OutputPanel";
-import { ParametersPanel } from "./panels/ParametersPanel";
+import type { INodeExecutionData } from "@/types/interfaces";
+import { ParametersPanel } from "../panels/ParametersPanel";
+import { NodeInputsPanel } from "./components/NodeInputsPanel";
+import { NodeOutputsPanel } from "./components/NodeOutputsPanel";
 
 interface NodeRegistryData {
 	nodes: NodeDefinition[];
@@ -52,13 +53,11 @@ export function NodeEditorModal({
 	executionCache,
 }: NodeEditorModalProps) {
 	const nodeData = selectedNode.data as Record<string, unknown>;
-	const [executionResult, setExecutionResult] = useState<Record<
-		string,
-		unknown
-	> | null>(null);
+	const [executionResult, setExecutionResult] =
+		useState<INodeExecutionData | null>(null);
 	const [allExecutionResults, setAllExecutionResults] = useState<Record<
 		string,
-		unknown
+		INodeExecutionData
 	> | null>(null);
 
 	// On mount, check if this node has cached execution data
@@ -156,7 +155,8 @@ export function NodeEditorModal({
 			);
 
 			// Call node execution API with workflow context
-			const response = await fetch(`/api/node-execute/${selectedNode.id}`, {
+			// Backend automatically executes all upstream nodes first (n8n-style)
+			const response = await fetch(`/api/execute/node/${selectedNode.id}`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -234,7 +234,7 @@ export function NodeEditorModal({
 				<div className="flex-1 flex overflow-hidden">
 					{/* Left Panel - Input Explorer */}
 					<div className="w-1/4 border-r border-surface-6 overflow-y-auto">
-						<InputExplorer
+						<NodeInputsPanel
 							connectedNodes={connectedNodes}
 							executionResults={allExecutionResults || executionCache}
 						/>
@@ -248,12 +248,15 @@ export function NodeEditorModal({
 							nodeRegistry={nodeRegistry}
 							currentPropertyValues={currentPropertyValues}
 							onPropertyValuesChange={setCurrentPropertyValues}
+							executionResults={allExecutionResults?.[selectedNode.id]}
+							allExecutionResults={allExecutionResults || executionCache}
+							connectedNodes={connectedNodes}
 						/>
 					</div>
 
 					{/* Right Panel - Test & Output */}
 					<div className="w-1/3 border-l flex flex-col">
-						<OutputPanel executionResult={executionResult} />
+						<NodeOutputsPanel executionResult={executionResult || {}} />
 					</div>
 				</div>
 			</div>

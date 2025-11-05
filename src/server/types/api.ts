@@ -129,14 +129,27 @@ export type UpdateWorkflowRequest = z.infer<typeof UpdateWorkflowRequestSchema>;
 export const WorkflowRunSchema = z.object({
 	id: z.string(),
 	workflowId: z.string(),
-	status: z.enum(["pending", "running", "success", "failed", "cancelled"]),
-	startedAt: z.string().nullable(),
-	completedAt: z.string().nullable(),
-	created_at: z.string(),
-	updated_at: z.string(),
+	ownerId: z.string().nullable(),
+	status: z.enum(["pending", "running", "completed", "failed"]),
+	inputs: z.record(z.string(), z.unknown()).nullable().optional(),
+	outputs: z.record(z.string(), z.unknown()).nullable().optional(),
+	errorMessage: z.string().nullable().optional(),
+	startedAt: z.string(),
+	completedAt: z.string().nullable().optional(),
+	totalTokensUsed: z.number().nullable().optional(),
+	durationMs: z.number().nullable().optional(),
 });
 
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
+
+export const WorkflowRunsListResponseSchema = z.object({
+	runs: z.array(WorkflowRunSchema),
+	total: z.number().optional(),
+});
+
+export type WorkflowRunsListResponse = z.infer<
+	typeof WorkflowRunsListResponseSchema
+>;
 
 export const RunWorkflowRequestSchema = z.object({
 	inputs: z.record(z.string(), z.unknown()).optional(),
