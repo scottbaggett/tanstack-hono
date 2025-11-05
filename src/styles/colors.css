@@ -17,6 +17,7 @@
 @import "./colors/gray.css";
 @import "./colors/red.css";
 @import "./colors/purple.css";
+@import "./colors/green.css";
 
 /* raw colors */
 @theme inline {
@@ -99,30 +100,30 @@
   --color-warning-a12: var(--amber-a12);
 
   /* Success colors */
-  --color-success-1: var(--green-1);
-  --color-success-a1: var(--green-a1);
-  --color-success-2: var(--green-2);
-  --color-success-a2: var(--green-a2);
-  --color-success-3: var(--green-3);
-  --color-success-a3: var(--green-a3);
-  --color-success-4: var(--green-4);
-  --color-success-a4: var(--green-a4);
-  --color-success-5: var(--green-5);
-  --color-success-a5: var(--green-a5);
-  --color-success-6: var(--green-6);
-  --color-success-a6: var(--green-a6);
-  --color-success-7: var(--green-7);
-  --color-success-a7: var(--green-a7);
-  --color-success-8: var(--green-8);
-  --color-success-a8: var(--green-a8);
-  --color-success-9: var(--green-9);
-  --color-success-a9: var(--green-a9);
-  --color-success-10: var(--green-10);
-  --color-success-a10: var(--green-a10);
-  --color-success-11: var(--green-11);
-  --color-success-a11: var(--green-a11);
-  --color-success-12: var(--green-12);
-  --color-success-a12: var(--green-a12);
+  --color-green-1: var(--green-1);
+  --color-green-a1: var(--green-a1);
+  --color-green-2: var(--green-2);
+  --color-green-a2: var(--green-a2);
+  --color-green-3: var(--green-3);
+  --color-green-a3: var(--green-a3);
+  --color-green-4: var(--green-4);
+  --color-green-a4: var(--green-a4);
+  --color-green-5: var(--green-5);
+  --color-green-a5: var(--green-a5);
+  --color-green-6: var(--green-6);
+  --color-green-a6: var(--green-a6);
+  --color-green-7: var(--green-7);
+  --color-green-a7: var(--green-a7);
+  --color-green-8: var(--green-8);
+  --color-green-a8: var(--green-a8);
+  --color-green-9: var(--green-9);
+  --color-green-a9: var(--green-a9);
+  --color-green-10: var(--green-10);
+  --color-green-a10: var(--green-a10);
+  --color-green-11: var(--green-11);
+  --color-green-a11: var(--green-a11);
+  --color-green-12: var(--green-12);
+  --color-green-a12: var(--green-a12);
 
   /* Primary colors */
   --color-primary-1: var(--gray-1);
