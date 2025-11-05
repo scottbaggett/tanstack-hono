@@ -5,10 +5,10 @@
  * Supports testing nodes with upstream re-execution (like n8n's "test step")
  */
 
+import crypto from "node:crypto";
 import { Hono } from "hono";
-import { WorkflowOrchestrator } from "../execution/WorkflowOrchestrator";
 import type { OrchestrationConfig } from "../execution/WorkflowOrchestrator";
-import crypto from "crypto";
+import { WorkflowOrchestrator } from "../execution/WorkflowOrchestrator";
 import "@/server/nodes/load"; // Ensure nodes are loaded
 
 export const nodeExecuteRoutes = new Hono();
@@ -86,24 +86,24 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 
 		// Build modified workflow: only include test node and its upstream dependencies
 		const nodes = (workflowDefinition.nodes as any[]) || [];
-		const nodesToExecute = nodes.filter(
-			(n: any) => n.id === testNodeId || upstreamNodeIds.has(n.id),
-		).map((n: any) => {
-			// Merge parameters into the test node's propertyValues
-			if (n.id === testNodeId) {
-				return {
-					...n,
-					data: {
-						...n.data,
-						propertyValues: {
-							...(n.data?.propertyValues || {}),
-							...parameters,
+		const nodesToExecute = nodes
+			.filter((n: any) => n.id === testNodeId || upstreamNodeIds.has(n.id))
+			.map((n: any) => {
+				// Merge parameters into the test node's propertyValues
+				if (n.id === testNodeId) {
+					return {
+						...n,
+						data: {
+							...n.data,
+							propertyValues: {
+								...(n.data?.propertyValues || {}),
+								...parameters,
+							},
 						},
-					},
-				};
-			}
-			return n;
-		});
+					};
+				}
+				return n;
+			});
 
 		// Build node ID set for quick lookup
 		const nodeIdSet = new Set([testNodeId, ...upstreamNodeIds]);
@@ -113,7 +113,7 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 			edges: edges.filter(
 				(e: any) =>
 					// Both source and target must be in our node set
-					nodeIdSet.has(e.source) && nodeIdSet.has(e.target)
+					nodeIdSet.has(e.source) && nodeIdSet.has(e.target),
 			),
 			viewport: { x: 0, y: 0, zoom: 1 },
 		};
@@ -143,7 +143,7 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 		const nodeResult = result.nodeResults.get(testNodeId);
 
 		if (!nodeResult) {
-			console.error('[NODE-EXECUTE] Node result not found:', {
+			console.error("[NODE-EXECUTE] Node result not found:", {
 				testNodeId,
 				availableNodes: Array.from(result.nodeResults.keys()),
 				executionErrors: result.errors,
@@ -154,10 +154,10 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 					error: `No execution result found for node ${testNodeId}`,
 					debug: {
 						availableNodes: Array.from(result.nodeResults.keys()),
-						errors: result.errors.map(e => e.error.message),
-					}
+						errors: result.errors.map((e) => e.error.message),
+					},
 				},
-				500
+				500,
 			);
 		}
 
@@ -171,15 +171,20 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 			runData: {
 				[testNodeId]: [
 					{
-						data: hasError ? null : {
-							json: mainOutput?.json || {},
-							binary: mainOutput?.binary || null,
-						},
-						error: hasError && nodeResult.error ? {
-							message: nodeResult.error.message,
-							stack: nodeResult.error.stack,
-							name: nodeResult.error.name,
-						} : null,
+						data: hasError
+							? null
+							: {
+									json: mainOutput?.json || {},
+									binary: mainOutput?.binary || null,
+								},
+						error:
+							hasError && nodeResult.error
+								? {
+										message: nodeResult.error.message,
+										stack: nodeResult.error.stack,
+										name: nodeResult.error.name,
+									}
+								: null,
 						startTime: nodeResult.startTime,
 						executionTime: nodeResult.durationMs,
 						metadata: {

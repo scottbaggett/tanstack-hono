@@ -5,8 +5,8 @@
  */
 
 import { useNavigate } from "@tanstack/react-router";
-import { isAuthenticated } from "@/lib/api";
 import { useEffect } from "react";
+import { isAuthenticated } from "@/lib/api";
 
 export function useProtectedRoute() {
 	const navigate = useNavigate();

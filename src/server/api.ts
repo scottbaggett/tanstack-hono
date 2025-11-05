@@ -7,14 +7,14 @@
 
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { authRoutes } from "./routes/auth";
-import { workflowRoutes } from "./routes/workflows";
-import { modelsRoutes } from "./routes/models";
-import { nodesRoutes } from "./routes/nodes";
-import { nodeExecuteRoutes } from "./routes/node-execute";
-import credentialsRoutes from "./routes/credentials";
-import { webhookRoutes } from "./routes/webhooks";
 import { authMiddleware } from "./auth/middleware";
+import { authRoutes } from "./routes/auth";
+import credentialsRoutes from "./routes/credentials";
+import { modelsRoutes } from "./routes/models";
+import { nodeExecuteRoutes } from "./routes/node-execute";
+import { nodesRoutes } from "./routes/nodes";
+import { webhookRoutes } from "./routes/webhooks";
+import { workflowRoutes } from "./routes/workflows";
 
 // ============================================================================
 // API SETUP
@@ -45,7 +45,7 @@ app.use(
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 		allowHeaders: ["Content-Type", "Authorization"],
 		credentials: true,
-	})
+	}),
 );
 
 // ============================================================================
@@ -98,12 +98,15 @@ app.get("/test-workflow", (c) => {
 			: undefined,
 	}));
 
-	const connections = Array.from({ length: Math.max(0, nodeCount - 1) }, (_, i) => ({
-		source: `node-${i + 1}`,
-		target: `node-${i + 2}`,
-		sourceHandle: "output",
-		targetHandle: "input",
-	}));
+	const connections = Array.from(
+		{ length: Math.max(0, nodeCount - 1) },
+		(_, i) => ({
+			source: `node-${i + 1}`,
+			target: `node-${i + 2}`,
+			sourceHandle: "output",
+			targetHandle: "input",
+		}),
+	);
 
 	return c.json({
 		success: true,
@@ -137,7 +140,7 @@ app.notFound((c) => {
 			success: false,
 			error: "Not Found",
 		},
-		404
+		404,
 	);
 });
 
@@ -150,7 +153,7 @@ app.onError((err, c) => {
 			success: false,
 			error: err instanceof Error ? err.message : "Internal Server Error",
 		},
-		500
+		500,
 	);
 });
 

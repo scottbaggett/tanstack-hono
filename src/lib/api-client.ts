@@ -15,7 +15,10 @@ import { getToken } from "./api";
 // RPC CLIENT SETUP
 // ============================================================================
 
-const apiURL = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000";
+const apiURL =
+	typeof window !== "undefined"
+		? window.location.origin
+		: "http://localhost:3000";
 
 /**
  * Create Hono RPC client with automatic type inference
@@ -71,11 +74,6 @@ export const rpcClient = createApiClient();
 // ============================================================================
 
 /**
- * Re-export the API router type for use in frontend code
- */
-export type { ApiRouter } from "@/server/api";
-
-/**
  * Type helper to infer request types from RPC client methods
  *
  * @example
@@ -85,3 +83,7 @@ export type { ApiRouter } from "@/server/api";
  * ```
  */
 export type { InferRequestType, InferResponseType } from "hono/client";
+/**
+ * Re-export the API router type for use in frontend code
+ */
+export type { ApiRouter } from "@/server/api";

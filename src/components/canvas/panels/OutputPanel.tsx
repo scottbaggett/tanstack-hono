@@ -5,8 +5,8 @@
  */
 
 import { useState } from "react";
-import { SchemaTree } from "./SchemaTree";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SchemaTree } from "./SchemaTree";
 
 interface OutputPanelProps {
 	executionResult: any;

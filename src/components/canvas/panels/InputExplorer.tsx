@@ -9,12 +9,12 @@
 import type { Node } from "@xyflow/react";
 import { useState } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SchemaTree } from "./SchemaTree";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface InputExplorerProps {
 	connectedNodes: Node[];
-	executionResults: Record<string, any> | null;
+	executionResults: Record<string, unknown> | null;
 }
 
 type ViewMode = "schema" | "table" | "json";
@@ -96,7 +96,14 @@ export function InputExplorer({
 					return (
 						<div key={node.id} className="border-b border-surface-6">
 							{/* Node Header */}
-							<div
+							<button
+								type="button"
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										toggleNode(node.id);
+									}
+								}}
 								className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-surface-2"
 								onClick={() => toggleNode(node.id)}
 							>
@@ -111,7 +118,7 @@ export function InputExplorer({
 									name={isExpanded ? "chevron-down" : "chevron-right"}
 									className="w-4 h-4 text-surface-11"
 								/>
-							</div>
+							</button>
 
 							{/* Node Data */}
 							{isExpanded && (
@@ -157,41 +164,47 @@ export function InputExplorer({
 																</tr>
 															</thead>
 															<tbody>
-																{Object.entries(jsonData).map(([key, value]) => {
-																	const valueType = Array.isArray(value)
-																		? "array"
-																		: value === null
-																			? "null"
-																			: typeof value;
-																	const displayValue =
-																		typeof value === "object" && value !== null
-																			? JSON.stringify(value)
-																			: String(value);
+																{Object.entries(jsonData).map(
+																	([key, value]) => {
+																		const valueType = Array.isArray(value)
+																			? "array"
+																			: value === null
+																				? "null"
+																				: typeof value;
+																		const displayValue =
+																			typeof value === "object" &&
+																			value !== null
+																				? JSON.stringify(value)
+																				: String(value);
 
-																	return (
-																		<tr
-																			key={key}
-																			className="border-b border-surface-5 hover:bg-surface-2"
-																			draggable
-																			onDragStart={(e) => {
-																				const path = `{{ json.${key} }}`;
-																				e.dataTransfer.setData("text/plain", path);
-																			}}
-																		>
-																			<td className="py-2 px-2 font-medium text-surface-12 cursor-grab">
-																				{key}
-																			</td>
-																			<td className="py-2 px-2 text-surface-11 max-w-xs truncate">
-																				{displayValue}
-																			</td>
-																			<td className="py-2 px-2 text-surface-10">
-																				<span className="px-2 py-0.5 bg-surface-3 rounded">
-																					{valueType}
-																				</span>
-																			</td>
-																		</tr>
-																	);
-																})}
+																		return (
+																			<tr
+																				key={key}
+																				className="border-b border-surface-5 hover:bg-surface-2"
+																				draggable
+																				onDragStart={(e) => {
+																					const path = `{{ json.${key} }}`;
+																					e.dataTransfer.setData(
+																						"text/plain",
+																						path,
+																					);
+																				}}
+																			>
+																				<td className="py-2 px-2 font-medium text-surface-12 cursor-grab">
+																					{key}
+																				</td>
+																				<td className="py-2 px-2 text-surface-11 max-w-xs truncate">
+																					{displayValue}
+																				</td>
+																				<td className="py-2 px-2 text-surface-10">
+																					<span className="px-2 py-0.5 bg-surface-3 rounded">
+																						{valueType}
+																					</span>
+																				</td>
+																			</tr>
+																		);
+																	},
+																)}
 															</tbody>
 														</table>
 													</div>
@@ -218,19 +231,20 @@ export function InputExplorer({
 											</div>
 											<div className="space-y-1">
 												{Object.keys(binaryData).map((key) => (
-													<div
+													<button
+														type="button"
 														key={key}
 														draggable
 														onDragStart={(e) => {
 															e.dataTransfer.setData(
 																"text/plain",
-																`{{ ${nodeName}.binary.${key} }}`
+																`{{ ${nodeName}.binary.${key} }}`,
 															);
 														}}
 														className="px-2 py-1 text-xs hover:bg-surface-3 rounded cursor-grab"
 													>
 														{key}
-													</div>
+													</button>
 												))}
 											</div>
 										</div>

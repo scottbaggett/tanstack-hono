@@ -9,7 +9,10 @@
  * - Versioning
  */
 
-import type { IExecuteFunctions, INodeExecutionData } from "../../../types/execution";
+import type {
+	IExecuteFunctions,
+	INodeExecutionData,
+} from "../../../types/execution";
 import type { INodeTypeDescription, IVersionedNodeType } from "../Node";
 import { Node, nodeLoader } from "../Node";
 
@@ -19,7 +22,8 @@ class TextTransformNode extends Node {
 		name: "textTransform",
 		version: 1,
 		category: "text",
-		description: "Transform text with various operations (uppercase, lowercase, etc)",
+		description:
+			"Transform text with various operations (uppercase, lowercase, etc)",
 		icon: "zap",
 		inputs: [
 			{

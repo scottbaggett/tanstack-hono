@@ -10,7 +10,7 @@ import type {
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-} from '@/types/interfaces';
+} from "@/types/interfaces";
 
 class NodeRegistry implements INodeRegistry {
 	private nodes: Map<string, INodeType> = new Map();
@@ -19,7 +19,10 @@ class NodeRegistry implements INodeRegistry {
 	/**
 	 * Register a node type
 	 */
-	register(nodeType: INodeType, baseDescription: INodeTypeBaseDescription): void {
+	register(
+		nodeType: INodeType,
+		baseDescription: INodeTypeBaseDescription,
+	): void {
 		const name = baseDescription.name;
 
 		if (this.nodes.has(name)) {

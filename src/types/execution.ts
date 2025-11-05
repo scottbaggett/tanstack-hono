@@ -6,10 +6,10 @@
  * workflow state, and emit streaming events.
  */
 
-import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Embeddings } from "@langchain/core/embeddings";
+import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Tool } from "@langchain/core/tools";
-import type { TypedValue, SerializedValue } from "./datatypes";
+import type { SerializedValue, TypedValue } from "./datatypes";
 
 // ============================================================================
 // NODE EXECUTION DATA
@@ -209,7 +209,10 @@ export interface IExecuteFunctionsCore {
 	 * @param eventType - Type of event
 	 * @param data - Event data
 	 */
-	emitStreamEvent(eventType: StreamEventType, data: Record<string, unknown>): void;
+	emitStreamEvent(
+		eventType: StreamEventType,
+		data: Record<string, unknown>,
+	): void;
 
 	/**
 	 * Emit a complete stream event object
@@ -318,7 +321,8 @@ export interface IExecuteFunctionsPrimitives extends IExecuteFunctionsCore {
  * This layer can be extended or replaced with other frameworks
  * without breaking existing nodes that only use core/primitives layers.
  */
-export interface IExecuteFunctionsLangChain extends IExecuteFunctionsPrimitives {
+export interface IExecuteFunctionsLangChain
+	extends IExecuteFunctionsPrimitives {
 	// === LangChain Models ===
 
 	/**
@@ -391,7 +395,8 @@ export interface IExecuteFunctions extends IExecuteFunctionsLangChain {
  * Context passed to node webhook() method
  * Used for handling incoming webhooks (e.g., Slack events, webhooks)
  */
-export interface IWebhookFunctions extends Omit<IExecuteFunctions, "setOutputData" | "setOutput"> {
+export interface IWebhookFunctions
+	extends Omit<IExecuteFunctions, "setOutputData" | "setOutput"> {
 	/**
 	 * Get the incoming webhook request
 	 */
@@ -414,7 +419,7 @@ export interface IWebhookFunctions extends Omit<IExecuteFunctions, "setOutputDat
 	setWebhookResponse(
 		statusCode: number,
 		data: unknown,
-		headers?: Record<string, string>
+		headers?: Record<string, string>,
 	): void;
 
 	/**

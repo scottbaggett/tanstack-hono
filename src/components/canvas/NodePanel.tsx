@@ -6,15 +6,15 @@
  */
 
 import { useState } from "react";
-import { useNodesByCategory } from "@/hooks/use-node-registry";
 import { LucideIcon } from "@/components/icon/LucideIcon";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
 	Collapsible,
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Input } from "@/components/ui/input";
+import { useNodesByCategory } from "@/hooks/use-node-registry";
 
 interface NodePanelProps {
 	onNodeDrag?: (nodeId: string, event: React.DragEvent) => void;
@@ -27,14 +27,6 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 		Record<string, boolean>
 	>({});
 
-	// Filter nodes by search query
-	const filteredNodes = allNodes.filter(
-		(node) =>
-			node.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-			node.description?.toLowerCase().includes(searchQuery.toLowerCase())
-	);
-
-	// Rebuild categories with filtered nodes
 	const filteredCategories = Object.entries(categories).reduce(
 		(acc, [category, nodes]) => {
 			const filtered = nodes.filter(
@@ -167,7 +159,8 @@ function NodeItem({
 	};
 
 	return (
-		<div
+		<button
+			type="button"
 			draggable
 			onDragStart={handleDragStart}
 			className="p-3 rounded bg-background shadow-xs border hover:border-surface-8 cursor-grab active:cursor-grabbing transition-colors"
@@ -182,6 +175,6 @@ function NodeItem({
 					)}
 				</div>
 			</div>
-		</div>
+		</button>
 	);
 }

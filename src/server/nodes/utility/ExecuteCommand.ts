@@ -5,30 +5,30 @@
  * Perfect for testing expression system
  */
 
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
+import { exec } from "node:child_process";
+import { promisify } from "node:util";
 import type {
 	IExecutionContext,
+	INodeExecutionData,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	INodeExecutionData,
-} from '@/types/interfaces';
+} from "@/types/interfaces";
 
 const execAsync = promisify(exec);
 
 const baseDescription: INodeTypeBaseDescription = {
-	displayName: 'Execute Command',
-	name: 'executeCommand',
-	icon: 'terminal',
-	iconColor: 'standard-gray',
-	category: 'utility',
-	description: 'Execute shell commands and capture output',
+	displayName: "Execute Command",
+	name: "executeCommand",
+	icon: "terminal",
+	iconColor: "standard-gray",
+	category: "utility",
+	description: "Execute shell commands and capture output",
 	codex: {
-		alias: ['Shell', 'Terminal', 'Command', 'Exec'],
-		categories: ['utility'],
+		alias: ["Shell", "Terminal", "Command", "Exec"],
+		categories: ["utility"],
 		subcategories: {
-			utility: ['System'],
+			utility: ["System"],
 		},
 	},
 };
@@ -41,33 +41,35 @@ export class ExecuteCommand implements INodeType {
 			...baseDescription,
 			version: 1,
 			defaults: {
-				name: 'Execute Command',
-				color: 'standard-gray',
+				name: "Execute Command",
+				color: "standard-gray",
 			},
 			maxInputs: 1,
 			maxOutputs: 1,
 			properties: [
 				{
-					displayName: 'Command',
-					name: 'command',
-					type: 'string',
+					displayName: "Command",
+					name: "command",
+					type: "string",
 					default: 'echo "Hello World"',
-					description: 'The shell command to execute. Use expressions like {{ TextInput.$json.text }}',
+					description:
+						"The shell command to execute. Use expressions like {{ TextInput.$json.text }}",
 					placeholder: 'echo "Hello"',
 				},
 				{
-					displayName: 'Timeout (ms)',
-					name: 'timeout',
-					type: 'number',
+					displayName: "Timeout (ms)",
+					name: "timeout",
+					type: "number",
 					default: 5000,
-					description: 'Maximum time to wait for command execution',
+					description: "Maximum time to wait for command execution",
 				},
 			],
 		};
 	}
 
 	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
-		const command = (context.evaluatedProperties.command as string) || 'echo "No command"';
+		const command =
+			(context.evaluatedProperties.command as string) || 'echo "No command"';
 		const timeout = (context.evaluatedProperties.timeout as number) || 5000;
 
 		try {
@@ -95,7 +97,7 @@ export class ExecuteCommand implements INodeType {
 					{
 						json: {
 							exitCode: error.code || 1,
-							stdout: error.stdout?.trim() || '',
+							stdout: error.stdout?.trim() || "",
 							stderr: error.stderr?.trim() || error.message,
 							command,
 							error: error.message,

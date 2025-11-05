@@ -3,15 +3,16 @@
  *
  * List, create, edit, and delete credentials
  */
+/** biome-ignore-all lint/correctness/useExhaustiveDependencies: fetchCredentials is not a dependency of useEffect */
 
-import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { LucideIcon } from '@/components/icon/LucideIcon';
-import { CredentialModal } from '@/components/credentials/CredentialModal';
-import type { ICredentialsResponse } from '@/types/credentials';
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { CredentialModal } from "@/components/credentials/CredentialModal";
+import { LucideIcon } from "@/components/icon/LucideIcon";
+import { Button } from "@/components/ui/button";
+import type { ICredentialsResponse } from "@/types/credentials";
 
-export const Route = createFileRoute('/credentials')({
+export const Route = createFileRoute("/credentials")({
 	component: CredentialsPage,
 });
 
@@ -19,20 +20,22 @@ function CredentialsPage() {
 	const [credentials, setCredentials] = useState<ICredentialsResponse[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [isModalOpen, setIsModalOpen] = useState(false);
-	const [editingCredential, setEditingCredential] = useState<string | null>(null);
+	const [editingCredential, setEditingCredential] = useState<string | null>(
+		null
+	);
 
 	// Fetch credentials
 	const fetchCredentials = async () => {
 		try {
 			setLoading(true);
-			const response = await fetch('/api/credentials');
+			const response = await fetch("/api/credentials");
 			const data = await response.json();
 
 			if (data.success) {
 				setCredentials(data.data);
 			}
 		} catch (error) {
-			console.error('Failed to fetch credentials:', error);
+			console.error("Failed to fetch credentials:", error);
 		} finally {
 			setLoading(false);
 		}
@@ -50,7 +53,7 @@ function CredentialsPage() {
 
 		try {
 			const response = await fetch(`/api/credentials/${id}`, {
-				method: 'DELETE',
+				method: "DELETE",
 			});
 
 			const data = await response.json();
@@ -59,11 +62,11 @@ function CredentialsPage() {
 				// Refresh list
 				fetchCredentials();
 			} else {
-				alert('Failed to delete credential');
+				alert("Failed to delete credential");
 			}
 		} catch (error) {
-			console.error('Failed to delete credential:', error);
-			alert('Failed to delete credential');
+			console.error("Failed to delete credential:", error);
+			alert("Failed to delete credential");
 		}
 	};
 
@@ -92,24 +95,24 @@ function CredentialsPage() {
 	// Format date
 	const formatDate = (dateString: string) => {
 		const date = new Date(dateString);
-		return new Intl.DateTimeFormat('en-US', {
-			month: 'short',
-			day: 'numeric',
-			year: 'numeric',
-			hour: '2-digit',
-			minute: '2-digit',
+		return new Intl.DateTimeFormat("en-US", {
+			month: "short",
+			day: "numeric",
+			year: "numeric",
+			hour: "2-digit",
+			minute: "2-digit",
 		}).format(date);
 	};
 
 	// Get credential type display info
 	const getTypeInfo = (type: string) => {
 		const typeMap: Record<string, { icon: string; color: string }> = {
-			httpBasicAuth: { icon: 'lock', color: 'text-blue-11' },
-			apiKey: { icon: 'key', color: 'text-green-11' },
-			bearerToken: { icon: 'shield', color: 'text-purple-11' },
+			httpBasicAuth: { icon: "lock", color: "text-blue-11" },
+			apiKey: { icon: "key", color: "text-green-11" },
+			bearerToken: { icon: "shield", color: "text-purple-11" },
 		};
 
-		return typeMap[type] || { icon: 'key', color: 'text-surface-11' };
+		return typeMap[type] || { icon: "key", color: "text-surface-11" };
 	};
 
 	if (loading) {

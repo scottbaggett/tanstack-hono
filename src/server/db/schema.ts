@@ -1,15 +1,15 @@
+import { sql } from "drizzle-orm";
 import {
+	boolean,
+	index,
+	integer,
+	jsonb,
 	pgTable,
 	text,
 	timestamp,
 	uuid,
 	varchar,
-	integer,
-	jsonb,
-	boolean,
-	index,
 } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
 // ============================================================================
 // USERS TABLE
@@ -34,7 +34,7 @@ export const users = pgTable(
 	(table) => [
 		index("users_email_idx").on(table.email),
 		index("users_username_idx").on(table.username),
-	]
+	],
 );
 
 // ============================================================================
@@ -66,7 +66,7 @@ export const workflows = pgTable(
 		index("workflows_owner_id_idx").on(table.ownerId),
 		index("workflows_name_idx").on(table.name),
 		index("workflows_version_idx").on(table.version),
-	]
+	],
 );
 
 // ============================================================================
@@ -90,7 +90,7 @@ export const workflowVersions = pgTable(
 	(table) => [
 		index("workflow_versions_workflow_id_idx").on(table.workflowId),
 		index("workflow_versions_version_idx").on(table.version),
-	]
+	],
 );
 
 // ============================================================================
@@ -221,7 +221,7 @@ export const nodeExecutions = pgTable(
 		index("node_executions_run_id_idx").on(table.runId),
 		index("node_executions_node_id_idx").on(table.nodeId),
 		index("node_executions_status_idx").on(table.status),
-	]
+	],
 );
 
 // ============================================================================
@@ -251,7 +251,7 @@ export const executionEvents = pgTable(
 		index("execution_events_event_type_idx").on(table.eventType),
 		index("execution_events_node_id_idx").on(table.nodeId),
 		index("execution_events_timestamp_idx").on(table.timestamp),
-	]
+	],
 );
 
 // ============================================================================
@@ -289,7 +289,7 @@ export const nodeDefinitions = pgTable(
 	(table) => [
 		index("node_definitions_node_type_idx").on(table.nodeType),
 		index("node_definitions_category_idx").on(table.category),
-	]
+	],
 );
 
 // ============================================================================
@@ -323,7 +323,7 @@ export const credentials = pgTable(
 		index("credentials_owner_id_idx").on(table.ownerId),
 		index("credentials_type_idx").on(table.type),
 		index("credentials_name_idx").on(table.name),
-	]
+	],
 );
 
 // ============================================================================

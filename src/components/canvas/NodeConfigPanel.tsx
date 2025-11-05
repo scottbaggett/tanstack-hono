@@ -4,7 +4,9 @@
  * Side panel for configuring selected node properties
  */
 
-import { useState, useEffect } from "react";
+import type { Node } from "@xyflow/react";
+import { useEffect, useState } from "react";
+import { LucideIcon } from "@/components/icon/LucideIcon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { JsonEditor } from "@/components/ui/json-editor";
@@ -16,8 +18,6 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { LucideIcon } from "@/components/icon/LucideIcon";
-import type { Node } from "@xyflow/react";
 
 interface NodeProperty {
 	displayName: string;
@@ -33,6 +33,11 @@ interface NodeConfigPanelProps {
 	onClose: () => void;
 }
 
+interface SelectProperty extends NodeProperty {
+	type: "select";
+	options?: Array<{ name: string; value: unknown }>;
+}
+
 export function NodeConfigPanel({
 	selectedNode,
 	onUpdateNode,
@@ -40,19 +45,16 @@ export function NodeConfigPanel({
 }: NodeConfigPanelProps) {
 	const [formValues, setFormValues] = useState<Record<string, unknown>>({});
 
-	if (!selectedNode) {
-		return null;
-	}
-
-	const nodeData = selectedNode.data as Record<string, unknown>;
-	const propertyDefinitions = Array.isArray(nodeData.properties)
+	const nodeData = selectedNode?.data as Record<string, unknown> | undefined;
+	const propertyDefinitions = Array.isArray(nodeData?.properties)
 		? (nodeData.properties as NodeProperty[])
 		: [];
 	const currentProperties =
-		(nodeData.propertyValues as Record<string, unknown>) || {};
+		(nodeData?.propertyValues as Record<string, unknown>) || {};
 
 	// Initialize form values from current properties
 	useEffect(() => {
+		if (!selectedNode) return;
 		const initial: Record<string, unknown> = {};
 		propertyDefinitions.forEach((prop) => {
 			if (typeof prop === "object" && prop !== null && "name" in prop) {
@@ -60,7 +62,11 @@ export function NodeConfigPanel({
 			}
 		});
 		setFormValues(initial);
-	}, [selectedNode.id]);
+	}, [selectedNode, propertyDefinitions, currentProperties]);
+
+	if (!selectedNode) {
+		return null;
+	}
 
 	const handlePropertyChange = (propertyName: string, value: unknown) => {
 		setFormValues((prev) => ({
@@ -150,12 +156,13 @@ export function NodeConfigPanel({
 										);
 									}
 									case "select": {
-										const options = (property as any).options || [];
+										const selectProperty = property as SelectProperty;
+										const options = selectProperty.options || [];
 										if (options.length > 0) {
 											return (
 												<Select
 													value={String(
-														currentValue || options[0]?.value || ""
+														currentValue || options[0]?.value || "",
 													)}
 													onValueChange={(val) =>
 														handlePropertyChange(property.name, val)
@@ -165,7 +172,7 @@ export function NodeConfigPanel({
 														<SelectValue />
 													</SelectTrigger>
 													<SelectContent>
-														{options.map((opt: any) => (
+														{options.map((opt) => (
 															<SelectItem
 																key={String(opt.value)}
 																value={String(opt.value)}
@@ -230,9 +237,13 @@ export function NodeConfigPanel({
 								}
 							};
 
+							const inputId = `property-${property.name}`;
 							return (
 								<div key={property.name} className="space-y-1">
-									<label className="text-sm font-medium text-surface-12">
+									<label
+										htmlFor={inputId}
+										className="text-sm font-medium text-surface-12"
+									>
 										{property.displayName || property.name}
 									</label>
 									{property.description && (
@@ -240,7 +251,7 @@ export function NodeConfigPanel({
 											{property.description}
 										</p>
 									)}
-									{renderInput()}
+									<div id={inputId}>{renderInput()}</div>
 								</div>
 							);
 						})}

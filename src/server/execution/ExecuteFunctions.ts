@@ -5,22 +5,20 @@
  * It bridges the workflow executor with the node's needs.
  */
 
-import type { BaseLanguageModel } from "@langchain/core/language_models/base";
+import { spawn } from "node:child_process";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 import type { Embeddings } from "@langchain/core/embeddings";
+import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Tool } from "@langchain/core/tools";
-
-import { promises as fs } from "fs";
-import path from "path";
-import { spawn } from "child_process";
-
+import type { INodeCredentialsDetails } from "@/types/credentials";
 import type {
 	IExecuteFunctions,
 	INodeExecutionData,
 	INodeOutputData,
-	StreamEventType,
 	StreamEvent,
+	StreamEventType,
 } from "../../types/execution";
-import type { INodeCredentialsDetails } from "@/types/credentials";
 import { credentialService } from "../services/credentials";
 import { extractDynamicInputHandles } from "./InputResolver";
 
@@ -44,12 +42,12 @@ export class ExecuteFunctions implements IExecuteFunctions {
 		private nodeParameters: Record<string, unknown>,
 		private inputData: Record<string, INodeExecutionData[]>,
 		private nodeCredentials: Record<string, INodeCredentialsDetails>,
-		private state: Record<string, unknown>,
+		private _state: Record<string, unknown>,
 		private langchainModels: Map<string, BaseLanguageModel>,
 		private langchainEmbeddings: Map<string, Embeddings>,
 		private langchainTools: Tool[],
 		private secrets: Map<string, string>,
-		private logger: Console
+		private logger: Console,
 	) {}
 
 	// === Node Configuration ===
@@ -75,22 +73,28 @@ export class ExecuteFunctions implements IExecuteFunctions {
 
 		if (!credentialDetails) {
 			throw new Error(
-				`Node "${this.nodeId}" does not have credentials of type "${type}" configured`
+				`Node "${this.nodeId}" does not have credentials of type "${type}" configured`,
 			);
 		}
 
 		const credentialData = await credentialService.getCredentialData(
 			type,
-			credentialDetails.id
+			credentialDetails.id,
 		);
 
 		if (!credentialData) {
 			throw new Error(
-				`Credential "${credentialDetails.name}" (${credentialDetails.id}) not found or inaccessible`
+				`Credential "${credentialDetails.name}" (${credentialDetails.id}) not found or inaccessible`,
 			);
 		}
 
 		return credentialData;
+	}
+
+	// === State ===
+
+	getState(): Record<string, unknown> {
+		return { ...this._state };
 	}
 
 	// === Input Data ===
@@ -116,7 +120,7 @@ export class ExecuteFunctions implements IExecuteFunctions {
 
 		if (!model) {
 			throw new Error(
-				`LangChain model "${name}" not found. Available models: ${Array.from(this.langchainModels.keys()).join(", ")}`
+				`LangChain model "${name}" not found. Available models: ${Array.from(this.langchainModels.keys()).join(", ")}`,
 			);
 		}
 
@@ -129,7 +133,7 @@ export class ExecuteFunctions implements IExecuteFunctions {
 
 		if (!embeddings) {
 			throw new Error(
-				`LangChain embeddings "${name}" not found. Available: ${Array.from(this.langchainEmbeddings.keys()).join(", ")}`
+				`LangChain embeddings "${name}" not found. Available: ${Array.from(this.langchainEmbeddings.keys()).join(", ")}`,
 			);
 		}
 
@@ -172,12 +176,16 @@ export class ExecuteFunctions implements IExecuteFunctions {
 
 			if (options.body !== undefined) {
 				fetchOptions.body =
-					typeof options.body === "string" ? options.body : JSON.stringify(options.body);
+					typeof options.body === "string"
+						? options.body
+						: JSON.stringify(options.body);
 
 				// Set Content-Type if not provided
-				if (!fetchOptions.headers?.["Content-Type"]) {
-					(fetchOptions.headers as Record<string, string>)["Content-Type"] =
-						"application/json";
+				const headers = fetchOptions.headers as
+					| Record<string, string>
+					| undefined;
+				if (headers && !headers["Content-Type"]) {
+					headers["Content-Type"] = "application/json";
 				}
 			}
 
@@ -230,16 +238,24 @@ export class ExecuteFunctions implements IExecuteFunctions {
 			let result: { stdout: string; stderr: string };
 
 			if (options.language === "javascript") {
-				result = await this.executeJavaScript(options.code, options.input || {}, timeout);
+				result = await this.executeJavaScript(
+					options.code,
+					options.input || {},
+					timeout,
+				);
 			} else if (options.language === "python") {
 				result = await this.executePython(
 					options.code,
 					options.requirements || [],
 					options.input || {},
-					timeout
+					timeout,
 				);
 			} else if (options.language === "bash") {
-				result = await this.executeBash(options.code, options.environment || {}, timeout);
+				result = await this.executeBash(
+					options.code,
+					options.environment || {},
+					timeout,
+				);
 			} else {
 				throw new Error(`Unsupported language: ${options.language}`);
 			}
@@ -278,7 +294,7 @@ export class ExecuteFunctions implements IExecuteFunctions {
 	private executeJavaScript(
 		code: string,
 		input: Record<string, unknown>,
-		timeout: number
+		timeout: number,
 	): Promise<{ stdout: string; stderr: string }> {
 		return new Promise((resolve, reject) => {
 			try {
@@ -290,11 +306,11 @@ export class ExecuteFunctions implements IExecuteFunctions {
 				const originalError = console.error;
 
 				console.log = (...args: unknown[]) => {
-					stdout += args.map((a) => String(a)).join(" ") + "\n";
+					stdout += `${args.map((a) => String(a)).join(" ")}\n`;
 				};
 
 				console.error = (...args: unknown[]) => {
-					stderr += args.map((a) => String(a)).join(" ") + "\n";
+					stderr += `${args.map((a) => String(a)).join(" ")}\n`;
 				};
 
 				const timeoutId = setTimeout(() => {
@@ -323,7 +339,8 @@ export class ExecuteFunctions implements IExecuteFunctions {
 								resolve({ stdout, stderr });
 							})
 							.catch((error) => {
-								stderr += error instanceof Error ? error.message : String(error);
+								stderr +=
+									error instanceof Error ? error.message : String(error);
 								console.log = originalLog;
 								console.error = originalError;
 								resolve({ stdout, stderr });
@@ -350,11 +367,11 @@ export class ExecuteFunctions implements IExecuteFunctions {
 
 	private executePython(
 		code: string,
-		requirements: string[],
+		_requirements: string[],
 		input: Record<string, unknown>,
-		timeout: number
+		timeout: number,
 	): Promise<{ stdout: string; stderr: string }> {
-		return new Promise((resolve, reject) => {
+		return new Promise((resolve) => {
 			// Prepare Python script with input data injected
 			const inputJson = JSON.stringify(input);
 
@@ -388,7 +405,7 @@ ${code}
 				stderr += data.toString();
 			});
 
-			process.on("close", (code) => {
+			process.on("close", () => {
 				resolve({ stdout, stderr });
 			});
 
@@ -409,7 +426,7 @@ ${code}
 	private executeBash(
 		code: string,
 		environment: Record<string, string>,
-		timeout: number
+		timeout: number,
 	): Promise<{ stdout: string; stderr: string }> {
 		return new Promise((resolve) => {
 			const env: Record<string, string> = {
@@ -417,7 +434,7 @@ ${code}
 				...environment,
 			};
 
-			const process = spawn("bash", ["-c", code], {
+			const proc = spawn("bash", ["-c", code], {
 				timeout,
 				stdio: ["pipe", "pipe", "pipe"],
 				env: env as NodeJS.ProcessEnv,
@@ -426,26 +443,26 @@ ${code}
 			let stdout = "";
 			let stderr = "";
 
-			process.stdout?.on("data", (data: Buffer) => {
+			proc.stdout?.on("data", (data: Buffer) => {
 				stdout += data.toString();
 			});
 
-			process.stderr?.on("data", (data: Buffer) => {
+			proc.stderr?.on("data", (data: Buffer) => {
 				stderr += data.toString();
 			});
 
-			process.on("close", () => {
+			proc.on("close", () => {
 				resolve({ stdout, stderr });
 			});
 
-			process.on("error", (error: Error) => {
+			proc.on("error", (error: Error) => {
 				stderr += error.message;
 				resolve({ stdout, stderr });
 			});
 
 			setTimeout(() => {
-				if (!process.killed) {
-					process.kill();
+				if (!proc.killed) {
+					proc.kill();
 					stderr = `Bash execution timeout after ${timeout}ms`;
 				}
 			}, timeout);
@@ -460,7 +477,9 @@ ${code}
 		const workspacePath = path.resolve(process.cwd());
 
 		if (!absolutePath.startsWith(workspacePath)) {
-			throw new Error(`Access denied: Cannot read file outside workspace: ${filePath}`);
+			throw new Error(
+				`Access denied: Cannot read file outside workspace: ${filePath}`,
+			);
 		}
 
 		this.logger.info(`[${this.nodeId}] Reading file: ${filePath}`);
@@ -482,7 +501,9 @@ ${code}
 		const workspacePath = path.resolve(process.cwd());
 
 		if (!absolutePath.startsWith(workspacePath)) {
-			throw new Error(`Access denied: Cannot write file outside workspace: ${filePath}`);
+			throw new Error(
+				`Access denied: Cannot write file outside workspace: ${filePath}`,
+			);
 		}
 
 		this.logger.info(`[${this.nodeId}] Writing file: ${filePath}`);
@@ -519,7 +540,10 @@ ${code}
 
 	// === Streaming & Events ===
 
-	emitStreamEvent(eventType: StreamEventType, data: Record<string, unknown>): void {
+	emitStreamEvent(
+		eventType: StreamEventType,
+		data: Record<string, unknown>,
+	): void {
 		const event: StreamEvent = {
 			type: eventType,
 			timestamp: Date.now(),

@@ -4,19 +4,19 @@
  * Helpers to extract and configure LangChain components from execution context
  */
 
-import { ChatOpenAI } from '@langchain/openai';
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { BaseMemory } from '@langchain/core/memory';
-import { DynamicStructuredTool } from '@langchain/core/tools';
-import type { IExecutionContext } from '@/types/interfaces';
-import type { AgentTool } from '@/server/types/agent';
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { BaseMemory } from "@langchain/core/memory";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { ChatOpenAI } from "@langchain/openai";
+import type { AgentTool } from "@/server/types/agent";
+import type { IExecutionContext } from "@/types/interfaces";
 
 // ============================================================================
 // Model Configuration
 // ============================================================================
 
 export interface ModelConfig {
-	provider?: 'openai' | 'anthropic' | 'custom';
+	provider?: "openai" | "anthropic" | "custom";
 	model?: string;
 	temperature?: number;
 	maxTokens?: number;
@@ -32,7 +32,7 @@ export interface ModelConfig {
  */
 export async function getChatModel(
 	context: IExecutionContext,
-	inputKey: string = 'languageModel',
+	inputKey: string = "languageModel",
 ): Promise<BaseChatModel> {
 	const modelInput = context.inputs[inputKey];
 
@@ -44,14 +44,16 @@ export async function getChatModel(
 	// For P0, expect a simple config object. In production, this would
 	// extract from connected model node's output
 	const config: ModelConfig =
-		typeof modelInput === 'object' && modelInput !== null
+		typeof modelInput === "object" && modelInput !== null
 			? (modelInput as ModelConfig)
 			: {};
 
-	const provider = config.provider || 'openai';
-	const modelName = config.model || 'gpt-4';
+	const provider = config.provider || "openai";
+	const modelName = config.model || "gpt-4";
 	const temperature =
-		config.temperature ?? (context.evaluatedProperties.temperature as number) ?? 0.7;
+		config.temperature ??
+		(context.evaluatedProperties.temperature as number) ??
+		0.7;
 	const maxTokens = config.maxTokens;
 
 	// Get API key from credentials or config
@@ -60,15 +62,15 @@ export async function getChatModel(
 		context.credentials?.openai?.apiKey ||
 		process.env.OPENAI_API_KEY;
 
-	if (!apiKey && provider === 'openai') {
+	if (!apiKey && provider === "openai") {
 		throw new Error(
-			'OpenAI API key not found. Set OPENAI_API_KEY environment variable or provide in credentials.',
+			"OpenAI API key not found. Set OPENAI_API_KEY environment variable or provide in credentials.",
 		);
 	}
 
 	// Create model based on provider
 	switch (provider) {
-		case 'openai':
+		case "openai":
 			return new ChatOpenAI({
 				modelName,
 				temperature,
@@ -101,8 +103,8 @@ export function convertToLangChainTool(tool: AgentTool): DynamicStructuredTool {
 			// Execute tool with mock context for P0
 			// TODO: Pass real context with signal, emit, etc.
 			const mockContext = {
-				executionId: 'mock',
-				nodeId: 'mock',
+				executionId: "mock",
+				nodeId: "mock",
 				signal: new AbortController().signal,
 				emit: () => {},
 			};
@@ -112,7 +114,7 @@ export function convertToLangChainTool(tool: AgentTool): DynamicStructuredTool {
 				return JSON.stringify(result);
 			} catch (error) {
 				return JSON.stringify({
-					error: error instanceof Error ? error.message : 'Unknown error',
+					error: error instanceof Error ? error.message : "Unknown error",
 				});
 			}
 		},
@@ -128,7 +130,7 @@ export function convertToLangChainTool(tool: AgentTool): DynamicStructuredTool {
  */
 export async function getTools(
 	context: IExecutionContext,
-	inputKey: string = 'tools',
+	inputKey: string = "tools",
 ): Promise<DynamicStructuredTool[]> {
 	const toolsInput = context.inputs[inputKey];
 
@@ -142,7 +144,7 @@ export async function getTools(
 	if (Array.isArray(toolsInput)) {
 		// Direct array of AgentTool objects
 		agentTools = toolsInput as AgentTool[];
-	} else if (typeof toolsInput === 'object') {
+	} else if (typeof toolsInput === "object") {
 		// Single tool object
 		agentTools = [toolsInput as AgentTool];
 	} else {
@@ -166,7 +168,7 @@ export async function getTools(
  */
 export async function getMemory(
 	context: IExecutionContext,
-	inputKey: string = 'memory',
+	inputKey: string = "memory",
 ): Promise<BaseMemory | undefined> {
 	const memoryInput = context.inputs[inputKey];
 
@@ -184,7 +186,7 @@ export async function getMemory(
  */
 export async function getOptionalMemory(
 	context: IExecutionContext,
-	inputKey: string = 'memory',
+	inputKey: string = "memory",
 ): Promise<BaseMemory | undefined> {
 	try {
 		return await getMemory(context, inputKey);
@@ -206,7 +208,7 @@ export async function getOptionalMemory(
  */
 export async function getOutputParser(
 	context: IExecutionContext,
-	inputKey: string = 'outputParser',
+	inputKey: string = "outputParser",
 ): Promise<any | undefined> {
 	const parserInput = context.inputs[inputKey];
 
@@ -243,13 +245,13 @@ export async function getAllTools(
 export function validateModelConfig(config: ModelConfig): void {
 	if (config.temperature !== undefined) {
 		if (config.temperature < 0 || config.temperature > 2) {
-			throw new Error('Temperature must be between 0 and 2');
+			throw new Error("Temperature must be between 0 and 2");
 		}
 	}
 
 	if (config.maxTokens !== undefined) {
 		if (config.maxTokens < 1) {
-			throw new Error('Max tokens must be positive');
+			throw new Error("Max tokens must be positive");
 		}
 	}
 }

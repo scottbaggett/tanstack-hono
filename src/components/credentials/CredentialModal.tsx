@@ -4,24 +4,29 @@
  * Modal for creating and editing credentials
  */
 
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { LucideIcon } from '@/components/icon/LucideIcon';
+import { useEffect, useState } from "react";
+import { LucideIcon } from "@/components/icon/LucideIcon";
+import { Button } from "@/components/ui/button";
 import type {
-	ICredentialType,
 	ICredentialData,
-} from '@/types/credentials';
+	ICredentialDataDecryptedObject,
+	ICredentialType,
+	ICredentialTypeProperty,
+} from "@/types/credentials";
 
 interface CredentialModalProps {
 	credentialId?: string | null;
 	onClose: (saved: boolean) => void;
 }
 
-export function CredentialModal({ credentialId, onClose }: CredentialModalProps) {
+export function CredentialModal({
+	credentialId,
+	onClose,
+}: CredentialModalProps) {
 	const [credentialTypes, setCredentialTypes] = useState<ICredentialType[]>([]);
-	const [selectedType, setSelectedType] = useState<string>('');
-	const [name, setName] = useState('');
-	const [data, setData] = useState<Record<string, any>>({});
+	const [selectedType, setSelectedType] = useState<string>("");
+	const [name, setName] = useState("");
+	const [data, setData] = useState<Record<string, unknown>>({});
 	const [loading, setLoading] = useState(false);
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
@@ -32,7 +37,7 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 	useEffect(() => {
 		const fetchTypes = async () => {
 			try {
-				const response = await fetch('/api/credentials/types');
+				const response = await fetch("/api/credentials/types");
 				const result = await response.json();
 
 				if (result.success) {
@@ -44,7 +49,7 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 					}
 				}
 			} catch (error) {
-				console.error('Failed to fetch credential types:', error);
+				console.error("Failed to fetch credential types:", error);
 			}
 		};
 
@@ -67,11 +72,11 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 					setSelectedType(cred.type);
 					setData(cred.data);
 				} else {
-					setError('Failed to load credential');
+					setError("Failed to load credential");
 				}
 			} catch (error) {
-				console.error('Failed to fetch credential:', error);
-				setError('Failed to load credential');
+				console.error("Failed to fetch credential:", error);
+				setError("Failed to load credential");
 			} finally {
 				setLoading(false);
 			}
@@ -82,14 +87,14 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 
 	// Get selected credential type definition
 	const selectedTypeDefinition = credentialTypes.find(
-		(t) => t.name === selectedType,
+		(t) => t.name === selectedType
 	);
 
 	// Handle save
 	const handleSave = async () => {
 		// Validation
 		if (!selectedType) {
-			setError('Please select a credential type');
+			setError("Please select a credential type");
 			return;
 		}
 
@@ -113,16 +118,16 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 			const credentialData: ICredentialData = {
 				name: credentialName,
 				type: selectedType,
-				data,
+				data: data as ICredentialDataDecryptedObject,
 			};
 
-			let response;
+			let response: Response | undefined;
 
 			if (isEditing) {
 				// Update existing
 				response = await fetch(`/api/credentials/${credentialId}`, {
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify({
 						name: credentialData.name,
 						data: credentialData.data,
@@ -130,9 +135,9 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 				});
 			} else {
 				// Create new
-				response = await fetch('/api/credentials', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
+				response = await fetch("/api/credentials", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(credentialData),
 				});
 			}
@@ -142,18 +147,18 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 			if (result.success) {
 				onClose(true);
 			} else {
-				setError(result.error || 'Failed to save credential');
+				setError(result.error || "Failed to save credential");
 			}
 		} catch (error) {
-			console.error('Failed to save credential:', error);
-			setError('Failed to save credential');
+			console.error("Failed to save credential:", error);
+			setError("Failed to save credential");
 		} finally {
 			setSaving(false);
 		}
 	};
 
 	// Handle property change
-	const handlePropertyChange = (propertyName: string, value: any) => {
+	const handlePropertyChange = (propertyName: string, value: unknown) => {
 		setData((prev) => ({
 			...prev,
 			[propertyName]: value,
@@ -168,7 +173,7 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 		// Check if user has filled in any identifying fields
 		if (data.username) return `${displayName} (${data.username})`;
 		if (data.email) return `${displayName} (${data.email})`;
-		if (data.apiKey && typeof data.apiKey === 'string') {
+		if (data.apiKey && typeof data.apiKey === "string") {
 			// Show last 4 chars of API key
 			const key = data.apiKey as string;
 			const suffix = key.length > 4 ? `...${key.slice(-4)}` : key;
@@ -180,16 +185,16 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 	};
 
 	// Check if a property should be displayed based on displayOptions
-	const shouldDisplayProperty = (prop: any): boolean => {
+	const shouldDisplayProperty = (prop: ICredentialTypeProperty): boolean => {
 		if (!prop.displayOptions) return true;
 
 		// Check 'show' conditions
 		if (prop.displayOptions.show) {
 			for (const [fieldName, allowedValues] of Object.entries(
-				prop.displayOptions.show,
+				prop.displayOptions.show
 			)) {
 				const currentValue = data[fieldName];
-				if (!allowedValues.includes(currentValue)) {
+				if (!allowedValues.includes(currentValue as unknown)) {
 					return false;
 				}
 			}
@@ -198,7 +203,7 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 		// Check 'hide' conditions
 		if (prop.displayOptions.hide) {
 			for (const [fieldName, hideValues] of Object.entries(
-				prop.displayOptions.hide,
+				prop.displayOptions.hide
 			)) {
 				const currentValue = data[fieldName];
 				if (hideValues.includes(currentValue)) {
@@ -227,12 +232,12 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 				<div className="flex items-center justify-between p-6 border-b border-surface-6">
 					<div>
 						<h2 className="text-lg font-semibold text-surface-12">
-							{isEditing ? 'Edit Credential' : 'New Credential'}
+							{isEditing ? "Edit Credential" : "New Credential"}
 						</h2>
 						<p className="text-sm text-surface-11 mt-1">
 							{isEditing
-								? 'Update credential details'
-								: 'Create a new credential for authentication'}
+								? "Update credential details"
+								: "Create a new credential for authentication"}
 						</p>
 					</div>
 					<Button
@@ -256,7 +261,10 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 
 					{/* Name */}
 					<div>
-						<label className="block text-sm font-medium text-surface-12 mb-2">
+						<label
+							htmlFor="name"
+							className="block text-sm font-medium text-surface-12 mb-2"
+						>
 							Name
 							<span className="text-xs font-normal text-surface-10 ml-2">
 								(optional)
@@ -269,7 +277,7 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 							placeholder={
 								selectedType
 									? `Leave empty for default (e.g., "${getDefaultName()}")`
-									: 'My API Key'
+									: "My API Key"
 							}
 							className="w-full px-3 py-2 bg-surface-3 border border-surface-6 rounded-lg text-surface-12 placeholder:text-surface-9 focus:outline-none focus:border-info-7"
 						/>
@@ -282,7 +290,10 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 					{/* Type (only for new credentials) */}
 					{!isEditing && (
 						<div>
-							<label className="block text-sm font-medium text-surface-12 mb-2">
+							<label
+								htmlFor="type"
+								className="block text-sm font-medium text-surface-12 mb-2"
+							>
 								Type
 							</label>
 							<select
@@ -313,23 +324,26 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 								.filter(shouldDisplayProperty)
 								.map((prop) => {
 									const inputType =
-										prop.type === 'password' || prop.typeOptions?.password
-											? 'password'
-											: prop.type === 'number'
-												? 'number'
-												: prop.type === 'boolean'
-													? 'checkbox'
-													: 'text';
+										prop.type === "password" || prop.typeOptions?.password
+											? "password"
+											: prop.type === "number"
+											? "number"
+											: prop.type === "boolean"
+											? "checkbox"
+											: "text";
 
 									return (
 										<div key={prop.name}>
-											<label className="block text-sm font-medium text-surface-12 mb-2">
+											<label
+												htmlFor={prop.name}
+												className="block text-sm font-medium text-surface-12 mb-2"
+											>
 												{prop.displayName}
 												{prop.required && (
 													<span className="text-red-9 ml-1">*</span>
 												)}
 											</label>
-											{prop.type === 'boolean' ? (
+											{prop.type === "boolean" ? (
 												<input
 													type="checkbox"
 													checked={!!data[prop.name]}
@@ -341,16 +355,18 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 											) : (
 												<input
 													type={inputType}
-													value={data[prop.name]?.toString() || ''}
+													value={data[prop.name]?.toString() || ""}
 													onChange={(e) =>
 														handlePropertyChange(
 															prop.name,
-															prop.type === 'number'
+															prop.type === "number"
 																? Number(e.target.value)
-																: e.target.value,
+																: e.target.value
 														)
 													}
-													placeholder={prop.placeholder || prop.default?.toString()}
+													placeholder={
+														prop.placeholder || prop.default?.toString()
+													}
 													className="w-full px-3 py-2 bg-surface-3 border border-surface-6 rounded-lg text-surface-12 placeholder:text-surface-9 focus:outline-none focus:border-info-7 font-mono text-sm"
 												/>
 											)}
@@ -380,8 +396,10 @@ export function CredentialModal({ credentialId, onClose }: CredentialModalProps)
 								/>
 								Saving...
 							</>
+						) : isEditing ? (
+							"Update"
 						) : (
-							<>{isEditing ? 'Update' : 'Create'}</>
+							"Create"
 						)}
 					</Button>
 				</div>

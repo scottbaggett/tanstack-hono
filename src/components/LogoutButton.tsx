@@ -19,7 +19,9 @@ export function LogoutButton() {
 
 	return (
 		<div className="flex items-center gap-4">
-			{user && <span className="text-sm text-muted-foreground">{user.email}</span>}
+			{user && (
+				<span className="text-sm text-muted-foreground">{user.email}</span>
+			)}
 			<Button variant="outline" size="sm" onClick={handleLogout}>
 				Logout
 			</Button>

@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
 	Card,
 	CardContent,
@@ -9,7 +9,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/login")({
 	component: LoginPage,
@@ -100,7 +100,9 @@ function LoginPage() {
 						{!isLogin && (
 							<>
 								<div>
-									<label className="text-sm font-medium">Username</label>
+									<label htmlFor="username" className="text-sm font-medium">
+										Username
+									</label>
 									<Input
 										type="text"
 										name="username"
@@ -111,7 +113,9 @@ function LoginPage() {
 									/>
 								</div>
 								<div>
-									<label className="text-sm font-medium">Full Name</label>
+									<label htmlFor="fullName" className="text-sm font-medium">
+										Full Name
+									</label>
 									<Input
 										type="text"
 										name="fullName"
@@ -124,7 +128,9 @@ function LoginPage() {
 						)}
 
 						<div>
-							<label className="text-sm font-medium">Email</label>
+							<label htmlFor="email" className="text-sm font-medium">
+								Email
+							</label>
 							<Input
 								type="email"
 								name="email"
@@ -136,8 +142,11 @@ function LoginPage() {
 						</div>
 
 						<div>
-							<label className="text-sm font-medium">Password</label>
+							<label htmlFor="password" className="text-sm font-medium">
+								Password
+							</label>
 							<Input
+								id="password"
 								type="password"
 								name="password"
 								value={formData.password}

@@ -5,34 +5,36 @@
  * - True output: when condition evaluates to truthy
  * - False output: when condition evaluates to falsy
  */
+/** biome-ignore-all lint/suspicious/noExplicitAny: inputData is a Record<string, unknown> */
 
+import { buildExpressionContext } from "@/server/execution/context";
+import { evaluateExpression } from "@/server/lib/expressions";
 import type {
 	IExecutionContext,
+	INodeExecutionData,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	INodeExecutionData,
-} from '@/types/interfaces';
-import { evaluateExpression } from '@/server/lib/expressions';
-import { buildExpressionContext } from '@/server/execution/context';
+} from "@/types/interfaces";
 
 const baseDescription: INodeTypeBaseDescription = {
-	displayName: 'If',
-	name: 'ifElse',
-	icon: 'git-branch',
-	iconColor: 'standard-purple',
-	category: 'control',
-	description: 'Conditionally routes data to different outputs based on a condition',
+	displayName: "If",
+	name: "ifElse",
+	icon: "git-branch",
+	iconColor: "standard-purple",
+	category: "control",
+	description:
+		"Conditionally routes data to different outputs based on a condition",
 	codex: {
-		alias: ['Condition', 'Branch', 'Switch', 'If'],
-		categories: ['control'],
+		alias: ["Condition", "Branch", "Switch", "If"],
+		categories: ["control"],
 		subcategories: {
-			control: ['Flow Control'],
+			control: ["Flow Control"],
 		},
 		resources: {
 			primaryDocumentation: [
 				{
-					url: 'https://docs.example.com/nodes/if-else',
+					url: "https://docs.example.com/nodes/if-else",
 				},
 			],
 		},
@@ -47,19 +49,20 @@ export class IfElse implements INodeType {
 			...baseDescription,
 			version: 1,
 			defaults: {
-				name: 'If/Else',
-				color: 'standard-purple',
+				name: "If/Else",
+				color: "standard-purple",
 			},
-			maxInputs: 1,   // One input connection
-			maxOutputs: 2,  // Two outputs: true and false
+			maxInputs: 1, // One input connection
+			maxOutputs: 2, // Two outputs: true and false
 			properties: [
 				{
-					displayName: 'Condition',
-					name: 'condition',
-					type: 'string',
-					default: 'json.value > 0',
-					description: 'CEL expression to evaluate. Use expressions like {{ json.field }} or {{ $input.count > 10 }}. Returns true if truthy, false otherwise.',
-					placeholder: 'json.value > 0',
+					displayName: "Condition",
+					name: "condition",
+					type: "string",
+					default: "json.value > 0",
+					description:
+						"CEL expression to evaluate. Use expressions like {{ json.field }} or {{ $input.count > 10 }}. Returns true if truthy, false otherwise.",
+					placeholder: "json.value > 0",
 					noDataExpression: false,
 				},
 			],
@@ -67,7 +70,8 @@ export class IfElse implements INodeType {
 	}
 
 	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
-		const condition = (context.evaluatedProperties.condition as string) || 'true';
+		const condition =
+			(context.evaluatedProperties.condition as string) || "true";
 
 		// Get input data to pass through
 		const inputData = context.inputs.main || context.inputs.input || {};
@@ -88,7 +92,7 @@ export class IfElse implements INodeType {
 
 		if (!evaluation.success) {
 			throw new Error(
-				`Failed to evaluate condition: ${evaluation.error || 'Unknown error'}`,
+				`Failed to evaluate condition: ${evaluation.error || "Unknown error"}`,
 			);
 		}
 
@@ -111,14 +115,13 @@ export class IfElse implements INodeType {
 		if (conditionResult) {
 			return [
 				[outputData], // Output group 0: True path (sourceHandle: "true")
-				[],          // Output group 1: False path (empty)
+				[], // Output group 1: False path (empty)
 			];
 		} else {
 			return [
-				[],          // Output group 0: True path (empty)
+				[], // Output group 0: True path (empty)
 				[outputData], // Output group 1: False path (sourceHandle: "false")
 			];
 		}
 	}
 }
-

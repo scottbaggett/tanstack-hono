@@ -61,7 +61,7 @@ export interface INodeTypeBaseDescription {
 		alias: string[];
 		categories: string[];
 		subcategories?: Record<string, string[]>;
-		resources?: any;
+		resources?: unknown;
 	};
 }
 
@@ -119,11 +119,11 @@ export interface IExecutionContext {
 	nodeId: string;
 	nodeType: string;
 	version: number;
-	inputs: Record<string, any>; // Values from connected inputs
+	inputs: Record<string, unknown>; // Values from connected inputs
 	properties: Record<string, unknown>; // Raw property values (may contain CEL expressions)
-	evaluatedProperties: Record<string, any>; // Properties with CEL expressions evaluated
-	credentials?: Record<string, Record<string, any>>; // Decrypted credentials by type
-	previousData?: any[];
+	evaluatedProperties: Record<string, unknown>; // Properties with CEL expressions evaluated
+	credentials?: Record<string, Record<string, unknown>>; // Decrypted credentials by type
+	previousData?: unknown[];
 	signal?: AbortSignal; // For cancellation
 
 	// Execution tracking (for multi-run and item-based execution)
@@ -138,11 +138,11 @@ export interface IExecutionContext {
 	// Helper methods (when implemented)
 	getInputData?(): INodeExecutionData[];
 	getInputByHandle?(handle: string): INodeExecutionData[] | undefined;
-	getNodeParameter?<T = any>(name: string, defaultValue?: T): T;
+	getNodeParameter?<T = unknown>(name: string, defaultValue?: T): T;
 }
 
 export interface INodeExecutionData {
-	json?: Record<string, any>; // Main output data
+	json?: Record<string, unknown>; // Main output data
 	binary?: Record<string, Buffer>; // Binary data
 	pairedItem?: number | number[]; // Link to input item
 	error?: Error; // Error object if execution failed
@@ -154,9 +154,9 @@ export interface INodeExecutionData {
 			executionId: string;
 		};
 		// Additional metadata for tracing, custom data, etc.
-		[key: string]: any;
+		[key: string]: unknown;
 	};
-	evaluationData?: Record<string, any>; // Data from expression evaluation
+	evaluationData?: Record<string, unknown>; // Data from expression evaluation
 	sendMessage?: string; // For chat/agent nodes
 }
 
@@ -199,7 +199,7 @@ export interface IWorkflowNode {
 	>;
 	data: {
 		label?: string; // Custom label
-		inputs?: Record<string, any>; // Values from connected nodes
+		inputs?: Record<string, unknown>; // Values from connected nodes
 		properties?: Record<string, unknown>; // Configuration values (legacy)
 		propertyValues?: Record<string, unknown>; // User-entered property values
 	};

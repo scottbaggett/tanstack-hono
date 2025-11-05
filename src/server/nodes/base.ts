@@ -6,10 +6,10 @@
  */
 
 import type {
-	NodeTypeDefinition,
-	NodeIOSpec,
-	NodeExecutionContext,
 	Logger,
+	NodeExecutionContext,
+	NodeIOSpec,
+	NodeTypeDefinition,
 } from "../../types/workflow";
 import { NodeError } from "../../types/workflow";
 
@@ -21,12 +21,15 @@ import { NodeError } from "../../types/workflow";
  * Abstract base class for all node types
  * Provides common functionality and enforces contract
  */
-export abstract class BaseNode<TInputs = Record<string, unknown>, TOutputs = Record<string, unknown>> {
+export abstract class BaseNode<
+	TInputs = Record<string, unknown>,
+	TOutputs = Record<string, unknown>,
+> {
 	protected logger: Logger;
 
 	constructor(
 		public nodeId: string,
-		protected context: NodeExecutionContext
+		protected context: NodeExecutionContext,
 	) {
 		this.logger = context.logger;
 	}
@@ -88,18 +91,27 @@ export abstract class BaseNode<TInputs = Record<string, unknown>, TOutputs = Rec
 // NODE REGISTRY
 // ============================================================================
 
-type NodeConstructor = new (nodeId: string, context: NodeExecutionContext) => BaseNode;
+type NodeConstructor = new (
+	nodeId: string,
+	context: NodeExecutionContext,
+) => BaseNode;
 
 /**
  * Global registry of all available node types
  */
 export class NodeRegistry {
-	private nodes = new Map<string, { definition: NodeTypeDefinition; constructor: NodeConstructor }>();
+	private nodes = new Map<
+		string,
+		{ definition: NodeTypeDefinition; constructor: NodeConstructor }
+	>();
 
 	/**
 	 * Register a new node type
 	 */
-	register(definition: NodeTypeDefinition, constructor: NodeConstructor): void {
+	register(
+		definition: NodeTypeDefinition,
+		_nodeConstructor: NodeConstructor,
+	): void {
 		if (this.nodes.has(definition.type)) {
 			throw new Error(`Node type "${definition.type}" is already registered`);
 		}
@@ -134,7 +146,11 @@ export class NodeRegistry {
 	/**
 	 * Create an instance of a node
 	 */
-	createNode(nodeType: string, nodeId: string, context: NodeExecutionContext): BaseNode {
+	createNode(
+		nodeType: string,
+		nodeId: string,
+		context: NodeExecutionContext,
+	): BaseNode {
 		const item = this.nodes.get(nodeType);
 		if (!item) {
 			throw new Error(`Unknown node type: "${nodeType}"`);
@@ -208,7 +224,9 @@ export class NodeBuilder {
 		return this;
 	}
 
-	category(cat: "input" | "processing" | "output" | "integration" | "control"): this {
+	category(
+		cat: "input" | "processing" | "output" | "integration" | "control",
+	): this {
 		this.definition.category = cat;
 		return this;
 	}
@@ -224,16 +242,27 @@ export class NodeBuilder {
 	}
 
 	input(spec: NodeIOSpec): this {
-		(this.definition.inputs ??= []).push(spec);
+		if (!this.definition.inputs) {
+			this.definition.inputs = [];
+		}
+		this.definition.inputs.push(spec);
 		return this;
 	}
 
 	output(spec: NodeIOSpec): this {
-		(this.definition.outputs ??= []).push(spec);
+		if (!this.definition.outputs) {
+			this.definition.outputs = [];
+		}
+		this.definition.outputs.push(spec);
 		return this;
 	}
 
-	execute(fn: (inputs: Record<string, unknown>, context: NodeExecutionContext) => Promise<Record<string, unknown>>): this {
+	execute(
+		fn: (
+			inputs: Record<string, unknown>,
+			context: NodeExecutionContext,
+		) => Promise<Record<string, unknown>>,
+	): this {
 		this.definition.execute = fn;
 		return this;
 	}
@@ -258,8 +287,8 @@ export class NodeBuilder {
 		return this.definition as NodeTypeDefinition;
 	}
 
-	register(constructor: NodeConstructor): void {
+	register(nodeConstructor: NodeConstructor): void {
 		const definition = this.build();
-		nodeRegistry.register(definition, constructor);
+		nodeRegistry.register(definition, nodeConstructor);
 	}
 }

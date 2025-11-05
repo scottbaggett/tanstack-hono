@@ -5,17 +5,18 @@
  * Implements timeout, size quotas, and error handling
  */
 
+import { createEventEmitter } from "@/server/observability/events";
 import type {
-	EngineRequest,
-	EngineResponse,
+	AgentError,
+	AgentEvent,
+	AgentTool,
 	EngineAction,
 	EngineActionResult,
+	EngineRequest,
+	EngineResponse,
 	RequestResponseMetadata,
-	AgentTool,
 	ToolContext,
-	AgentError,
-} from '@/server/types/agent';
-import { createEventEmitter } from '@/server/observability/events';
+} from "@/server/types/agent";
 
 // ============================================================================
 // Tool Registry
@@ -60,7 +61,7 @@ export interface HandleRequestOptions {
 	/** Organization ID (for allowlist checks) */
 	orgId?: string;
 	/** Event emitter for observability */
-	emit?: (event: IAgentEvent) => void;
+	emit?: (event: AgentEvent) => void;
 	/** Abort signal for cancellation */
 	signal?: AbortSignal;
 }
@@ -78,7 +79,7 @@ export async function handleEngineRequest(
 
 	// Emit engine.request event
 	emitter.emit({
-		t: 'engine.request',
+		t: "engine.request",
 		requestId: `req_${Date.now().toString(36)}`,
 		actions: request.actions.map((a) => ({
 			id: a.id,
@@ -141,7 +142,9 @@ async function executeAction(
 
 		// Check org allowlist
 		if (orgId && tool.allowedOrgs && !tool.allowedOrgs.includes(orgId)) {
-			throw new Error(`Tool "${action.tool}" not allowed for organization "${orgId}"`);
+			throw new Error(
+				`Tool "${action.tool}" not allowed for organization "${orgId}"`,
+			);
 		}
 
 		// Merge workflow data with action input
@@ -172,7 +175,10 @@ async function executeAction(
 		const output = await Promise.race([
 			tool.execute(ctx, validInput),
 			new Promise<never>((_, reject) =>
-				setTimeout(() => reject(new Error('Tool execution timeout')), timeoutMs),
+				setTimeout(
+					() => reject(new Error("Tool execution timeout")),
+					timeoutMs,
+				),
 			),
 		]);
 
@@ -226,27 +232,30 @@ export function normalizeError(error: unknown): AgentError {
 
 	if (error instanceof Error) {
 		// Detect specific error types
-		if (error.message.includes('timeout')) {
+		if (error.message.includes("timeout")) {
 			return {
-				code: 'TOOL_TIMEOUT',
+				code: "TOOL_TIMEOUT",
 				message: error.message,
 				cause: error,
 				retriable: true,
 			};
 		}
 
-		if (error.message.includes('not found') || error.message.includes('unavailable')) {
+		if (
+			error.message.includes("not found") ||
+			error.message.includes("unavailable")
+		) {
 			return {
-				code: 'TOOL_UNAVAILABLE',
+				code: "TOOL_UNAVAILABLE",
 				message: error.message,
 				cause: error,
 				retriable: true,
 			};
 		}
 
-		if (error.name === 'ZodError') {
+		if (error.name === "ZodError") {
 			return {
-				code: 'VALIDATION_ERROR',
+				code: "VALIDATION_ERROR",
 				message: error.message,
 				cause: error,
 				retriable: false,
@@ -255,7 +264,7 @@ export function normalizeError(error: unknown): AgentError {
 
 		// Generic error
 		return {
-			code: 'MODEL_ERROR',
+			code: "MODEL_ERROR",
 			message: error.message,
 			cause: error,
 			retriable: false,
@@ -264,7 +273,7 @@ export function normalizeError(error: unknown): AgentError {
 
 	// Unknown error type
 	return {
-		code: 'MODEL_ERROR',
+		code: "MODEL_ERROR",
 		message: String(error),
 		retriable: false,
 	};
@@ -272,11 +281,11 @@ export function normalizeError(error: unknown): AgentError {
 
 function isAgentError(error: unknown): error is AgentError {
 	return (
-		typeof error === 'object' &&
+		typeof error === "object" &&
 		error !== null &&
-		'code' in error &&
-		'message' in error &&
-		'retriable' in error
+		"code" in error &&
+		"message" in error &&
+		"retriable" in error
 	);
 }
 
@@ -289,11 +298,11 @@ function isAgentError(error: unknown): error is AgentError {
  */
 export function redactSecrets(text: string): string {
 	return text
-		.replace(/api[_-]?key[=:]\s*["']?[\w-]+["']?/gi, 'api_key=***')
-		.replace(/token[=:]\s*["']?[\w.-]+["']?/gi, 'token=***')
-		.replace(/password[=:]\s*["']?[^\s"']+["']?/gi, 'password=***')
-		.replace(/secret[=:]\s*["']?[^\s"']+["']?/gi, 'secret=***')
-		.replace(/bearer\s+[\w.-]+/gi, 'bearer ***');
+		.replace(/api[_-]?key[=:]\s*["']?[\w-]+["']?/gi, "api_key=***")
+		.replace(/token[=:]\s*["']?[\w.-]+["']?/gi, "token=***")
+		.replace(/password[=:]\s*["']?[^\s"']+["']?/gi, "password=***")
+		.replace(/secret[=:]\s*["']?[^\s"']+["']?/gi, "secret=***")
+		.replace(/bearer\s+[\w.-]+/gi, "bearer ***");
 }
 
 /**
@@ -308,7 +317,10 @@ export function checkToolAllowed(tool: AgentTool, orgId?: string): boolean {
 /**
  * Truncate output to prevent excessive data transfer
  */
-export function truncateOutput(output: unknown, maxLength: number = 500): unknown {
+export function truncateOutput(
+	output: unknown,
+	maxLength: number = 500,
+): unknown {
 	const str = JSON.stringify(output);
 	if (str.length <= maxLength) return output;
 
@@ -335,7 +347,7 @@ export async function handleEngineRequestParallel(
 	const emitter = createEventEmitter();
 
 	emitter.emit({
-		t: 'engine.request',
+		t: "engine.request",
 		requestId: `req_${Date.now().toString(36)}`,
 		actions: request.actions.map((a) => ({
 			id: a.id,

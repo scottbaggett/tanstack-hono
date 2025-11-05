@@ -7,19 +7,11 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
-import type { ModelRegistry, ModelConfig } from "@/server/models/registry";
 import {
-	modelSupportsParam,
 	getTemperatureRange,
+	modelSupportsParam,
 } from "@/server/models/registry";
-
-interface ModelsResponse {
-	success: boolean;
-	data: {
-		models: ModelRegistry;
-		total: number;
-	};
-}
+import type { ModelRegistry } from "@/server/models/types";
 
 /**
  * Fetch model registry from the backend
@@ -56,7 +48,13 @@ export function useModelRegistry() {
  * Hook to get configuration for a specific model
  */
 export function useModelConfig(modelName: string | undefined) {
-	const { data: registry, isLoading, isError, error, ...query } = useModelRegistry();
+	const {
+		data: registry,
+		isLoading,
+		isError,
+		error,
+		...query
+	} = useModelRegistry();
 
 	const modelConfig = modelName && registry ? registry[modelName] : null;
 
@@ -64,7 +62,7 @@ export function useModelConfig(modelName: string | undefined) {
 	if (modelName && registry && !modelConfig) {
 		console.warn(
 			`Model "${modelName}" not found in registry. Available models:`,
-			Object.keys(registry)
+			Object.keys(registry),
 		);
 	}
 
@@ -101,12 +99,14 @@ export function useAvailableModels() {
 /**
  * Get models filtered by provider
  */
-export function useModelsByProvider(provider: "openai" | "anthropic" | "google") {
+export function useModelsByProvider(
+	provider: "openai" | "anthropic" | "google",
+) {
 	const { data: registry, isLoading, isError, error } = useModelRegistry();
 
 	const models = registry
 		? Object.entries(registry)
-				.filter(([_, config]) => config.provider === provider)
+				.filter(([, config]) => config.provider === provider)
 				.map(([name, config]) => ({ name, config }))
 		: [];
 

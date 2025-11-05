@@ -11,17 +11,17 @@ import {
 
 const useThemePreference = (): [
 	ThemePreference,
-	(themePreference: ThemePreference) => void
+	(themePreference: ThemePreference) => void,
 ] => {
 	const [themePreference, setThemePreference] = useState<ThemePreference>(
-		DEFAULT_THEME_PREFERENCE
+		DEFAULT_THEME_PREFERENCE,
 	);
 	const [mounted, setMounted] = useState(false);
 
 	useEffect(() => {
 		setMounted(true);
 		const stored = localStorage.getItem(
-			LOCALSTORAGEKEY_THEME_PREFERENCE
+			LOCALSTORAGEKEY_THEME_PREFERENCE,
 		) as ThemePreference | null;
 		if (stored) {
 			setThemePreference(stored);
@@ -57,7 +57,7 @@ const useSystemTheme = () => {
 };
 
 export const ThemeContext = createContext<ThemeContextState | undefined>(
-	undefined
+	undefined,
 );
 
 export const ThemeContextProvider = ({ children }: { children: ReactNode }) => {

@@ -11,14 +11,14 @@ import { useState } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
 
 interface SchemaTreeProps {
-	data: any;
+	data: Record<string, unknown>;
 	path?: string;
 	nodeName?: string;
 }
 
 type DataType = "string" | "number" | "boolean" | "object" | "array" | "null";
 
-function getDataType(value: any): DataType {
+function getDataType(value: unknown): DataType {
 	if (value === null) return "null";
 	if (Array.isArray(value)) return "array";
 	return typeof value as DataType;
@@ -60,18 +60,19 @@ function getTypeColor(type: DataType): string {
 	}
 }
 
-function formatValue(value: any, type: DataType): string {
-	if (type === "string") return value;
+function formatValue(value: unknown, type: DataType): string {
+	if (type === "string") return String(value);
 	if (type === "number" || type === "boolean") return String(value);
 	if (type === "null") return "null";
-	if (type === "array") return `[${value.length}]`;
-	if (type === "object") return `{${Object.keys(value).length}}`;
+	if (type === "array") return `[${Array.isArray(value) ? value.length : 0}]`;
+	if (type === "object")
+		return `{${Object.keys(value as Record<string, unknown>).length}}`;
 	return "";
 }
 
 interface TreeNodeProps {
 	label: string;
-	value: any;
+	value: unknown;
 	path: string;
 	level: number;
 }
@@ -98,14 +99,15 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 	return (
 		<div className="select-none">
 			{/* Node row */}
-			<div
+			<button
+				type="button"
 				className="flex items-center gap-2 py-1 px-2 hover:bg-surface-3 rounded cursor-pointer group"
 				style={{ paddingLeft: `${level * 16 + 8}px` }}
 				onClick={toggleExpanded}
 			>
 				{/* Expand/collapse icon */}
 				{isExpandable && (
-					<div className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+					<div className="w-4 h-4 flex items-center justify-center shrink-0">
 						<LucideIcon
 							name={isExpanded ? "chevron-down" : "chevron-right"}
 							className="w-3 h-3 text-surface-11"
@@ -116,7 +118,7 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 
 				{/* Type icon */}
 				<div
-					className={`w-4 h-4 flex items-center justify-center flex-shrink-0 ${getTypeColor(
+					className={`w-4 h-4 flex items-center justify-center shrink-0 ${getTypeColor(
 						type
 					)}`}
 				>
@@ -124,7 +126,8 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 				</div>
 
 				{/* Label chip - draggable */}
-				<div
+				<button
+					type="button"
 					draggable={!isExpandable}
 					onDragStart={handleDragStart}
 					className={`px-2 py-0.5 rounded text-xs font-medium bg-surface-4 text-surface-12 ${
@@ -132,7 +135,7 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 					} group-hover:bg-surface-5 transition-colors`}
 				>
 					{label}
-				</div>
+				</button>
 
 				{/* Value preview */}
 				{!isExpandable && (
@@ -144,40 +147,44 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 				{/* Array/Object count badge */}
 				{isExpandable && (
 					<span className="text-xs text-surface-10 ml-auto">
-						{type === "array" ? `${value.length} items` : `${Object.keys(value).length} keys`}
+						{type === "array"
+							? `${Array.isArray(value) ? value.length : 0} items`
+							: `${Object.keys(value as Record<string, unknown>).length} keys`}
 					</span>
 				)}
-			</div>
+			</button>
 
 			{/* Children */}
 			{isExpandable && isExpanded && (
 				<div>
 					{type === "array"
-						? value.map((item: any, index: number) => (
+						? (value as unknown[]).map((item: unknown, index: number) => (
 								<TreeNode
-									key={index}
+									key={path}
 									label={`[${index}]`}
 									value={item}
 									path={`${path}[${index}]`}
 									level={level + 1}
 								/>
-							))
-						: Object.entries(value).map(([key, val]) => (
-								<TreeNode
-									key={key}
-									label={key}
-									value={val}
-									path={`${path}.${key}`}
-									level={level + 1}
-								/>
-							))}
+						  ))
+						: Object.entries(value as Record<string, unknown>).map(
+								([key, val]: [string, unknown]) => (
+									<TreeNode
+										key={key}
+										label={key}
+										value={val}
+										path={`${path}.${key}`}
+										level={level + 1}
+									/>
+								)
+						  )}
 				</div>
 			)}
 		</div>
 	);
 }
 
-export function SchemaTree({ data, path = "json", nodeName }: SchemaTreeProps) {
+export function SchemaTree({ data, path = "json" }: SchemaTreeProps) {
 	if (!data || typeof data !== "object") {
 		return (
 			<div className="p-4 text-center text-xs text-surface-10">

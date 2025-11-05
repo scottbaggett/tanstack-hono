@@ -4,8 +4,8 @@
  * Wrapper for routes that require authentication.
  */
 
-import { useEffect } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { isAuthenticated } from "@/lib/api";
 
 interface ProtectedRouteProps {

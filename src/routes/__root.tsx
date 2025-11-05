@@ -1,15 +1,14 @@
+import { QueryClientProvider } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
 	HeadContent,
 	Outlet,
 	Scripts,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { ThemeContextProvider } from "../context/ThemeContext";
 import { queryClient } from "../lib/query-client";
 import type { RouterContext } from "../routerContext";
 import appCss from "../styles/index.css?url";
-import { ThemeContextProvider } from "../context/ThemeContext";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
 	head: () => ({
@@ -84,7 +83,7 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 							type: "module",
 							src: "/@vite/client",
 						},
-				  ]
+					]
 				: []),
 			{
 				type: "module",

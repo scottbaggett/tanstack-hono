@@ -130,12 +130,12 @@ export function Canvas({
 									...node.data,
 									...data,
 								},
-						  }
-						: node
-				)
+							}
+						: node,
+				),
 			);
 		},
-		[setNodes]
+		[setNodes],
 	);
 
 	// Handle execution results from node test runs
@@ -159,26 +159,30 @@ export function Canvas({
 					if (!nodeRunData) return node;
 
 					// Extract the first run result (runData[nodeId] is an array)
-					const runResult = Array.isArray(nodeRunData)
-						? nodeRunData[0]
-						: null;
+					const runResult = Array.isArray(nodeRunData) ? nodeRunData[0] : null;
 					if (!runResult) return node;
 
 					// Determine execution status: success if data exists, error if error exists
-					const hasError = runResult.error !== null && runResult.error !== undefined;
-					const hasSuccess = runResult.data !== null && runResult.data !== undefined;
+					const hasError =
+						runResult.error !== null && runResult.error !== undefined;
+					const hasSuccess =
+						runResult.data !== null && runResult.data !== undefined;
 
 					return {
 						...node,
 						data: {
 							...node.data,
-							executionStatus: hasError ? "error" : hasSuccess ? "success" : undefined,
+							executionStatus: hasError
+								? "error"
+								: hasSuccess
+									? "success"
+									: undefined,
 						},
 					};
-				})
+				}),
 			);
 		},
-		[setNodes]
+		[setNodes],
 	);
 
 	// Update edge styles based on execution state
@@ -192,7 +196,8 @@ export function Canvas({
 				const targetStatus = targetNode?.data?.executionStatus;
 
 				// Edge is green only if both nodes executed successfully
-				const isSuccess = sourceStatus === "success" && targetStatus === "success";
+				const isSuccess =
+					sourceStatus === "success" && targetStatus === "success";
 				// Edge is red if either node has an error
 				const hasError = sourceStatus === "error" || targetStatus === "error";
 
@@ -209,7 +214,7 @@ export function Canvas({
 						strokeWidth: isSuccess || hasError ? 2 : 1,
 					},
 				};
-			})
+			}),
 		);
 	}, [nodes, setEdges]);
 
@@ -218,7 +223,7 @@ export function Canvas({
 		(connection: Connection) => {
 			setEdges((eds) => addEdge(connection, eds));
 		},
-		[setEdges]
+		[setEdges],
 	);
 
 	// Generate auto-incremented names based on node type
@@ -231,36 +236,13 @@ export function Canvas({
 			// Count existing nodes with same base name
 			const count = existingNodes.filter(
 				(n) =>
-					typeof n.data?.name === "string" && n.data.name.startsWith(baseName)
+					typeof n.data?.name === "string" && n.data.name.startsWith(baseName),
 			).length;
 
 			return count > 0 ? `${baseName} ${count + 1}` : baseName;
 		},
-		[nodesRegistry?.nodes]
+		[nodesRegistry?.nodes],
 	);
-
-	// Add new node
-	const handleAddNode = useCallback(() => {
-		const newNode: Node = {
-			id: `node-${Date.now()}`,
-			data: { label: "New Node" },
-			position: { x: Math.random() * 500, y: Math.random() * 500 },
-			type: "workflow",
-		};
-		setNodes((nds) => [...nds, newNode]);
-	}, [setNodes]);
-
-	// Delete selected node
-	const handleDeleteNode = useCallback(() => {
-		if (!selectedNode) return;
-		setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
-		setEdges((eds) =>
-			eds.filter(
-				(e) => e.source !== selectedNode.id && e.target !== selectedNode.id
-			)
-		);
-		setSelectedNode(null);
-	}, [selectedNode, setNodes, setEdges]);
 
 	// Save workflow (create if doesn't exist, update if exists)
 	const handleSave = useCallback(async () => {
@@ -314,7 +296,7 @@ export function Canvas({
 
 				// Find the node definition from registry
 				const nodeDefinition = nodesRegistry?.nodes?.find(
-					(n) => n.id === nodeType
+					(n) => n.id === nodeType,
 				);
 
 				if (!nodeDefinition) {
@@ -356,7 +338,7 @@ export function Canvas({
 				console.error("Failed to drop node:", error);
 			}
 		},
-		[setNodes, nodesRegistry?.nodes, getAutoName, nodes]
+		[setNodes, nodesRegistry?.nodes, getAutoName, nodes],
 	);
 
 	return (
@@ -426,35 +408,44 @@ export function Canvas({
 			</div>
 
 			{/* Node Editor Modal */}
-			{((showConfig && selectedNode) || selectedNodeFromId) && (
-				<NodeEditorModal
-					selectedNode={(selectedNodeFromId || selectedNode)!}
-					onClose={() => {
-						setShowConfig(false);
-						// Clear nodeId from URL
-						if (workflowId && selectedNodeId) {
-							navigate({
-								to: "/workflow/$workflowId",
-								params: { workflowId },
-								search: {},
-							});
+			{(() => {
+				const nodeToEdit = selectedNodeFromId || selectedNode;
+				if (
+					!nodeToEdit ||
+					!((showConfig && selectedNode) || selectedNodeFromId)
+				) {
+					return null;
+				}
+				return (
+					<NodeEditorModal
+						selectedNode={nodeToEdit}
+						onClose={() => {
+							setShowConfig(false);
+							// Clear nodeId from URL
+							if (workflowId && selectedNodeId) {
+								navigate({
+									to: "/workflow/$workflowId",
+									params: { workflowId },
+									search: {},
+								});
+							}
+						}}
+						onUpdateNode={handleUpdateNodeData}
+						onExecutionComplete={handleExecutionComplete}
+						workflowEdges={
+							edges as Array<{
+								source: string;
+								target: string;
+								sourceHandle?: string;
+								targetHandle?: string;
+							}>
 						}
-					}}
-					onUpdateNode={handleUpdateNodeData}
-					onExecutionComplete={handleExecutionComplete}
-					workflowEdges={
-						edges as Array<{
-							source: string;
-							target: string;
-							sourceHandle?: string;
-							targetHandle?: string;
-						}>
-					}
-					allNodes={nodes}
-					nodeRegistry={nodesRegistry}
-					executionCache={executionCache}
-				/>
-			)}
+						allNodes={nodes}
+						nodeRegistry={nodesRegistry}
+						executionCache={executionCache}
+					/>
+				);
+			})()}
 		</div>
 	);
 }

@@ -35,7 +35,7 @@ modelsRoutes.get("/:id", (c) => {
 				success: false,
 				error: `Model "${id}" not found`,
 			},
-			404
+			404,
 		);
 	}
 

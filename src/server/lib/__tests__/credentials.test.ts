@@ -4,8 +4,8 @@
  * Tests encryption/decryption and credential flow
  */
 
-import { describe, it, expect } from "vitest";
-import { encrypt, decrypt, generateEncryptionKey } from "../crypto";
+import { describe, expect, it } from "vitest";
+import { decrypt, encrypt, generateEncryptionKey } from "../crypto";
 
 describe("Credential Encryption System", () => {
 	const testKey = generateEncryptionKey();
@@ -53,7 +53,7 @@ describe("Credential Encryption System", () => {
 	it("should fail with tampered data", () => {
 		const encrypted = encrypt(credentialData, testKey);
 		const parts = encrypted.split(":");
-		parts[3] = parts[3].substring(0, parts[3].length - 1) + "X"; // Tamper
+		parts[3] = `${parts[3].substring(0, parts[3].length - 1)}X`; // Tamper
 		const tampered = parts.join(":");
 
 		expect(() => {

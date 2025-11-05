@@ -5,36 +5,36 @@
  * Example tool demonstrating async operations and timeout handling
  */
 
-import { z } from 'zod';
-import type { AgentTool, ToolContext, ToolName } from '@/server/types/agent';
+import { z } from "zod";
+import type { AgentTool, ToolContext, ToolName } from "@/server/types/agent";
 
 // ============================================================================
 // Schema Definitions
 // ============================================================================
 
 const searchInputSchema = z.object({
-	query: z.string().min(1).max(500).describe('Search query'),
+	query: z.string().min(1).max(500).describe("Search query"),
 	maxResults: z
 		.number()
 		.int()
 		.min(1)
 		.max(10)
 		.default(5)
-		.describe('Maximum number of results to return'),
+		.describe("Maximum number of results to return"),
 });
 
 const searchResultSchema = z.object({
-	title: z.string().describe('Result title'),
-	url: z.string().url().describe('Result URL'),
-	snippet: z.string().describe('Short excerpt/description'),
+	title: z.string().describe("Result title"),
+	url: z.string().url().describe("Result URL"),
+	snippet: z.string().describe("Short excerpt/description"),
 });
 
 const searchOutputSchema = z.object({
-	query: z.string().describe('Original search query'),
-	results: z.array(searchResultSchema).describe('Search results'),
-	totalResults: z.number().int().describe('Total number of results found'),
-	success: z.boolean().describe('Whether search succeeded'),
-	error: z.string().optional().describe('Error message if search failed'),
+	query: z.string().describe("Original search query"),
+	results: z.array(searchResultSchema).describe("Search results"),
+	totalResults: z.number().int().describe("Total number of results found"),
+	success: z.boolean().describe("Whether search succeeded"),
+	error: z.string().optional().describe("Error message if search failed"),
 });
 
 export type SearchInput = z.infer<typeof searchInputSchema>;
@@ -49,7 +49,10 @@ export type SearchResult = z.infer<typeof searchResultSchema>;
  * Mock search function for demonstration
  * In production, replace with actual search API (e.g., Google Custom Search, Bing, DuckDuckGo)
  */
-async function mockSearch(query: string, maxResults: number): Promise<SearchResult[]> {
+async function mockSearch(
+	query: string,
+	maxResults: number,
+): Promise<SearchResult[]> {
 	// Simulate network delay
 	await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -73,9 +76,9 @@ async function mockSearch(query: string, maxResults: number): Promise<SearchResu
 // ============================================================================
 
 export const searchTool: AgentTool<SearchInput, SearchOutput> = {
-	name: 'search' as ToolName,
+	name: "search" as ToolName,
 	description:
-		'Searches the web for information. Provide a search query and optionally the maximum number of results (default: 5, max: 10). Returns titles, URLs, and snippets.',
+		"Searches the web for information. Provide a search query and optionally the maximum number of results (default: 5, max: 10). Returns titles, URLs, and snippets.",
 	inputSchema: searchInputSchema,
 	outputSchema: searchOutputSchema,
 	timeoutMs: 5000, // 5 seconds for network requests
@@ -83,8 +86,8 @@ export const searchTool: AgentTool<SearchInput, SearchOutput> = {
 
 	async execute(ctx: ToolContext, input: SearchInput): Promise<SearchOutput> {
 		ctx.emit({
-			t: 'tool.start',
-			tool: 'search' as ToolName,
+			t: "tool.start",
+			tool: "search" as ToolName,
 			id: ctx.executionId,
 			input,
 		});
@@ -94,20 +97,20 @@ export const searchTool: AgentTool<SearchInput, SearchOutput> = {
 		try {
 			// Check for cancellation
 			if (ctx.signal.aborted) {
-				throw new Error('Search cancelled');
+				throw new Error("Search cancelled");
 			}
 
 			// Perform search with timeout
 			const results = await Promise.race([
 				mockSearch(input.query, input.maxResults ?? 5),
 				new Promise<never>((_, reject) =>
-					setTimeout(() => reject(new Error('Search timeout')), 4000),
+					setTimeout(() => reject(new Error("Search timeout")), 4000),
 				),
 			]);
 
 			// Check cancellation again after async operation
 			if (ctx.signal.aborted) {
-				throw new Error('Search cancelled');
+				throw new Error("Search cancelled");
 			}
 
 			const output: SearchOutput = {
@@ -118,8 +121,8 @@ export const searchTool: AgentTool<SearchInput, SearchOutput> = {
 			};
 
 			ctx.emit({
-				t: 'tool.success',
-				tool: 'search' as ToolName,
+				t: "tool.success",
+				tool: "search" as ToolName,
 				id: ctx.executionId,
 				size: JSON.stringify(output).length,
 				ms: Date.now() - startTime,
@@ -127,7 +130,8 @@ export const searchTool: AgentTool<SearchInput, SearchOutput> = {
 
 			return output;
 		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
 
 			const output: SearchOutput = {
 				query: input.query,
@@ -138,13 +142,14 @@ export const searchTool: AgentTool<SearchInput, SearchOutput> = {
 			};
 
 			ctx.emit({
-				t: 'tool.error',
-				tool: 'search' as ToolName,
+				t: "tool.error",
+				tool: "search" as ToolName,
 				id: ctx.executionId,
 				error: {
-					code: error instanceof Error && error.message.includes('timeout')
-						? 'TOOL_TIMEOUT'
-						: 'TOOL_UNAVAILABLE',
+					code:
+						error instanceof Error && error.message.includes("timeout")
+							? "TOOL_TIMEOUT"
+							: "TOOL_UNAVAILABLE",
 					message: errorMessage,
 					cause: error instanceof Error ? error : undefined,
 					retriable: true, // Search failures are usually retriable

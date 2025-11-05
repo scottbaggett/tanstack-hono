@@ -4,11 +4,14 @@
  * Endpoints for CRUD operations on credentials
  */
 
-import { Hono } from 'hono';
-import { credentialService } from '../services/credentials';
-import { credentialRegistry } from '../credentials/registry';
-import { z } from 'zod';
-import type { ICredentialData } from '@/types/credentials';
+import { Hono } from "hono";
+import { z } from "zod";
+import type {
+	ICredentialData,
+	ICredentialDataDecryptedObject,
+} from "@/types/credentials";
+import { credentialRegistry } from "../credentials/registry";
+import { credentialService } from "../services/credentials";
 
 const app = new Hono();
 
@@ -17,14 +20,14 @@ const app = new Hono();
 // ============================================================================
 
 const createCredentialSchema = z.object({
-	name: z.string().min(1, 'Name is required'),
-	type: z.string().min(1, 'Type is required'),
-	data: z.record(z.any()),
+	name: z.string().min(1, "Name is required"),
+	type: z.string().min(1, "Type is required"),
+	data: z.record(z.string(), z.unknown()),
 });
 
 const updateCredentialSchema = z.object({
 	name: z.string().min(1).optional(),
-	data: z.record(z.any()).optional(),
+	data: z.record(z.string(), z.unknown()).optional(),
 });
 
 // ============================================================================
@@ -36,7 +39,7 @@ const updateCredentialSchema = z.object({
  * Get all available credential types
  * NOTE: This must come BEFORE /:id to avoid route conflict
  */
-app.get('/types', async (c) => {
+app.get("/types", async (c) => {
 	try {
 		const types = credentialRegistry.getAllTypes();
 
@@ -45,11 +48,11 @@ app.get('/types', async (c) => {
 			data: types,
 		});
 	} catch (error) {
-		console.error('Failed to fetch credential types:', error);
+		console.error("Failed to fetch credential types:", error);
 		return c.json(
 			{
 				success: false,
-				error: 'Failed to fetch credential types',
+				error: "Failed to fetch credential types",
 			},
 			500,
 		);
@@ -60,10 +63,10 @@ app.get('/types', async (c) => {
  * GET /api/credentials
  * List all credentials for the current user (metadata only, no sensitive data)
  */
-app.get('/', async (c) => {
+app.get("/", async (c) => {
 	try {
 		// TODO: Get actual user ID from auth context
-		const ownerId = 'temp-user-id';
+		const ownerId = "temp-user-id";
 
 		const credentials = await credentialService.getAllCredentials(ownerId);
 
@@ -72,11 +75,11 @@ app.get('/', async (c) => {
 			data: credentials,
 		});
 	} catch (error) {
-		console.error('Failed to fetch credentials:', error);
+		console.error("Failed to fetch credentials:", error);
 		return c.json(
 			{
 				success: false,
-				error: 'Failed to fetch credentials',
+				error: "Failed to fetch credentials",
 			},
 			500,
 		);
@@ -87,11 +90,11 @@ app.get('/', async (c) => {
  * GET /api/credentials/:id
  * Get a specific credential (decrypted for editing)
  */
-app.get('/:id', async (c) => {
+app.get("/:id", async (c) => {
 	try {
-		const id = c.req.param('id');
+		const id = c.req.param("id");
 		// TODO: Get actual user ID from auth context
-		const ownerId = 'temp-user-id';
+		const ownerId = "temp-user-id";
 
 		const credential = await credentialService.getCredential(id, ownerId);
 
@@ -99,7 +102,7 @@ app.get('/:id', async (c) => {
 			return c.json(
 				{
 					success: false,
-					error: 'Credential not found',
+					error: "Credential not found",
 				},
 				404,
 			);
@@ -110,11 +113,11 @@ app.get('/:id', async (c) => {
 			data: credential,
 		});
 	} catch (error) {
-		console.error('Failed to fetch credential:', error);
+		console.error("Failed to fetch credential:", error);
 		return c.json(
 			{
 				success: false,
-				error: 'Failed to fetch credential',
+				error: "Failed to fetch credential",
 			},
 			500,
 		);
@@ -125,7 +128,7 @@ app.get('/:id', async (c) => {
  * POST /api/credentials
  * Create a new credential
  */
-app.post('/', async (c) => {
+app.post("/", async (c) => {
 	try {
 		const body = await c.req.json();
 
@@ -135,8 +138,8 @@ app.post('/', async (c) => {
 			return c.json(
 				{
 					success: false,
-					error: 'Validation failed',
-					details: validation.error.errors,
+					error: "Validation failed",
+					details: validation.error.issues,
 				},
 				400,
 			);
@@ -156,17 +159,19 @@ app.post('/', async (c) => {
 		}
 
 		// TODO: Get actual user ID from auth context
-		const ownerId = 'temp-user-id';
+		const ownerId = "temp-user-id";
 
 		// Create credential
 		const credentialData: ICredentialData = {
 			name,
 			type,
-			data,
+			data: data as ICredentialDataDecryptedObject,
 		};
 
-		const newCredential =
-			await credentialService.createCredential(ownerId, credentialData);
+		const newCredential = await credentialService.createCredential(
+			ownerId,
+			credentialData,
+		);
 
 		return c.json(
 			{
@@ -176,11 +181,11 @@ app.post('/', async (c) => {
 			201,
 		);
 	} catch (error) {
-		console.error('Failed to create credential:', error);
+		console.error("Failed to create credential:", error);
 		return c.json(
 			{
 				success: false,
-				error: 'Failed to create credential',
+				error: "Failed to create credential",
 			},
 			500,
 		);
@@ -191,9 +196,9 @@ app.post('/', async (c) => {
  * PUT /api/credentials/:id
  * Update an existing credential
  */
-app.put('/:id', async (c) => {
+app.put("/:id", async (c) => {
 	try {
-		const id = c.req.param('id');
+		const id = c.req.param("id");
 		const body = await c.req.json();
 
 		// Validate input
@@ -202,28 +207,35 @@ app.put('/:id', async (c) => {
 			return c.json(
 				{
 					success: false,
-					error: 'Validation failed',
-					details: validation.error.errors,
+					error: "Validation failed",
+					details: validation.error.issues,
 				},
 				400,
 			);
 		}
 
 		// TODO: Get actual user ID from auth context
-		const ownerId = 'temp-user-id';
+		const ownerId = "temp-user-id";
 
 		// Update credential
+		const updates = validation.data;
+		const updatesWithCorrectType = updates.data
+			? { ...updates, data: updates.data as ICredentialDataDecryptedObject }
+			: updates;
 		const updated = await credentialService.updateCredential(
 			id,
 			ownerId,
-			validation.data,
+			updatesWithCorrectType as {
+				name?: string;
+				data?: ICredentialDataDecryptedObject;
+			},
 		);
 
 		if (!updated) {
 			return c.json(
 				{
 					success: false,
-					error: 'Credential not found',
+					error: "Credential not found",
 				},
 				404,
 			);
@@ -234,11 +246,11 @@ app.put('/:id', async (c) => {
 			data: updated,
 		});
 	} catch (error) {
-		console.error('Failed to update credential:', error);
+		console.error("Failed to update credential:", error);
 		return c.json(
 			{
 				success: false,
-				error: 'Failed to update credential',
+				error: "Failed to update credential",
 			},
 			500,
 		);
@@ -249,11 +261,11 @@ app.put('/:id', async (c) => {
  * DELETE /api/credentials/:id
  * Delete a credential
  */
-app.delete('/:id', async (c) => {
+app.delete("/:id", async (c) => {
 	try {
-		const id = c.req.param('id');
+		const id = c.req.param("id");
 		// TODO: Get actual user ID from auth context
-		const ownerId = 'temp-user-id';
+		const ownerId = "temp-user-id";
 
 		const deleted = await credentialService.deleteCredential(id, ownerId);
 
@@ -261,7 +273,7 @@ app.delete('/:id', async (c) => {
 			return c.json(
 				{
 					success: false,
-					error: 'Credential not found',
+					error: "Credential not found",
 				},
 				404,
 			);
@@ -269,14 +281,14 @@ app.delete('/:id', async (c) => {
 
 		return c.json({
 			success: true,
-			message: 'Credential deleted successfully',
+			message: "Credential deleted successfully",
 		});
 	} catch (error) {
-		console.error('Failed to delete credential:', error);
+		console.error("Failed to delete credential:", error);
 		return c.json(
 			{
 				success: false,
-				error: 'Failed to delete credential',
+				error: "Failed to delete credential",
 			},
 			500,
 		);

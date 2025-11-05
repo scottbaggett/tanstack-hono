@@ -4,7 +4,7 @@
  * Tests the new json/binary/input accessor pattern (no $ prefix)
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import { evaluateTemplate } from "../expressions";
 
 describe("Expression System", () => {

@@ -12,13 +12,12 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-
-import { authRoutes } from "./routes/auth";
-import { workflowRoutes } from "./routes/workflows";
-import { nodesRoutes } from "./routes/nodes";
-import { executeRoutes } from "./routes/execute";
-import { webhookRoutes } from "./routes/webhooks";
 import { authMiddleware } from "./auth/middleware";
+import { authRoutes } from "./routes/auth";
+import { executeRoutes } from "./routes/execute";
+import { nodesRoutes } from "./routes/nodes";
+import { webhookRoutes } from "./routes/webhooks";
+import { workflowRoutes } from "./routes/workflows";
 // Load nodes to ensure they are registered
 import "./nodes/load";
 
@@ -59,7 +58,7 @@ app.use(
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 		allowHeaders: ["Content-Type", "Authorization"],
 		credentials: true,
-	})
+	}),
 );
 
 // ============================================================================
@@ -94,12 +93,15 @@ app.get("/api/test-workflow", (c) => {
 			: undefined,
 	}));
 
-	const connections = Array.from({ length: Math.max(0, nodeCount - 1) }, (_, i) => ({
-		source: `node-${i + 1}`,
-		target: `node-${i + 2}`,
-		sourceHandle: "output",
-		targetHandle: "input",
-	}));
+	const connections = Array.from(
+		{ length: Math.max(0, nodeCount - 1) },
+		(_, i) => ({
+			source: `node-${i + 1}`,
+			target: `node-${i + 2}`,
+			sourceHandle: "output",
+			targetHandle: "input",
+		}),
+	);
 
 	return c.json({
 		success: true,
@@ -137,7 +139,7 @@ app.notFound((c) => {
 			success: false,
 			error: "Not Found",
 		},
-		404
+		404,
 	);
 });
 
@@ -150,7 +152,7 @@ app.onError((err, c) => {
 			success: false,
 			error: err instanceof Error ? err.message : "Internal Server Error",
 		},
-		500
+		500,
 	);
 });
 

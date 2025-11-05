@@ -27,13 +27,14 @@ import type { INodeExecutionData } from "../../types/execution";
 export function extractVariables(text: string): string[] {
 	const pattern = /\{\{([^}]+)\}\}/g;
 	const variables: string[] = [];
-	let match;
+	let match: RegExpExecArray | null = pattern.exec(text);
 
-	while ((match = pattern.exec(text)) !== null) {
+	while (match !== null) {
 		const varName = match[1].trim();
 		if (!variables.includes(varName)) {
 			variables.push(varName);
 		}
+		match = pattern.exec(text);
 	}
 
 	return variables;
@@ -62,11 +63,12 @@ export function getEdgeValue(
 		sourceHandle?: string;
 		targetHandle?: string;
 	}>,
-	state: Record<string, Record<string, INodeExecutionData[]>>
+	state: Record<string, Record<string, INodeExecutionData[]>>,
 ): INodeExecutionData | undefined {
 	// Find edges connecting to this node's input
 	const incomingEdges = edges.filter(
-		(edge) => edge.target === nodeId && (edge.targetHandle ?? "default") === inputName
+		(edge) =>
+			edge.target === nodeId && (edge.targetHandle ?? "default") === inputName,
 	);
 
 	if (incomingEdges.length === 0) {
@@ -105,10 +107,11 @@ export function getEdgeValues(
 		sourceHandle?: string;
 		targetHandle?: string;
 	}>,
-	state: Record<string, Record<string, INodeExecutionData[]>>
+	state: Record<string, Record<string, INodeExecutionData[]>>,
 ): INodeExecutionData[] {
 	const incomingEdges = edges.filter(
-		(edge) => edge.target === nodeId && (edge.targetHandle ?? "default") === inputName
+		(edge) =>
+			edge.target === nodeId && (edge.targetHandle ?? "default") === inputName,
 	);
 
 	if (incomingEdges.length === 0) {
@@ -153,13 +156,13 @@ export function resolveVariablesInString(
 		sourceHandle?: string;
 		targetHandle?: string;
 	}>,
-	state: Record<string, Record<string, INodeExecutionData[]>>
+	state: Record<string, Record<string, INodeExecutionData[]>>,
 ): string {
 	const pattern = /\{\{([^}]+)\}\}/g;
 	let resolved = text;
 
-	let match;
-	while ((match = pattern.exec(text)) !== null) {
+	let match: RegExpExecArray | null = pattern.exec(text);
+	while (match !== null) {
 		const variableName = match[1].trim();
 		const placeholder = match[0];
 
@@ -182,6 +185,7 @@ export function resolveVariablesInString(
 			resolved = resolved.replace(placeholder, stringValue);
 		}
 		// If value not found, leave placeholder as-is
+		match = pattern.exec(text);
 	}
 
 	return resolved;
@@ -213,7 +217,9 @@ export interface ResolveInputsConfig {
  * 2. Resolving {{variable}} placeholders
  * 3. Handling nested structures
  */
-export function resolveInputs(config: ResolveInputsConfig): Record<string, unknown> {
+export function resolveInputs(
+	config: ResolveInputsConfig,
+): Record<string, unknown> {
 	const { nodeInputs, nodeId, edges, state, logger } = config;
 	const resolved: Record<string, unknown> = {};
 
@@ -226,16 +232,32 @@ export function resolveInputs(config: ResolveInputsConfig): Record<string, unkno
 			logger?.info(`[${nodeId}] Edge connection: ${inputName}`);
 		} else if (typeof inputValue === "string") {
 			// Process string for {{variable}} placeholders
-			resolved[inputName] = resolveVariablesInString(inputValue, nodeId, edges, state);
+			resolved[inputName] = resolveVariablesInString(
+				inputValue,
+				nodeId,
+				edges,
+				state,
+			);
 
 			// Log if variables were resolved
 			const vars = extractVariables(inputValue);
 			if (vars.length > 0) {
-				logger?.info(`[${nodeId}] Resolved variables in ${inputName}: ${vars.join(", ")}`);
+				logger?.info(
+					`[${nodeId}] Resolved variables in ${inputName}: ${vars.join(", ")}`,
+				);
 			}
-		} else if (typeof inputValue === "object" && inputValue !== null && !Array.isArray(inputValue)) {
+		} else if (
+			typeof inputValue === "object" &&
+			inputValue !== null &&
+			!Array.isArray(inputValue)
+		) {
 			// Recursively resolve nested objects
-			resolved[inputName] = resolveNestedObject(inputValue as Record<string, unknown>, nodeId, edges, state);
+			resolved[inputName] = resolveNestedObject(
+				inputValue as Record<string, unknown>,
+				nodeId,
+				edges,
+				state,
+			);
 		} else {
 			// Pass through unchanged
 			resolved[inputName] = inputValue;
@@ -257,15 +279,24 @@ function resolveNestedObject(
 		sourceHandle?: string;
 		targetHandle?: string;
 	}>,
-	state: Record<string, Record<string, INodeExecutionData[]>>
+	state: Record<string, Record<string, INodeExecutionData[]>>,
 ): Record<string, unknown> {
 	const resolved: Record<string, unknown> = {};
 
 	for (const [key, value] of Object.entries(obj)) {
 		if (typeof value === "string") {
 			resolved[key] = resolveVariablesInString(value, nodeId, edges, state);
-		} else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-			resolved[key] = resolveNestedObject(value as Record<string, unknown>, nodeId, edges, state);
+		} else if (
+			typeof value === "object" &&
+			value !== null &&
+			!Array.isArray(value)
+		) {
+			resolved[key] = resolveNestedObject(
+				value as Record<string, unknown>,
+				nodeId,
+				edges,
+				state,
+			);
 		} else {
 			resolved[key] = value;
 		}
@@ -290,14 +321,22 @@ function resolveNestedObject(
  *
  * These become implicit input handles that can be connected in the UI.
  */
-export function extractDynamicInputHandles(nodeInputs: Record<string, unknown>): string[] {
+export function extractDynamicInputHandles(
+	nodeInputs: Record<string, unknown>,
+): string[] {
 	const handles = new Set<string>();
 
 	function extractFromValue(value: unknown) {
 		if (typeof value === "string") {
 			const vars = extractVariables(value);
-			vars.forEach((v) => handles.add(v));
-		} else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+			for (const v of vars) {
+				handles.add(v);
+			}
+		} else if (
+			typeof value === "object" &&
+			value !== null &&
+			!Array.isArray(value)
+		) {
 			for (const v of Object.values(value as Record<string, unknown>)) {
 				extractFromValue(v);
 			}
@@ -352,8 +391,8 @@ export function validateInputs(
 		sourceHandle?: string;
 		targetHandle?: string;
 	}>,
-	state: Record<string, Record<string, INodeExecutionData[]>>,
-	requiredInputs: string[] = []
+	_state: Record<string, Record<string, INodeExecutionData[]>>,
+	requiredInputs: string[] = [],
 ): { valid: boolean; errors: string[] } {
 	const errors: string[] = [];
 
@@ -362,7 +401,9 @@ export function validateInputs(
 
 		// Check if has edge connection
 		const hasEdge = edges.some(
-			(edge) => edge.target === nodeId && (edge.targetHandle ?? "default") === requiredInput
+			(edge) =>
+				edge.target === nodeId &&
+				(edge.targetHandle ?? "default") === requiredInput,
 		);
 
 		if (hasEdge) {
@@ -386,12 +427,14 @@ export function validateInputs(
 
 			for (const varName of vars) {
 				const hasEdge = edges.some(
-					(edge) => edge.target === nodeId && (edge.targetHandle ?? "default") === varName
+					(edge) =>
+						edge.target === nodeId &&
+						(edge.targetHandle ?? "default") === varName,
 				);
 
 				if (!hasEdge) {
 					errors.push(
-						`Unresolved variable "{{${varName}}}" in input "${requiredInput}"`
+						`Unresolved variable "{{${varName}}}" in input "${requiredInput}"`,
 					);
 				}
 			}

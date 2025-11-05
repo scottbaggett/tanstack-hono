@@ -10,27 +10,28 @@
  * 6. Recording execution history
  */
 
-import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Embeddings } from "@langchain/core/embeddings";
+import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Tool } from "@langchain/core/tools";
+
 // Note: BufferMemory was removed in LangChain 1.0 - using LangGraph state instead
 // import { BufferMemory } from "langchain/memory";
 
-import type { IWorkflowDefinition, INodeExecutionData } from "../../types/interfaces";
 import type { StreamEvent } from "../../types/execution";
+import type {
+	IExecutionContext,
+	INodeExecutionData,
+	IWorkflowDefinition,
+} from "../../types/interfaces";
+import { db } from "../db";
+import type { InternalStep, InternalTraceData } from "../db/schema";
+import { nodeExecutions } from "../db/schema";
+import { type ExpressionContext, evaluateTemplate } from "../lib/expressions";
 import { nodeRegistry } from "../nodes/registry";
+import type { EngineRequest, RequestResponseMetadata } from "../types/agent";
 import { ExecuteFunctions } from "./ExecuteFunctions";
 import { resolveInputs } from "./InputResolver";
-import { evaluateTemplate, type ExpressionContext } from "../lib/expressions";
-import type {
-	EngineRequest,
-	RequestResponseMetadata,
-} from "../types/agent";
 import { handleEngineRequest } from "./requestHandler";
-import type { IExecutionContext } from "../../types/interfaces";
-import type { InternalTraceData, InternalStep } from "../db/schema";
-import { db } from "../db";
-import { nodeExecutions } from "../db/schema";
 
 // ============================================================================
 // TYPES
@@ -172,7 +173,7 @@ export class WorkflowOrchestrator {
 
 			// Execute each node
 			for (const nodeId of executionOrder) {
-				const node = this.config.definition.nodes.find(n => n.id === nodeId);
+				const node = this.config.definition.nodes.find((n) => n.id === nodeId);
 
 				if (!node) {
 					const error = new Error(
@@ -261,7 +262,9 @@ export class WorkflowOrchestrator {
 		};
 
 		if (!nodeType) {
-			throw new Error(`Node ${nodeId} is missing nodeType/nodeId in data. Node data: ${JSON.stringify(nodeData.data)}`);
+			throw new Error(
+				`Node ${nodeId} is missing nodeType/nodeId in data. Node data: ${JSON.stringify(nodeData.data)}`,
+			);
 		}
 
 		this.config.logger.info(
@@ -285,7 +288,7 @@ export class WorkflowOrchestrator {
 			nodeParameters,
 			inputData,
 			nodeId,
-			nodeType
+			nodeType,
 		);
 
 		// Create execution context
@@ -362,7 +365,7 @@ export class WorkflowOrchestrator {
 					});
 
 					// Execute tools via request handler
-					const toolStartTime = Date.now();
+					const _toolStartTime = Date.now();
 					const response = await handleEngineRequest(result, {
 						emit: (event) => {
 							this.config.logger.debug(`[${nodeId}] Agent event:`, event);
@@ -415,16 +418,18 @@ export class WorkflowOrchestrator {
 				const internalTrace: InternalTraceData = {
 					steps: agentExecutionSteps,
 					iterationCount: currentIteration,
-					finalState: currentIteration > maxIterations ? "max_iterations" : "success",
+					finalState:
+						currentIteration > maxIterations ? "max_iterations" : "success",
 					halted: currentIteration > maxIterations,
-					haltReason: currentIteration > maxIterations ? "max_iterations" : undefined,
+					haltReason:
+						currentIteration > maxIterations ? "max_iterations" : undefined,
 				};
 
 				// Convert agent result to outputs format
 				// Agent returns INodeExecutionData[][], we need to store as outputs
 				const agentOutputData = result as INodeExecutionData[][];
-				if (agentOutputData && agentOutputData[0]) {
-					executeFunctions.setOutput('main', agentOutputData[0]);
+				if (agentOutputData?.[0]) {
+					executeFunctions.setOutput("main", agentOutputData[0]);
 				}
 
 				// Collect outputs and store with trace
@@ -447,7 +452,9 @@ export class WorkflowOrchestrator {
 				});
 
 				this.allEvents.push(...events);
-				this.config.logger.debug(`[${nodeId}] Agent execution complete with trace`);
+				this.config.logger.debug(
+					`[${nodeId}] Agent execution complete with trace`,
+				);
 				return; // Early return after agent handling
 			} else {
 				// Regular nodes use ExecuteFunctions
@@ -463,7 +470,7 @@ export class WorkflowOrchestrator {
 			if (result && Array.isArray(result) && result.length > 0) {
 				// result is [[{ json: {...} }]] format
 				if (!outputs.main || outputs.main.length === 0) {
-					executeFunctions.setOutput('main', result[0]);
+					executeFunctions.setOutput("main", result[0]);
 					outputs = executeFunctions.getCollectedOutputs();
 				}
 			}
@@ -582,7 +589,7 @@ export class WorkflowOrchestrator {
 		parameters: Record<string, unknown>,
 		inputData: Record<string, INodeExecutionData[]>,
 		nodeId: string,
-		nodeType: string
+		nodeType: string,
 	): Record<string, unknown> {
 		// Build expression context from input data
 		const context: ExpressionContext = {
@@ -597,9 +604,11 @@ export class WorkflowOrchestrator {
 		const inputKeys = Object.keys(inputData);
 		if (inputKeys.length > 0) {
 			const firstInput = inputData[inputKeys[0]];
-			if (firstInput && firstInput[0]) {
+			if (firstInput?.[0]) {
 				context.json = firstInput[0].json as Record<string, any>;
-				context.binary = firstInput[0].binary as Record<string, any> | undefined;
+				context.binary = firstInput[0].binary as
+					| Record<string, any>
+					| undefined;
 			}
 		}
 
@@ -608,7 +617,7 @@ export class WorkflowOrchestrator {
 			context.inputs = {};
 			for (const key of inputKeys) {
 				const input = inputData[key];
-				if (input && input[0]) {
+				if (input?.[0]) {
 					context.inputs[key] = {
 						json: input[0].json as Record<string, any>,
 						binary: input[0].binary as Record<string, any> | undefined,
@@ -619,14 +628,14 @@ export class WorkflowOrchestrator {
 
 		// Recursively evaluate all string parameters
 		const evaluateValue = (value: unknown): unknown => {
-			if (typeof value === 'string') {
+			if (typeof value === "string") {
 				const result = evaluateTemplate(value, context);
 				return result.success ? result.value : value;
 			}
 			if (Array.isArray(value)) {
 				return value.map(evaluateValue);
 			}
-			if (value && typeof value === 'object') {
+			if (value && typeof value === "object") {
 				const evaluated: Record<string, unknown> = {};
 				for (const [k, v] of Object.entries(value)) {
 					evaluated[k] = evaluateValue(v);
@@ -645,7 +654,7 @@ export class WorkflowOrchestrator {
 	private prepareInputData(
 		nodeId: string,
 	): Record<string, INodeExecutionData[]> {
-		const node = this.config.definition.nodes.find(n => n.id === nodeId);
+		const node = this.config.definition.nodes.find((n) => n.id === nodeId);
 		const nodeInputs = (node?.data as any)?.nodeInputs || {};
 
 		// Resolve inputs using InputResolver
@@ -686,7 +695,7 @@ export class WorkflowOrchestrator {
 		// Then, add resolved parameters as "param" input
 		// These come from {{variable}} resolution
 		if (Object.keys(resolvedInputs).length > 0) {
-			inputData["params"] = [resolvedInputs];
+			inputData.params = [resolvedInputs];
 		}
 
 		return inputData;
@@ -696,7 +705,7 @@ export class WorkflowOrchestrator {
 	 * Get execution order using topological sort (Kahn's algorithm)
 	 */
 	private getExecutionOrder(): string[] {
-		const nodes = this.config.definition.nodes.map(n => n.id);
+		const nodes = this.config.definition.nodes.map((n) => n.id);
 		const edges = this.config.definition.edges;
 
 		// Build adjacency list and in-degree map
@@ -731,7 +740,8 @@ export class WorkflowOrchestrator {
 		const order: string[] = [];
 
 		while (queue.length > 0) {
-			const nodeId = queue.shift()!;
+			const nodeId = queue.shift();
+			if (!nodeId) break;
 			order.push(nodeId);
 
 			const dependents = adjacency.get(nodeId) || [];
@@ -747,7 +757,7 @@ export class WorkflowOrchestrator {
 		}
 
 		if (order.length !== nodes.length) {
-			this.config.logger.error('[ORCHESTRATOR] Topological sort failed:', {
+			this.config.logger.error("[ORCHESTRATOR] Topological sort failed:", {
 				nodesCount: nodes.length,
 				orderCount: order.length,
 				nodes,
@@ -766,7 +776,9 @@ export class WorkflowOrchestrator {
 	private async persistNodeExecutions(): Promise<void> {
 		// Skip persistence if configured (e.g., for node testing)
 		if (this.config.skipPersistence) {
-			this.config.logger.debug('[ORCHESTRATOR] Skipping database persistence (skipPersistence=true)');
+			this.config.logger.debug(
+				"[ORCHESTRATOR] Skipping database persistence (skipPersistence=true)",
+			);
 			return;
 		}
 
@@ -782,12 +794,18 @@ export class WorkflowOrchestrator {
 					internalTrace: result.internalTrace,
 					startedAt: new Date(result.startTime),
 					completedAt: new Date(result.endTime),
-					errorMessage: result.status === 'error' ? 'Execution failed' : undefined,
+					errorMessage:
+						result.status === "error" ? "Execution failed" : undefined,
 				});
 			}
-			this.config.logger.info(`[ORCHESTRATOR] Persisted ${this.nodeResults.size} node execution(s) to database`);
+			this.config.logger.info(
+				`[ORCHESTRATOR] Persisted ${this.nodeResults.size} node execution(s) to database`,
+			);
 		} catch (error) {
-			this.config.logger.error('[ORCHESTRATOR] Failed to persist node executions:', error);
+			this.config.logger.error(
+				"[ORCHESTRATOR] Failed to persist node executions:",
+				error,
+			);
 			// Don't throw - persistence failure shouldn't break workflow execution
 		}
 	}

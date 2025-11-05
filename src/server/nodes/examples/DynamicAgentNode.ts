@@ -12,15 +12,13 @@
  * Output: "Hello Alice"
  */
 
-import type { IExecuteFunctions, INodeExecutionData } from "../../../types/execution";
+import type {
+	IExecuteFunctions,
+	INodeExecutionData,
+} from "../../../types/execution";
+import { extractVariables } from "../../execution/InputResolver";
 import type { INodeTypeDescription, IVersionedNodeType } from "../Node";
 import { Node, nodeLoader } from "../Node";
-import {
-	extractVariables,
-	resolveVariablesInString,
-	extractDynamicInputHandles,
-	extractDynamicOutputHandles,
-} from "../../execution/InputResolver";
 
 class DynamicAgentNode extends Node {
 	description: INodeTypeDescription = {
@@ -92,7 +90,7 @@ class DynamicAgentNode extends Node {
 		// Extract variables from the prompt template
 		const variables = extractVariables(promptTemplate);
 		context.logInfo(
-			`Found {{variables}} in prompt: ${variables.length > 0 ? variables.join(", ") : "none"}`
+			`Found {{variables}} in prompt: ${variables.length > 0 ? variables.join(", ") : "none"}`,
 		);
 
 		// Get input data
@@ -105,20 +103,19 @@ class DynamicAgentNode extends Node {
 			if (varValue && Array.isArray(varValue) && varValue.length > 0) {
 				resolvedVariables[varName] = varValue[0];
 				context.logInfo(
-					`Resolved {{${varName}}} = ${String(varValue[0]).substring(0, 50)}`
+					`Resolved {{${varName}}} = ${String(varValue[0]).substring(0, 50)}`,
 				);
 			} else {
-				context.logWarn(`Variable {{${varName}}} not connected - will use placeholder`);
+				context.logWarn(
+					`Variable {{${varName}}} not connected - will use placeholder`,
+				);
 			}
 		}
 
 		// Resolve the prompt by replacing {{variables}} with actual values
 		let resolvedPrompt = promptTemplate;
 		for (const [varName, value] of Object.entries(resolvedVariables)) {
-			resolvedPrompt = resolvedPrompt.replace(
-				`{{${varName}}}`,
-				String(value)
-			);
+			resolvedPrompt = resolvedPrompt.replace(`{{${varName}}}`, String(value));
 		}
 
 		context.logInfo(`Resolved prompt: "${resolvedPrompt}"`);
@@ -161,7 +158,9 @@ class DynamicAgentNode extends Node {
 
 		context.logInfo("Dynamic Agent Node completed");
 
-		return [[{ response: mockResponse, metadata: { variables: resolvedVariables } }]];
+		return [
+			[{ response: mockResponse, metadata: { variables: resolvedVariables } }],
+		];
 	}
 }
 

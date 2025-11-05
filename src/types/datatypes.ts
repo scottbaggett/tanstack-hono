@@ -318,7 +318,9 @@ export function serializeValue(typed: TypedValue): SerializedValue {
 			} else if (typeof typed.value === "string") {
 				serialized = typed.value;
 			} else {
-				throw new Error(`Cannot serialize ${typed.dataType}: invalid value type`);
+				throw new Error(
+					`Cannot serialize ${typed.dataType}: invalid value type`,
+				);
 			}
 			break;
 		}
@@ -330,7 +332,9 @@ export function serializeValue(typed: TypedValue): SerializedValue {
 		}
 
 		default:
-			throw new Error(`Unknown serialization format: ${metadata.serializationFormat}`);
+			throw new Error(
+				`Unknown serialization format: ${metadata.serializationFormat}`,
+			);
 	}
 
 	return {
@@ -378,13 +382,13 @@ export function deserializeValue(serialized: SerializedValue): TypedValue {
 		case "reference": {
 			// Data not included, would need to load from reference
 			throw new Error(
-				`Cannot deserialize reference type without context: ${serialized.dataType}`
+				`Cannot deserialize reference type without context: ${serialized.dataType}`,
 			);
 		}
 
 		default:
 			throw new Error(
-				`Unknown serialization format: ${metadata.serializationFormat}`
+				`Unknown serialization format: ${metadata.serializationFormat}`,
 			);
 	}
 
@@ -416,7 +420,9 @@ export function isJsonSerializable(dataType: DataTypeId): boolean {
 /**
  * Get serialization format for a data type
  */
-export function getSerializationFormat(dataType: DataTypeId): SerializationFormat {
+export function getSerializationFormat(
+	dataType: DataTypeId,
+): SerializationFormat {
 	const format = DATA_TYPE_METADATA[dataType]?.serializationFormat;
 	if (!format) {
 		throw new Error(`Unknown data type: ${dataType}`);

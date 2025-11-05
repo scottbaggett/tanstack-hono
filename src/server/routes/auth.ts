@@ -4,14 +4,13 @@
  * Endpoints for user registration and login.
  */
 
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-
+import { comparePassword, generateToken, hashPassword } from "../auth/jwt";
+import { authMiddleware, getAuthUser } from "../auth/middleware";
 import { db } from "../db";
 import { users } from "../db/schema";
-import { eq } from "drizzle-orm";
-import { hashPassword, comparePassword, generateToken } from "../auth/jwt";
-import { getAuthUser, authMiddleware } from "../auth/middleware";
 
 // ============================================================================
 // TYPES
@@ -51,7 +50,7 @@ authRoutes.post("/register", async (c) => {
 					success: false,
 					error: "Email already registered",
 				},
-				400
+				400,
 			);
 		}
 
@@ -92,7 +91,7 @@ authRoutes.post("/register", async (c) => {
 					token,
 				},
 			},
-			201
+			201,
 		);
 	} catch (error) {
 		console.error("Registration error:", error);
@@ -102,7 +101,7 @@ authRoutes.post("/register", async (c) => {
 				success: false,
 				error: error instanceof Error ? error.message : "Registration failed",
 			},
-			400
+			400,
 		);
 	}
 });
@@ -133,7 +132,7 @@ authRoutes.post("/login", async (c) => {
 					success: false,
 					error: "Invalid email or password",
 				},
-				401
+				401,
 			);
 		}
 
@@ -146,12 +145,15 @@ authRoutes.post("/login", async (c) => {
 					success: false,
 					error: "User account is inactive",
 				},
-				401
+				401,
 			);
 		}
 
 		// Verify password
-		const isValid = await comparePassword(validated.password, user.passwordHash || "");
+		const isValid = await comparePassword(
+			validated.password,
+			user.passwordHash || "",
+		);
 
 		if (!isValid) {
 			return c.json(
@@ -159,7 +161,7 @@ authRoutes.post("/login", async (c) => {
 					success: false,
 					error: "Invalid email or password",
 				},
-				401
+				401,
 			);
 		}
 
@@ -190,7 +192,7 @@ authRoutes.post("/login", async (c) => {
 				success: false,
 				error: error instanceof Error ? error.message : "Login failed",
 			},
-			400
+			400,
 		);
 	}
 });
@@ -213,7 +215,7 @@ authRoutes.get("/me", authMiddleware, async (c) => {
 					success: false,
 					error: "User not found",
 				},
-				404
+				404,
 			);
 		}
 
@@ -236,7 +238,7 @@ authRoutes.get("/me", authMiddleware, async (c) => {
 				success: false,
 				error: error instanceof Error ? error.message : "Failed to fetch user",
 			},
-			500
+			500,
 		);
 	}
 });

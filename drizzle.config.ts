@@ -5,7 +5,9 @@ export default {
 	out: "./src/server/db/migrations",
 	dialect: "postgresql",
 	dbCredentials: {
-		url: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/workflow_builder",
+		url:
+			process.env.DATABASE_URL ||
+			"postgresql://postgres:postgres@localhost:5432/workflow_builder",
 	},
 	migrations: {
 		prefix: "timestamp",

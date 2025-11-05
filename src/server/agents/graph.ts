@@ -4,20 +4,25 @@
  * Core LangGraph state machine for agent execution
  * Handles iteration, tool calling, and halting rules
  */
+/** biome-ignore-all lint/suspicious/noExplicitAny: any is used for type flexibility */
 
-import { StateGraph, END } from '@langchain/langgraph';
-import type { BaseMessage } from '@langchain/core/messages';
-import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { Tool } from '@langchain/core/tools';
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { BaseMessage } from "@langchain/core/messages";
+import {
+	AIMessage,
+	HumanMessage,
+	SystemMessage,
+} from "@langchain/core/messages";
+import type { Tool } from "@langchain/core/tools";
+import { END, StateGraph } from "@langchain/langgraph";
 import type {
 	AgentGraphState,
-	ToolCallRequest,
-	EngineActionResult,
 	AgentOptions,
+	EngineActionResult,
+	ToolCallRequest,
 	ToolName,
-} from '@/server/types/agent';
-import { generateStepHashSync } from '@/server/utils/ids';
+} from "@/server/types/agent";
+import { generateStepHashSync } from "@/server/utils/ids";
 
 // Re-export for convenience
 export type { AgentGraphState };
@@ -42,8 +47,10 @@ const stateChannels = {
 	},
 	toolResults: {
 		// Merge tool results by ID
-		value: (x: Map<string, EngineActionResult>, y: Map<string, EngineActionResult>) =>
-			new Map([...Array.from(x), ...Array.from(y)]),
+		value: (
+			x: Map<string, EngineActionResult>,
+			y: Map<string, EngineActionResult>,
+		) => new Map([...Array.from(x), ...Array.from(y)]),
 		default: () => new Map<string, EngineActionResult>(),
 	},
 	iteration: {
@@ -88,7 +95,7 @@ async function planNode(
 		for (const tc of response.additional_kwargs.tool_calls) {
 			toolCalls.push({
 				tool: tc.function?.name as ToolName,
-				toolInput: JSON.parse(tc.function?.arguments || '{}'),
+				toolInput: JSON.parse(tc.function?.arguments || "{}"),
 				toolCallId: tc.id || `call_${Date.now()}`,
 				type: tc.type,
 			});
@@ -96,7 +103,8 @@ async function planNode(
 	}
 
 	// If no tool calls, extract text response as final output
-	const finalOutput = toolCalls.length === 0 ? response.content.toString() : undefined;
+	const finalOutput =
+		toolCalls.length === 0 ? response.content.toString() : undefined;
 
 	return {
 		messages: [response],
@@ -110,7 +118,9 @@ async function planNode(
  * Tools Node: Placeholder for tool execution
  * In production, this returns an EngineRequest and execution is handled by engine
  */
-async function toolsNode(state: AgentGraphState): Promise<Partial<AgentGraphState>> {
+async function toolsNode(
+	state: AgentGraphState,
+): Promise<Partial<AgentGraphState>> {
 	console.log(`[TOOLS] Executing ${state.toolCalls.length} tool calls`);
 
 	// NOTE: In production, this node would:
@@ -126,19 +136,21 @@ async function toolsNode(state: AgentGraphState): Promise<Partial<AgentGraphStat
 		// Simulate tool execution
 		toolResults.set(toolCall.toolCallId, {
 			id: toolCall.toolCallId,
-			output: { result: 'Simulated tool result', success: true },
+			output: { result: "Simulated tool result", success: true },
 			durationMs: 100,
 			outputSize: 50,
 		});
 	}
 
 	// Add tool results as messages
-	const resultMessages = Array.from(toolResults.entries()).map(([id, result]) => {
-		return new AIMessage({
-			content: JSON.stringify(result.output),
-			additional_kwargs: { tool_call_id: id },
-		});
-	});
+	const resultMessages = Array.from(toolResults.entries()).map(
+		([id, result]) => {
+			return new AIMessage({
+				content: JSON.stringify(result.output),
+				additional_kwargs: { tool_call_id: id },
+			});
+		},
+	);
 
 	return {
 		messages: resultMessages,
@@ -157,35 +169,35 @@ async function toolsNode(state: AgentGraphState): Promise<Partial<AgentGraphStat
 function shouldContinue(
 	state: AgentGraphState,
 	options: AgentOptions,
-): 'tools' | 'end' {
+): "tools" | "end" {
 	const maxIterations = options.maxIterations ?? 5;
 
 	// Check if we have a final output
 	if (state.finalOutput) {
-		console.log('[ROUTE] Final output received, ending');
-		return 'end';
+		console.log("[ROUTE] Final output received, ending");
+		return "end";
 	}
 
 	// Check if we have tool calls
 	if (state.toolCalls.length === 0) {
-		console.log('[ROUTE] No tool calls, ending');
-		return 'end';
+		console.log("[ROUTE] No tool calls, ending");
+		return "end";
 	}
 
 	// Check max iterations
 	if (state.iteration >= maxIterations) {
-		console.log('[ROUTE] Max iterations reached, ending');
-		return 'end';
+		console.log("[ROUTE] Max iterations reached, ending");
+		return "end";
 	}
 
 	// Check for no progress (duplicate tool calls)
 	if (detectNoProgress(state)) {
-		console.log('[ROUTE] No progress detected, ending');
-		return 'end';
+		console.log("[ROUTE] No progress detected, ending");
+		return "end";
 	}
 
-	console.log('[ROUTE] Continuing to tools');
-	return 'tools';
+	console.log("[ROUTE] Continuing to tools");
+	return "tools";
 }
 
 /**
@@ -194,26 +206,28 @@ function shouldContinue(
 function shouldContinueAfterTools(
 	state: AgentGraphState,
 	options: AgentOptions,
-): 'plan' | 'end' {
+): "plan" | "end" {
 	const maxIterations = options.maxIterations ?? 5;
 
 	// Check max iterations
 	if (state.iteration >= maxIterations) {
-		console.log('[ROUTE] Max iterations reached after tools, ending');
-		return 'end';
+		console.log("[ROUTE] Max iterations reached after tools, ending");
+		return "end";
 	}
 
 	// Check for errors in tool results
 	const hasErrors = Array.from(state.toolResults.values()).some((r) => {
 		const result = r as EngineActionResult;
-		return 'error' in result && result.error !== undefined;
+		return "error" in result && result.error !== undefined;
 	});
 	if (hasErrors) {
-		console.log('[ROUTE] Tool errors detected, continuing to plan for handling');
+		console.log(
+			"[ROUTE] Tool errors detected, continuing to plan for handling",
+		);
 	}
 
-	console.log('[ROUTE] Tools complete, continuing to plan');
-	return 'plan';
+	console.log("[ROUTE] Tools complete, continuing to plan");
+	return "plan";
 }
 
 // ============================================================================
@@ -226,7 +240,7 @@ function shouldContinueAfterTools(
 function detectNoProgress(state: AgentGraphState): boolean {
 	// Look at recent AI messages with tool calls
 	const recentToolCalls = state.messages
-		.filter((m) => m._getType() === 'ai' && m.additional_kwargs?.tool_calls)
+		.filter((m) => m._getType() === "ai" && m.additional_kwargs?.tool_calls)
 		.slice(-3);
 
 	if (recentToolCalls.length < 2) return false;
@@ -235,8 +249,13 @@ function detectNoProgress(state: AgentGraphState): boolean {
 	const hashes = recentToolCalls.map((msg) => {
 		const toolCalls = msg.additional_kwargs?.tool_calls || [];
 		return toolCalls
-			.map((tc: any) => generateStepHashSync(tc.function?.name || '', tc.function?.arguments || '{}'))
-			.join(',');
+			.map((tc: any) =>
+				generateStepHashSync(
+					tc.function?.name || "",
+					tc.function?.arguments || "{}",
+				),
+			)
+			.join(",");
 	});
 
 	// Check for duplicates
@@ -244,7 +263,7 @@ function detectNoProgress(state: AgentGraphState): boolean {
 	const hasDuplicate = uniqueHashes.size < hashes.length;
 
 	if (hasDuplicate) {
-		console.warn('[HALTING] Duplicate tool calls detected - no progress');
+		console.warn("[HALTING] Duplicate tool calls detected - no progress");
 	}
 
 	return hasDuplicate;
@@ -272,22 +291,30 @@ export function createAgentGraph(config: CreateAgentGraphOptions) {
 	});
 
 	// Add nodes
-	graph.addNode('plan', async (state) => planNode(state, model, tools));
-	graph.addNode('tools', toolsNode);
+	graph.addNode("plan", async (state) => planNode(state, model, tools));
+	graph.addNode("tools", toolsNode);
 
 	// Set entry point
-	graph.addEdge('__start__', 'plan' as any);
+	graph.addEdge("__start__", "plan" as any);
 
 	// Add conditional edges
-	graph.addConditionalEdges('plan' as any, (state) => shouldContinue(state, options), {
-		tools: 'tools' as any,
-		end: END,
-	} as any);
+	graph.addConditionalEdges(
+		"plan" as keyof typeof graph.nodes,
+		(state) => shouldContinue(state, options),
+		{
+			tools: "tools" as keyof typeof graph.nodes,
+			end: END,
+		} as any,
+	);
 
-	graph.addConditionalEdges('tools' as any, (state) => shouldContinueAfterTools(state, options), {
-		plan: 'plan' as any,
-		end: END,
-	} as any);
+	graph.addConditionalEdges(
+		"tools" as keyof typeof graph.nodes,
+		(state) => shouldContinueAfterTools(state, options),
+		{
+			plan: "plan" as keyof typeof graph.nodes,
+			end: END,
+		} as any,
+	);
 
 	return graph;
 }

@@ -38,7 +38,7 @@ export function clearToken(): void {
  */
 export async function apiRequest<T = unknown>(
 	endpoint: string,
-	options: RequestInit = {}
+	options: RequestInit = {},
 ): Promise<ApiResponse<T>> {
 	const token = getToken();
 
@@ -48,7 +48,7 @@ export async function apiRequest<T = unknown>(
 	};
 
 	if (token) {
-		headers["Authorization"] = `Bearer ${token}`;
+		headers.Authorization = `Bearer ${token}`;
 	}
 
 	try {
@@ -78,7 +78,9 @@ export async function apiRequest<T = unknown>(
 /**
  * GET request
  */
-export async function apiGet<T = unknown>(endpoint: string): Promise<ApiResponse<T>> {
+export async function apiGet<T = unknown>(
+	endpoint: string,
+): Promise<ApiResponse<T>> {
 	return apiRequest<T>(endpoint, { method: "GET" });
 }
 
@@ -87,7 +89,7 @@ export async function apiGet<T = unknown>(endpoint: string): Promise<ApiResponse
  */
 export async function apiPost<T = unknown>(
 	endpoint: string,
-	body?: unknown
+	body?: unknown,
 ): Promise<ApiResponse<T>> {
 	return apiRequest<T>(endpoint, {
 		method: "POST",
@@ -100,7 +102,7 @@ export async function apiPost<T = unknown>(
  */
 export async function apiPut<T = unknown>(
 	endpoint: string,
-	body?: unknown
+	body?: unknown,
 ): Promise<ApiResponse<T>> {
 	return apiRequest<T>(endpoint, {
 		method: "PUT",
@@ -111,7 +113,9 @@ export async function apiPut<T = unknown>(
 /**
  * DELETE request
  */
-export async function apiDelete<T = unknown>(endpoint: string): Promise<ApiResponse<T>> {
+export async function apiDelete<T = unknown>(
+	endpoint: string,
+): Promise<ApiResponse<T>> {
 	return apiRequest<T>(endpoint, { method: "DELETE" });
 }
 

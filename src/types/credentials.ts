@@ -3,6 +3,7 @@
  *
  * Based on n8n's credential architecture with encryption support
  */
+/** biome-ignore-all lint/suspicious/noExplicitAny: any is used for type flexibility */
 
 // ============================================================================
 // CREDENTIAL TYPE DEFINITION
@@ -14,7 +15,7 @@
 export interface ICredentialTypeProperty {
 	displayName: string;
 	name: string;
-	type: 'string' | 'password' | 'number' | 'boolean';
+	type: "string" | "password" | "number" | "boolean";
 	description?: string;
 	required?: boolean;
 	default?: string | number | boolean;
@@ -44,7 +45,7 @@ export interface IHttpRequestOptions {
  * Credential test rules for validating responses
  */
 export interface IAuthenticateRuleResponseCode {
-	type: 'responseCode';
+	type: "responseCode";
 	properties: {
 		value: number;
 		message?: string;
@@ -52,7 +53,7 @@ export interface IAuthenticateRuleResponseCode {
 }
 
 export interface IAuthenticateRuleResponseSuccessBody {
-	type: 'responseSuccessBody';
+	type: "responseSuccessBody";
 	properties: {
 		key: string;
 		value?: string | number | boolean;
@@ -65,14 +66,17 @@ export interface IAuthenticateRuleResponseSuccessBody {
  */
 export interface ICredentialTestRequest {
 	request: IHttpRequestOptions;
-	rules?: (IAuthenticateRuleResponseCode | IAuthenticateRuleResponseSuccessBody)[];
+	rules?: (
+		| IAuthenticateRuleResponseCode
+		| IAuthenticateRuleResponseSuccessBody
+	)[];
 }
 
 /**
  * Credential test data
  */
 export interface ICredentialTestRequestData {
-	nodeType?: any;
+	nodeType?: Record<string, unknown>;
 	testRequest: ICredentialTestRequest;
 }
 
@@ -89,7 +93,7 @@ export type ICredentialHttpRequestNode = {
  * Authentication configuration for automatic header/query injection
  */
 export interface ICredentialAuthentication {
-	type: 'generic';
+	type: "generic";
 	properties: {
 		headers?: Record<string, string>;
 		qs?: Record<string, string>;
@@ -105,8 +109,15 @@ export interface ICredentialType {
 	properties: ICredentialTypeProperty[];
 	extends?: string[]; // Inherit from other credential types
 	__overwrittenProperties?: string[]; // Properties overridden from parent
-	authenticate?: ICredentialAuthentication | ((credentials: ICredentialDataDecryptedObject, requestOptions: IHttpRequestOptions) => Promise<IHttpRequestOptions>);
-	preAuthentication?: (credentials: ICredentialDataDecryptedObject) => Promise<Record<string, any>>;
+	authenticate?:
+		| ICredentialAuthentication
+		| ((
+				credentials: ICredentialDataDecryptedObject,
+				requestOptions: IHttpRequestOptions,
+		  ) => Promise<IHttpRequestOptions>);
+	preAuthentication?: (
+		credentials: ICredentialDataDecryptedObject,
+	) => Promise<Record<string, any>>;
 	test?: ICredentialTestRequest;
 	genericAuth?: boolean; // Whether this is a generic auth type
 	httpRequestNode?: ICredentialHttpRequestNode; // HTTP request node integration

@@ -43,7 +43,7 @@ nodesRoutes.get("/", (c) => {
 			acc[node.category].push(node);
 			return acc;
 		},
-		{} as Record<string, typeof nodeDefinitions>
+		{} as Record<string, typeof nodeDefinitions>,
 	);
 
 	return c.json({
@@ -69,7 +69,7 @@ nodesRoutes.get("/:id", (c) => {
 				success: false,
 				error: `Node "${nodeId}" not found`,
 			},
-			404
+			404,
 		);
 	}
 

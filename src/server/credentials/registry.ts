@@ -4,14 +4,14 @@
  * Central registry for all credential types
  */
 
-import type { ICredentialType } from '@/types/credentials';
-import { HttpBasicAuth } from './HttpBasicAuth';
-import { ApiKey } from './ApiKey';
-import { BearerToken } from './BearerToken';
-import { AnthropicApi } from './AnthropicApi';
-import { OpenAiApi } from './OpenAiApi';
-import { SlackApi } from './SlackApi';
-import { GitHubApi } from './GitHubApi';
+import type { ICredentialType } from "@/types/credentials";
+import { AnthropicApi } from "./AnthropicApi";
+import { ApiKey } from "./ApiKey";
+import { BearerToken } from "./BearerToken";
+import { GitHubApi } from "./GitHubApi";
+import { HttpBasicAuth } from "./HttpBasicAuth";
+import { OpenAiApi } from "./OpenAiApi";
+import { SlackApi } from "./SlackApi";
 
 // ============================================================================
 // CREDENTIAL REGISTRY

@@ -8,10 +8,10 @@
 
 import type {
 	IExecutionContext,
+	INodeExecutionData,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	INodeExecutionData,
 } from "@/types/interfaces";
 
 const baseDescription: INodeTypeBaseDescription = {
@@ -133,9 +133,10 @@ export class Webhook implements INodeType {
 		// This method is called when manually executing or testing the node
 		// In production, webhook data comes from the HTTP request
 
-		const httpMethod = (context.evaluatedProperties.httpMethod as string) || "POST";
+		const httpMethod =
+			(context.evaluatedProperties.httpMethod as string) || "POST";
 		const path = (context.evaluatedProperties.path as string) || "";
-		const responseMode = context.evaluatedProperties.responseMode as string;
+		const _responseMode = context.evaluatedProperties.responseMode as string;
 
 		// Get webhook data from execution context if available
 		const webhookData = (context as any).webhookData || {

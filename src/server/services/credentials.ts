@@ -4,15 +4,15 @@
  * Handles CRUD operations for credentials with encryption/decryption
  */
 
-import { db } from '../db';
-import { credentials } from '../db/schema';
-import { encrypt, decrypt } from '../lib/crypto';
-import { eq, and } from 'drizzle-orm';
+import { and, eq } from "drizzle-orm";
 import type {
 	ICredentialData,
 	ICredentialDataDecryptedObject,
 	ICredentialsResponse,
-} from '@/types/credentials';
+} from "@/types/credentials";
+import { db } from "../db";
+import { credentials } from "../db/schema";
+import { decrypt, encrypt } from "../lib/crypto";
 
 // ============================================================================
 // CREDENTIAL SERVICE
@@ -139,7 +139,7 @@ export class CredentialService {
 		}
 
 		// Prepare update values
-		const updateValues: any = {};
+		const updateValues: Record<string, unknown> = {};
 
 		if (updates.name !== undefined) {
 			updateValues.name = updates.name;

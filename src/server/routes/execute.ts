@@ -4,22 +4,22 @@
  * Endpoints for executing workflows
  */
 
-import { Hono } from 'hono';
-import { db } from '@/server/db';
-import { workflows, workflowRuns } from '@/server/db/schema';
-import { eq } from 'drizzle-orm';
-import { WorkflowOrchestrator } from '@/server/execution/WorkflowOrchestrator';
-import type { OrchestrationConfig } from '@/server/execution/WorkflowOrchestrator';
-import crypto from 'crypto';
-import '@/server/nodes/load'; // Ensure nodes are loaded
+import crypto from "node:crypto";
+import { eq } from "drizzle-orm";
+import { Hono } from "hono";
+import { db } from "@/server/db";
+import { workflowRuns, workflows } from "@/server/db/schema";
+import type { OrchestrationConfig } from "@/server/execution/WorkflowOrchestrator";
+import { WorkflowOrchestrator } from "@/server/execution/WorkflowOrchestrator";
+import "@/server/nodes/load"; // Ensure nodes are loaded
 
 export const executeRoutes = new Hono();
 
 /**
  * POST /execute/:id - Execute a workflow
  */
-executeRoutes.post('/:id', async (c) => {
-	const workflowId = c.req.param('id');
+executeRoutes.post("/:id", async (c) => {
+	const workflowId = c.req.param("id");
 	const body = await c.req.json();
 
 	try {
@@ -34,7 +34,7 @@ executeRoutes.post('/:id', async (c) => {
 			return c.json(
 				{
 					success: false,
-					error: 'Workflow not found',
+					error: "Workflow not found",
 				},
 				404,
 			);
@@ -43,17 +43,21 @@ executeRoutes.post('/:id', async (c) => {
 		const workflowDef = workflow[0];
 
 		// Parse workflow definition
-		let definition;
+		let definition: {
+			nodes: unknown[];
+			edges: unknown[];
+			viewport?: unknown;
+		};
 		try {
 			definition =
-				typeof workflowDef.definition === 'string'
+				typeof workflowDef.definition === "string"
 					? JSON.parse(workflowDef.definition)
 					: workflowDef.definition;
-		} catch (error) {
+		} catch (_error) {
 			return c.json(
 				{
 					success: false,
-					error: 'Invalid workflow definition',
+					error: "Invalid workflow definition",
 				},
 				400,
 			);
@@ -66,7 +70,7 @@ executeRoutes.post('/:id', async (c) => {
 		await db.insert(workflowRuns).values({
 			id: runId,
 			workflowId: workflowId,
-			status: 'running',
+			status: "running",
 			inputs: body.inputs || {},
 		});
 
@@ -96,7 +100,7 @@ executeRoutes.post('/:id', async (c) => {
 			await db
 				.update(workflowRuns)
 				.set({
-					status: result.status === 'success' ? 'completed' : 'error',
+					status: result.status === "success" ? "completed" : "error",
 					outputs: result.finalOutputs as any,
 					completedAt: new Date(),
 					durationMs: result.totalDurationMs,
@@ -104,7 +108,7 @@ executeRoutes.post('/:id', async (c) => {
 				.where(eq(workflowRuns.id, runId));
 
 			return c.json({
-				success: result.status === 'success',
+				success: result.status === "success",
 				data: {
 					workflowId,
 					runId,
@@ -120,8 +124,9 @@ executeRoutes.post('/:id', async (c) => {
 			await db
 				.update(workflowRuns)
 				.set({
-					status: 'error',
-					errorMessage: error instanceof Error ? error.message : 'Execution failed',
+					status: "error",
+					errorMessage:
+						error instanceof Error ? error.message : "Execution failed",
 					completedAt: new Date(),
 				})
 				.where(eq(workflowRuns.id, runId));
@@ -131,12 +136,12 @@ executeRoutes.post('/:id', async (c) => {
 			clearTimeout(timeoutId);
 		}
 	} catch (error) {
-		console.error('Workflow execution error:', error);
+		console.error("Workflow execution error:", error);
 
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : 'Execution failed',
+				error: error instanceof Error ? error.message : "Execution failed",
 			},
 			500,
 		);
@@ -147,11 +152,11 @@ executeRoutes.post('/:id', async (c) => {
  * POST /execute/:id/stream - Execute workflow with streaming
  * (Placeholder for future streaming implementation)
  */
-executeRoutes.post('/:id/stream', async (c) => {
+executeRoutes.post("/:id/stream", async (c) => {
 	return c.json(
 		{
 			success: false,
-			error: 'Streaming execution not yet implemented',
+			error: "Streaming execution not yet implemented",
 		},
 		501,
 	);

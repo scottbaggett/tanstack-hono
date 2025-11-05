@@ -4,12 +4,12 @@
  * A textarea-based JSON editor with validation and formatting
  */
 
-import { useState, useEffect } from "react";
-import { Textarea } from "./textarea";
-import { Button } from "./button";
-import { Alert } from "./alert";
-import { CheckCircle2, XCircle, Code } from "lucide-react";
+import { CheckCircle2, Code, XCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { Alert } from "./alert";
+import { Button } from "./button";
+import { Textarea } from "./textarea";
 
 interface JsonEditorProps {
 	value: unknown;
@@ -19,6 +19,27 @@ interface JsonEditorProps {
 	disabled?: boolean;
 }
 
+// Convert value to JSON string (moved outside component to prevent recreation on each render)
+function getJsonString(val: unknown): string {
+	if (val === null || val === undefined) {
+		return "";
+	}
+	if (typeof val === "string") {
+		// Try to parse if it's already a JSON string
+		try {
+			const parsed = JSON.parse(val);
+			return JSON.stringify(parsed, null, 2);
+		} catch {
+			return val;
+		}
+	}
+	try {
+		return JSON.stringify(val, null, 2);
+	} catch {
+		return String(val);
+	}
+}
+
 export function JsonEditor({
 	value,
 	onChange,
@@ -26,42 +47,11 @@ export function JsonEditor({
 	className,
 	disabled = false,
 }: JsonEditorProps) {
-	// Convert value to JSON string
-	const getJsonString = (val: unknown): string => {
-		if (val === null || val === undefined) {
-			return "";
-		}
-		if (typeof val === "string") {
-			// Try to parse if it's already a JSON string
-			try {
-				const parsed = JSON.parse(val);
-				return JSON.stringify(parsed, null, 2);
-			} catch {
-				return val;
-			}
-		}
-		try {
-			return JSON.stringify(val, null, 2);
-		} catch {
-			return String(val);
-		}
-	};
-
 	const [jsonString, setJsonString] = useState(() => getJsonString(value));
 	const [error, setError] = useState<string | null>(null);
 	const [isValid, setIsValid] = useState(true);
 
-	// Update jsonString when value prop changes
-	useEffect(() => {
-		const newString = getJsonString(value);
-		if (newString !== jsonString) {
-			setJsonString(newString);
-			// Validate the new string
-			validateJson(newString);
-		}
-	}, [value]);
-
-	const validateJson = (str: string): boolean => {
+	const validateJson = useCallback((str: string): boolean => {
 		if (!str.trim()) {
 			setError(null);
 			setIsValid(true);
@@ -79,7 +69,19 @@ export function JsonEditor({
 			setIsValid(false);
 			return false;
 		}
-	};
+	}, []);
+
+	// Update jsonString when value prop changes
+	useEffect(() => {
+		const newString = getJsonString(value);
+		setJsonString((prevString) => {
+			if (newString !== prevString) {
+				validateJson(newString);
+				return newString;
+			}
+			return prevString;
+		});
+	}, [value, validateJson]);
 
 	const handleChange = (newString: string) => {
 		setJsonString(newString);
@@ -130,8 +132,10 @@ export function JsonEditor({
 			const target = e.currentTarget;
 			const start = target.selectionStart;
 			const end = target.selectionEnd;
-			const newValue =
-				jsonString.substring(0, start) + "  " + jsonString.substring(end);
+			const newValue = `${jsonString.substring(
+				0,
+				start
+			)}  ${jsonString.substring(end)}`;
 			setJsonString(newValue);
 			handleChange(newValue);
 

@@ -4,7 +4,7 @@
  * React Query hooks for workflow CRUD operations with type-safe Hono RPC client
  */
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 import type { Workflow, WorkflowsListResponse } from "@/server/types/api";
 
@@ -15,9 +15,12 @@ export function useWorkflows() {
 	return useQuery({
 		queryKey: ["workflows"],
 		queryFn: async () => {
-			const response = await apiRequest<WorkflowsListResponse>("/api/workflows", {
-				method: "GET",
-			});
+			const response = await apiRequest<WorkflowsListResponse>(
+				"/api/workflows",
+				{
+					method: "GET",
+				},
+			);
 
 			if (!response.success) {
 				throw new Error(response.error || "Failed to fetch workflows");
@@ -41,7 +44,7 @@ export function useWorkflow(workflowId: string | null) {
 
 			const response = await apiRequest<Workflow>(
 				`/api/workflows/${workflowId}`,
-				{ method: "GET" }
+				{ method: "GET" },
 			);
 
 			if (!response.success) {
@@ -103,7 +106,7 @@ export function useUpdateWorkflow() {
 				{
 					method: "PUT",
 					body: JSON.stringify(data),
-				}
+				},
 			);
 
 			if (!response.success) {
@@ -129,7 +132,7 @@ export function useDeleteWorkflow() {
 		mutationFn: async (workflowId: string) => {
 			const response = await apiRequest<{ success: boolean }>(
 				`/api/workflows/${workflowId}`,
-				{ method: "DELETE" }
+				{ method: "DELETE" },
 			);
 
 			if (!response.success) {
@@ -162,7 +165,7 @@ export function useRunWorkflow() {
 				{
 					method: "POST",
 					body: JSON.stringify({ inputs }),
-				}
+				},
 			);
 
 			if (!response.success) {

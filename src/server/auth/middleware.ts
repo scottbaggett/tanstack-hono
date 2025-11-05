@@ -5,7 +5,7 @@
  */
 
 import { createMiddleware } from "hono/factory";
-import { extractToken, verifyToken, type JWTPayload } from "./jwt";
+import { extractToken, type JWTPayload, verifyToken } from "./jwt";
 
 // ============================================================================
 // TYPES
@@ -36,7 +36,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 					success: false,
 					error: "Missing authentication token",
 				},
-				401
+				401,
 			);
 		}
 
@@ -52,7 +52,7 @@ export const authMiddleware = createMiddleware(async (c, next) => {
 				success: false,
 				error: error instanceof Error ? error.message : "Authentication failed",
 			},
-			401
+			401,
 		);
 	}
 });

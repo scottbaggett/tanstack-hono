@@ -7,29 +7,29 @@
 
 import type {
 	IExecutionContext,
+	INodeExecutionData,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	INodeExecutionData,
-} from '@/types/interfaces';
+} from "@/types/interfaces";
 
 const baseDescription: INodeTypeBaseDescription = {
-	displayName: 'Output',
-	name: 'output',
-	icon: 'send',
-	iconColor: 'standard-green',
-	category: 'output',
-	description: 'Output node that formats and returns workflow results',
+	displayName: "Output",
+	name: "output",
+	icon: "send",
+	iconColor: "standard-green",
+	category: "output",
+	description: "Output node that formats and returns workflow results",
 	codex: {
-		alias: ['Result', 'Return', 'Output'],
-		categories: ['output'],
+		alias: ["Result", "Return", "Output"],
+		categories: ["output"],
 		subcategories: {
-			output: ['Results'],
+			output: ["Results"],
 		},
 		resources: {
 			primaryDocumentation: [
 				{
-					url: 'https://docs.example.com/nodes/output',
+					url: "https://docs.example.com/nodes/output",
 				},
 			],
 		},
@@ -44,25 +44,25 @@ export class Output implements INodeType {
 			...baseDescription,
 			version: 1,
 			defaults: {
-				name: 'Output',
-				color: 'standard-green',
+				name: "Output",
+				color: "standard-green",
 			},
-			maxInputs: 1,   // One input connection
-			maxOutputs: 0,  // End node - no outputs
+			maxInputs: 1, // One input connection
+			maxOutputs: 0, // End node - no outputs
 			properties: [
 				{
-					displayName: 'Output Label',
-					name: 'label',
-					type: 'string',
-					default: 'result',
-					description: 'Label for the output field',
+					displayName: "Output Label",
+					name: "label",
+					type: "string",
+					default: "result",
+					description: "Label for the output field",
 				},
 			],
 		};
 	}
 
 	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
-		const label = (context.evaluatedProperties.label as string) || 'result';
+		const label = (context.evaluatedProperties.label as string) || "result";
 		const input = context.inputs.input || {};
 
 		return [

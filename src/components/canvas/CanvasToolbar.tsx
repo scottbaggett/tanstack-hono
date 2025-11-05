@@ -4,10 +4,10 @@
  * Toolbar with workflow actions: add node, delete node, save, etc.
  */
 
-import { Button } from "@/components/ui/button";
-import { LucideIcon } from "@/components/icon/LucideIcon";
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
+import { LucideIcon } from "@/components/icon/LucideIcon";
+import { Button } from "@/components/ui/button";
 
 interface CanvasToolbarProps {
 	onSave: () => void;

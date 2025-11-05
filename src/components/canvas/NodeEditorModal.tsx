@@ -7,19 +7,29 @@
  * Right: Test & Output
  */
 
-import { useState, useEffect } from "react";
 import type { Node } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
+import { Button } from "@/components/ui/button";
+import type { NodeDefinition } from "@/hooks/use-node-registry";
 import { InputExplorer } from "./panels/InputExplorer";
-import { ParametersPanel } from "./panels/ParametersPanel";
 import { OutputPanel } from "./panels/OutputPanel";
+import { ParametersPanel } from "./panels/ParametersPanel";
+
+interface NodeRegistryData {
+	nodes: NodeDefinition[];
+	byCategory: Record<string, NodeDefinition[]>;
+	total: number;
+}
 
 interface NodeEditorModalProps {
 	selectedNode: Node;
 	onClose: () => void;
 	onUpdateNode: (nodeId: string, data: Record<string, unknown>) => void;
-	onExecutionComplete: (nodeId: string, runData: Record<string, unknown>) => void;
+	onExecutionComplete: (
+		nodeId: string,
+		runData: Record<string, unknown>,
+	) => void;
 	workflowEdges: Array<{
 		source: string;
 		target: string;
@@ -27,7 +37,7 @@ interface NodeEditorModalProps {
 		targetHandle?: string;
 	}>;
 	allNodes: Node[];
-	nodeRegistry: any;
+	nodeRegistry: NodeRegistryData | undefined;
 	executionCache: Record<string, Record<string, unknown>>;
 }
 
@@ -57,7 +67,9 @@ export function NodeEditorModal({
 		const cachedResult = executionCache[selectedNode.id];
 		if (cachedResult && Array.isArray(cachedResult) && cachedResult[0]) {
 			const nodeRun = cachedResult[0];
-			setExecutionResult(nodeRun.error ? { error: nodeRun.error } : nodeRun.data);
+			setExecutionResult(
+				nodeRun.error ? { error: nodeRun.error } : nodeRun.data,
+			);
 		}
 
 		// Load all execution cache for INPUT panel to show upstream nodes
@@ -69,14 +81,23 @@ export function NodeEditorModal({
 	const [currentPropertyValues, setCurrentPropertyValues] = useState<
 		Record<string, unknown>
 	>(() => {
-		const nodeType = (selectedNode.data as any).nodeType || (selectedNode.data as any).nodeId;
-		const registryNode = nodeRegistry?.nodes?.find((n: any) => n.id === nodeType);
-		const properties = Array.isArray(registryNode?.properties) ? registryNode.properties : [];
+		const nodeData = selectedNode.data as Record<string, unknown>;
+		const nodeType =
+			(nodeData.nodeType as string) || (nodeData.nodeId as string);
+		const registryNode = nodeRegistry?.nodes?.find((n) => n.id === nodeType);
+		const properties = Array.isArray(registryNode?.properties)
+			? registryNode.properties
+			: [];
 
 		// Build defaults from property definitions
 		const defaults: Record<string, unknown> = {};
 		for (const prop of properties) {
-			if (prop && typeof prop === 'object' && 'name' in prop && 'default' in prop) {
+			if (
+				prop &&
+				typeof prop === "object" &&
+				"name" in prop &&
+				"default" in prop
+			) {
 				defaults[prop.name] = prop.default;
 			}
 		}
@@ -103,12 +124,10 @@ export function NodeEditorModal({
 	// Auto-save property changes
 	useEffect(() => {
 		// Update the node data whenever property values change
+		// Only update propertyValues, don't spread selectedNode.data to avoid dependency issues
 		onUpdateNode(selectedNode.id, {
-			...selectedNode.data,
 			propertyValues: currentPropertyValues,
 		});
-		// Note: We intentionally don't include selectedNode.data in deps to avoid infinite loops
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [currentPropertyValues, selectedNode.id, onUpdateNode]);
 
 	// Find all connected input nodes
@@ -117,7 +136,7 @@ export function NodeEditorModal({
 		.map((edge) => edge.source);
 
 	const connectedNodes = allNodes.filter((node) =>
-		connectedNodeIds.includes(node.id)
+		connectedNodeIds.includes(node.id),
 	);
 
 	const handleExecute = async () => {
@@ -132,8 +151,8 @@ export function NodeEditorModal({
 								...node.data,
 								propertyValues: currentPropertyValues,
 							},
-					  }
-					: node
+						}
+					: node,
 			);
 
 			// Call node execution API with workflow context
@@ -161,7 +180,9 @@ export function NodeEditorModal({
 			const nodeRun = result.runData?.[selectedNode.id]?.[0];
 			if (nodeRun) {
 				// Pass the entire nodeRun (contains both data and error)
-				setExecutionResult(nodeRun.error ? { error: nodeRun.error } : nodeRun.data);
+				setExecutionResult(
+					nodeRun.error ? { error: nodeRun.error } : nodeRun.data,
+				);
 
 				// Update execution cache for visual indicators
 				onExecutionComplete(selectedNode.id, result.runData || {});
@@ -173,7 +194,7 @@ export function NodeEditorModal({
 				error instanceof Error ? error.message : "Unknown error";
 			setExecutionResult({
 				error: errorMessage,
-			} as any);
+			} as Record<string, unknown>);
 		} finally {
 			setIsExecuting(false);
 		}

@@ -4,15 +4,15 @@
  * Core types for LangGraph-based agent execution with request-response pattern
  */
 
-import type { ZodSchema } from 'zod';
-import type { BaseMessage } from '@langchain/core/messages';
+import type { BaseMessage } from "@langchain/core/messages";
+import type { ZodSchema } from "zod";
 
 // ============================================================================
 // Action Types
 // ============================================================================
 
-export type ActionType = 'ai_tool' | 'structured_output' | 'noop';
-export type ToolName = string & { __brand: 'ToolName' };
+export type ActionType = "ai_tool" | "structured_output" | "noop";
+export type ToolName = string & { __brand: "ToolName" };
 
 // ============================================================================
 // Engine Request/Response (Resumable Loop)
@@ -42,7 +42,7 @@ export interface EngineAction {
 		itemIndex: number;
 		iteration: number;
 		attempt: number;
-		source: 'agent' | 'system';
+		source: "agent" | "system";
 		/** Hash of action for deduplication */
 		stepHash: string;
 	};
@@ -116,7 +116,7 @@ export interface AgentResult {
 	output: string;
 	toolCalls?: ToolCallRequest[];
 	steps?: IntermediateStep[];
-	finalState?: 'success' | 'max_iterations' | 'no_progress' | 'error';
+	finalState?: "success" | "max_iterations" | "no_progress" | "error";
 }
 
 export interface IntermediateStep {
@@ -139,43 +139,46 @@ export interface IntermediateStep {
 
 export type AgentEvent =
 	| {
-			t: 'agent.plan';
+			t: "agent.plan";
 			iteration: number;
 			actions: PlannedActionPreview[];
 	  }
 	| {
-			t: 'engine.request';
+			t: "engine.request";
 			requestId: string;
 			actions: EngineActionPreview[];
 	  }
 	| {
-			t: 'tool.start';
+			t: "tool.start";
 			tool: ToolName;
 			id: string;
 			input: unknown;
 	  }
 	| {
-			t: 'tool.success';
+			t: "tool.success";
 			tool: ToolName;
 			id: string;
 			size: number;
 			ms: number;
 	  }
 	| {
-			t: 'tool.error';
+			t: "tool.error";
 			tool: ToolName;
 			id: string;
 			error: AgentError;
 	  }
 	| {
-			t: 'agent.finish';
+			t: "agent.finish";
 			iteration: number;
 			output: string;
 			finalState: string;
 	  };
 
-export type PlannedActionPreview = Pick<EngineAction, 'tool' | 'type'>;
-export type EngineActionPreview = Pick<EngineAction, 'id' | 'tool' | 'nodeName'>;
+export type PlannedActionPreview = Pick<EngineAction, "tool" | "type">;
+export type EngineActionPreview = Pick<
+	EngineAction,
+	"id" | "tool" | "nodeName"
+>;
 
 // ============================================================================
 // Error Types
@@ -183,12 +186,12 @@ export type EngineActionPreview = Pick<EngineAction, 'id' | 'tool' | 'nodeName'>
 
 export interface AgentError {
 	code:
-		| 'TOOL_TIMEOUT'
-		| 'VALIDATION_ERROR'
-		| 'MAX_ITERATIONS'
-		| 'NO_PROGRESS'
-		| 'MODEL_ERROR'
-		| 'TOOL_UNAVAILABLE';
+		| "TOOL_TIMEOUT"
+		| "VALIDATION_ERROR"
+		| "MAX_ITERATIONS"
+		| "NO_PROGRESS"
+		| "MODEL_ERROR"
+		| "TOOL_UNAVAILABLE";
 	message: string;
 	cause?: Error;
 	retriable: boolean;
@@ -197,11 +200,9 @@ export interface AgentError {
 export class AgentExecutionError extends Error {
 	public cause?: Error;
 
-	constructor(
-		public readonly agentError: AgentError,
-	) {
+	constructor(public readonly agentError: AgentError) {
 		super(agentError.message);
-		this.name = 'AgentExecutionError';
+		this.name = "AgentExecutionError";
 		if (agentError.cause) {
 			this.cause = agentError.cause;
 		}
@@ -212,7 +213,7 @@ export class AgentExecutionError extends Error {
 // Memory Types
 // ============================================================================
 
-export type MemoryType = 'ephemeral' | 'thread' | 'global';
+export type MemoryType = "ephemeral" | "thread" | "global";
 
 export interface MemoryConfig {
 	type: MemoryType;
@@ -255,21 +256,21 @@ export function isEngineRequest<T = RequestResponseMetadata>(
 	result: unknown,
 ): result is EngineRequest<T> {
 	return (
-		typeof result === 'object' &&
+		typeof result === "object" &&
 		result !== null &&
-		'actions' in result &&
-		'metadata' in result &&
+		"actions" in result &&
+		"metadata" in result &&
 		Array.isArray((result as EngineRequest<T>).actions)
 	);
 }
 
 export function isAgentError(error: unknown): error is AgentError {
 	return (
-		typeof error === 'object' &&
+		typeof error === "object" &&
 		error !== null &&
-		'code' in error &&
-		'message' in error &&
-		'retriable' in error
+		"code" in error &&
+		"message" in error &&
+		"retriable" in error
 	);
 }
 
@@ -278,7 +279,7 @@ export function isAgentError(error: unknown): error is AgentError {
 // ============================================================================
 
 export interface StreamChunk {
-	type: 'token' | 'tool_call' | 'tool_result' | 'final';
+	type: "token" | "tool_call" | "tool_result" | "final";
 	content?: string;
 	id?: string;
 	tool?: ToolName;

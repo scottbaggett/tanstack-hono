@@ -4,15 +4,16 @@
  * Provides common nodes that come with the workflow engine
  */
 
-import type { NodeExecutionContext } from "../../types/workflow";
-import { BaseNode, NodeBuilder, nodeRegistry } from "./base";
+import { BaseNode, NodeBuilder } from "./base";
 
 // ============================================================================
 // TEXT INPUT NODE
 // ============================================================================
 
 class TextInputNode extends BaseNode {
-	async execute(inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+	async execute(
+		inputs: Record<string, unknown>,
+	): Promise<Record<string, unknown>> {
 		const text = inputs.text as string;
 
 		if (!text) {
@@ -73,7 +74,9 @@ new NodeBuilder("text-input")
 // ============================================================================
 
 class TextOutputNode extends BaseNode {
-	async execute(inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+	async execute(
+		inputs: Record<string, unknown>,
+	): Promise<Record<string, unknown>> {
 		const text = inputs.text as string | undefined;
 
 		if (text === undefined) {
@@ -118,7 +121,9 @@ new NodeBuilder("text-output")
 // ============================================================================
 
 class StringTransformNode extends BaseNode {
-	async execute(inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+	async execute(
+		inputs: Record<string, unknown>,
+	): Promise<Record<string, unknown>> {
 		const text = inputs.text as string;
 		const operation = inputs.operation as string;
 
@@ -236,7 +241,9 @@ new NodeBuilder("string-transform")
 // ============================================================================
 
 class DelayNode extends BaseNode {
-	async execute(inputs: Record<string, unknown>): Promise<Record<string, unknown>> {
+	async execute(
+		inputs: Record<string, unknown>,
+	): Promise<Record<string, unknown>> {
 		const delayMs = (inputs.delayMs as number) || 1000;
 		const value = inputs.value;
 

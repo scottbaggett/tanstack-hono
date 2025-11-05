@@ -11,10 +11,13 @@
  * - Multiple output handles with different types
  */
 
-import type { IExecuteFunctions, INodeExecutionData } from "../../../types/execution";
+import type { TypedValue } from "../../../types/datatypes";
+import type {
+	IExecuteFunctions,
+	INodeExecutionData,
+} from "../../../types/execution";
 import type { INodeTypeDescription, IVersionedNodeType } from "../Node";
 import { Node, nodeLoader } from "../Node";
-import type { TypedValue } from "../../../types/datatypes";
 
 class ImageProcessingNode extends Node {
 	description: INodeTypeDescription = {
@@ -124,9 +127,7 @@ class ImageProcessingNode extends Node {
 				throw new Error("Invalid image data");
 			}
 
-			context.logInfo(
-				`Processing image: ${imageBuffer.length} bytes`
-			);
+			context.logInfo(`Processing image: ${imageBuffer.length} bytes`);
 
 			// Simulate image processing
 			// In production, you'd use a library like sharp or ImageMagick
@@ -174,7 +175,7 @@ class ImageProcessingNode extends Node {
 			}
 
 			context.logInfo(
-				`Image processing complete: ${processedBuffer.length} bytes`
+				`Image processing complete: ${processedBuffer.length} bytes`,
 			);
 
 			// Emit event showing progress
@@ -207,7 +208,7 @@ class ImageProcessingNode extends Node {
 			value: r.metadata,
 		}));
 		const fileSizes = results.map((r: any) =>
-			r.fileSize ? { dataType: "number", value: r.fileSize } : 0
+			r.fileSize ? { dataType: "number", value: r.fileSize } : 0,
 		);
 
 		context.setOutputData({

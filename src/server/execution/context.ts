@@ -8,11 +8,11 @@
  * - Preparing context with workflow state
  */
 
-import type { IExecutionContext, INodeTypeDescription } from '@/types/interfaces';
-import { evaluateProperties } from '@/server/lib/expressions';
-import type { ExpressionContext } from '@/server/lib/expressions';
-import type { INodeCredentialsDetails } from '@/types/credentials';
-import { credentialService } from '../services/credentials';
+import type { ExpressionContext } from "@/server/lib/expressions";
+import { evaluateProperties } from "@/server/lib/expressions";
+import type { INodeCredentialsDetails } from "@/types/credentials";
+import type { INodeTypeDescription } from "@/types/interfaces";
+import { credentialService } from "../services/credentials";
 
 interface ContextBuilderInput {
 	nodeId: string;
@@ -80,7 +80,9 @@ export async function buildExecutionContext(
 	const decryptedCredentials: Record<string, Record<string, any>> = {};
 
 	if (credentials) {
-		for (const [credentialType, credentialDetails] of Object.entries(credentials)) {
+		for (const [credentialType, credentialDetails] of Object.entries(
+			credentials,
+		)) {
 			try {
 				const credentialData = await credentialService.getCredentialData(
 					credentialType,
@@ -100,7 +102,7 @@ export async function buildExecutionContext(
 					error,
 				);
 				throw new Error(
-					`Failed to load credential "${credentialDetails.name}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+					`Failed to load credential "${credentialDetails.name}": ${error instanceof Error ? error.message : "Unknown error"}`,
 				);
 			}
 		}
@@ -114,7 +116,10 @@ export async function buildExecutionContext(
 		inputs,
 		properties,
 		evaluatedProperties: evaluation.values || {},
-		credentials: Object.keys(decryptedCredentials).length > 0 ? decryptedCredentials : undefined,
+		credentials:
+			Object.keys(decryptedCredentials).length > 0
+				? decryptedCredentials
+				: undefined,
 		previousData,
 		signal,
 	};

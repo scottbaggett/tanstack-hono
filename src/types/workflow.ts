@@ -124,10 +124,16 @@ export interface NodeTypeDefinition {
 	required?: string[];
 
 	// Execution method
-	execute: (inputs: Record<string, unknown>, context: NodeExecutionContext) => Promise<Record<string, unknown>>;
+	execute: (
+		inputs: Record<string, unknown>,
+		context: NodeExecutionContext,
+	) => Promise<Record<string, unknown>>;
 
 	// Optional: validation
-	validate?: (inputs: Record<string, unknown>) => { valid: boolean; errors?: string[] };
+	validate?: (inputs: Record<string, unknown>) => {
+		valid: boolean;
+		errors?: string[];
+	};
 
 	// Optional: UI hints
 	uiHints?: {
@@ -169,12 +175,22 @@ export interface Logger {
 /**
  * Status of a workflow run
  */
-export type WorkflowRunStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type WorkflowRunStatus =
+	| "pending"
+	| "running"
+	| "completed"
+	| "failed"
+	| "cancelled";
 
 /**
  * Status of a node execution
  */
-export type NodeExecutionStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+export type NodeExecutionStatus =
+	| "pending"
+	| "running"
+	| "completed"
+	| "failed"
+	| "skipped";
 
 /**
  * A workflow execution instance
@@ -247,7 +263,7 @@ export class WorkflowError extends Error {
 		message: string,
 		public code: string,
 		public nodeId?: string,
-		public details?: unknown
+		public details?: unknown,
 	) {
 		super(message);
 		this.name = "WorkflowError";

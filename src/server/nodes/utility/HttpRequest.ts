@@ -8,24 +8,24 @@
 
 import type {
 	IExecutionContext,
+	INodeExecutionData,
 	INodeType,
 	INodeTypeBaseDescription,
 	INodeTypeDescription,
-	INodeExecutionData,
-} from '@/types/interfaces';
+} from "@/types/interfaces";
 
 const baseDescription: INodeTypeBaseDescription = {
-	displayName: 'HTTP Request',
-	name: 'httpRequest',
-	icon: 'globe',
-	iconColor: 'standard-blue',
-	category: 'utility',
-	description: 'Make HTTP requests to external APIs',
+	displayName: "HTTP Request",
+	name: "httpRequest",
+	icon: "globe",
+	iconColor: "standard-blue",
+	category: "utility",
+	description: "Make HTTP requests to external APIs",
 	codex: {
-		alias: ['HTTP', 'API', 'REST', 'Fetch', 'Request'],
-		categories: ['utility'],
+		alias: ["HTTP", "API", "REST", "Fetch", "Request"],
+		categories: ["utility"],
 		subcategories: {
-			utility: ['Network'],
+			utility: ["Network"],
 		},
 	},
 };
@@ -38,49 +38,50 @@ export class HttpRequest implements INodeType {
 			...baseDescription,
 			version: 1,
 			defaults: {
-				name: 'HTTP Request',
-				color: 'standard-blue',
+				name: "HTTP Request",
+				color: "standard-blue",
 			},
 			maxInputs: 1,
 			maxOutputs: 1,
 			properties: [
 				{
-					displayName: 'Method',
-					name: 'method',
-					type: 'select',
-					default: 'GET',
-					description: 'The HTTP method to use',
+					displayName: "Method",
+					name: "method",
+					type: "select",
+					default: "GET",
+					description: "The HTTP method to use",
 					options: [
-						{ name: 'GET', value: 'GET' },
-						{ name: 'POST', value: 'POST' },
-						{ name: 'PUT', value: 'PUT' },
-						{ name: 'PATCH', value: 'PATCH' },
-						{ name: 'DELETE', value: 'DELETE' },
-						{ name: 'HEAD', value: 'HEAD' },
-						{ name: 'OPTIONS', value: 'OPTIONS' },
+						{ name: "GET", value: "GET" },
+						{ name: "POST", value: "POST" },
+						{ name: "PUT", value: "PUT" },
+						{ name: "PATCH", value: "PATCH" },
+						{ name: "DELETE", value: "DELETE" },
+						{ name: "HEAD", value: "HEAD" },
+						{ name: "OPTIONS", value: "OPTIONS" },
 					],
 				},
 				{
-					displayName: 'URL',
-					name: 'url',
-					type: 'string',
-					default: 'https://api.example.com',
-					description: 'The URL to make the request to. Use expressions like {{ TextInput.$json.text }}',
-					placeholder: 'https://api.example.com/users',
+					displayName: "URL",
+					name: "url",
+					type: "string",
+					default: "https://api.example.com",
+					description:
+						"The URL to make the request to. Use expressions like {{ TextInput.$json.text }}",
+					placeholder: "https://api.example.com/users",
 				},
 				{
-					displayName: 'Send Query Parameters',
-					name: 'sendQuery',
-					type: 'boolean',
+					displayName: "Send Query Parameters",
+					name: "sendQuery",
+					type: "boolean",
 					default: false,
-					description: 'Whether to send query parameters',
+					description: "Whether to send query parameters",
 				},
 				{
-					displayName: 'Query Parameters',
-					name: 'queryParameters',
-					type: 'json',
+					displayName: "Query Parameters",
+					name: "queryParameters",
+					type: "json",
 					default: {},
-					description: 'Query parameters to send with the request',
+					description: "Query parameters to send with the request",
 					displayOptions: {
 						show: {
 							sendQuery: [true],
@@ -88,18 +89,18 @@ export class HttpRequest implements INodeType {
 					},
 				},
 				{
-					displayName: 'Send Headers',
-					name: 'sendHeaders',
-					type: 'boolean',
+					displayName: "Send Headers",
+					name: "sendHeaders",
+					type: "boolean",
 					default: false,
-					description: 'Whether to send custom headers',
+					description: "Whether to send custom headers",
 				},
 				{
-					displayName: 'Headers',
-					name: 'headers',
-					type: 'json',
+					displayName: "Headers",
+					name: "headers",
+					type: "json",
 					default: {},
-					description: 'Headers to send with the request',
+					description: "Headers to send with the request",
 					displayOptions: {
 						show: {
 							sendHeaders: [true],
@@ -107,28 +108,28 @@ export class HttpRequest implements INodeType {
 					},
 				},
 				{
-					displayName: 'Send Body',
-					name: 'sendBody',
-					type: 'boolean',
+					displayName: "Send Body",
+					name: "sendBody",
+					type: "boolean",
 					default: false,
-					description: 'Whether to send a request body',
+					description: "Whether to send a request body",
 					displayOptions: {
 						show: {
-							method: ['POST', 'PUT', 'PATCH'],
+							method: ["POST", "PUT", "PATCH"],
 						},
 					},
 				},
 				{
-					displayName: 'Body Content Type',
-					name: 'bodyContentType',
-					type: 'select',
-					default: 'json',
-					description: 'The content type of the body',
+					displayName: "Body Content Type",
+					name: "bodyContentType",
+					type: "select",
+					default: "json",
+					description: "The content type of the body",
 					options: [
-						{ name: 'JSON', value: 'json' },
-						{ name: 'Form-Data', value: 'formData' },
-						{ name: 'Form-Urlencoded', value: 'formUrlencoded' },
-						{ name: 'Raw', value: 'raw' },
+						{ name: "JSON", value: "json" },
+						{ name: "Form-Data", value: "formData" },
+						{ name: "Form-Urlencoded", value: "formUrlencoded" },
+						{ name: "Raw", value: "raw" },
 					],
 					displayOptions: {
 						show: {
@@ -137,90 +138,90 @@ export class HttpRequest implements INodeType {
 					},
 				},
 				{
-					displayName: 'JSON Body',
-					name: 'jsonBody',
-					type: 'json',
+					displayName: "JSON Body",
+					name: "jsonBody",
+					type: "json",
 					default: {},
-					description: 'JSON body to send',
+					description: "JSON body to send",
 					displayOptions: {
 						show: {
 							sendBody: [true],
-							bodyContentType: ['json'],
+							bodyContentType: ["json"],
 						},
 					},
 				},
 				{
-					displayName: 'Form Data',
-					name: 'formData',
-					type: 'json',
+					displayName: "Form Data",
+					name: "formData",
+					type: "json",
 					default: {},
-					description: 'Form data to send as key-value pairs',
+					description: "Form data to send as key-value pairs",
 					displayOptions: {
 						show: {
 							sendBody: [true],
-							bodyContentType: ['formData'],
+							bodyContentType: ["formData"],
 						},
 					},
 				},
 				{
-					displayName: 'Form URL Encoded',
-					name: 'formUrlencoded',
-					type: 'json',
+					displayName: "Form URL Encoded",
+					name: "formUrlencoded",
+					type: "json",
 					default: {},
-					description: 'Form URL encoded data to send',
+					description: "Form URL encoded data to send",
 					displayOptions: {
 						show: {
 							sendBody: [true],
-							bodyContentType: ['formUrlencoded'],
+							bodyContentType: ["formUrlencoded"],
 						},
 					},
 				},
 				{
-					displayName: 'Raw Content Type',
-					name: 'rawContentType',
-					type: 'string',
-					default: 'application/json',
-					description: 'Content type for raw body',
+					displayName: "Raw Content Type",
+					name: "rawContentType",
+					type: "string",
+					default: "application/json",
+					description: "Content type for raw body",
 					displayOptions: {
 						show: {
 							sendBody: [true],
-							bodyContentType: ['raw'],
+							bodyContentType: ["raw"],
 						},
 					},
 				},
 				{
-					displayName: 'Raw Body',
-					name: 'rawBody',
-					type: 'string',
-					default: '',
-					description: 'Raw body content to send',
+					displayName: "Raw Body",
+					name: "rawBody",
+					type: "string",
+					default: "",
+					description: "Raw body content to send",
 					displayOptions: {
 						show: {
 							sendBody: [true],
-							bodyContentType: ['raw'],
+							bodyContentType: ["raw"],
 						},
 					},
 				},
 				{
-					displayName: 'Timeout (ms)',
-					name: 'timeout',
-					type: 'number',
+					displayName: "Timeout (ms)",
+					name: "timeout",
+					type: "number",
 					default: 30000,
-					description: 'Request timeout in milliseconds',
+					description: "Request timeout in milliseconds",
 				},
 				{
-					displayName: 'Include Response Headers',
-					name: 'includeHeaders',
-					type: 'boolean',
+					displayName: "Include Response Headers",
+					name: "includeHeaders",
+					type: "boolean",
 					default: false,
-					description: 'Whether to include response headers in output',
+					description: "Whether to include response headers in output",
 				},
 				{
-					displayName: 'Never Error',
-					name: 'neverError',
-					type: 'boolean',
+					displayName: "Never Error",
+					name: "neverError",
+					type: "boolean",
 					default: false,
-					description: 'Return success even if HTTP status code is not 2xx',
+					description: "Return success even if HTTP status code is not 2xx",
 				},
 			],
 		};
@@ -228,17 +229,18 @@ export class HttpRequest implements INodeType {
 
 	async execute(context: IExecutionContext): Promise<INodeExecutionData[][]> {
 		const method =
-			(context.evaluatedProperties.method as string)?.toUpperCase() || 'GET';
+			(context.evaluatedProperties.method as string)?.toUpperCase() || "GET";
 		const url = context.evaluatedProperties.url as string;
 		const timeout = (context.evaluatedProperties.timeout as number) || 30000;
 		const sendQuery = context.evaluatedProperties.sendQuery as boolean;
 		const sendHeaders = context.evaluatedProperties.sendHeaders as boolean;
 		const sendBody = context.evaluatedProperties.sendBody as boolean;
-		const includeHeaders = context.evaluatedProperties.includeHeaders as boolean;
+		const includeHeaders = context.evaluatedProperties
+			.includeHeaders as boolean;
 		const neverError = context.evaluatedProperties.neverError as boolean;
 
 		if (!url) {
-			throw new Error('URL is required');
+			throw new Error("URL is required");
 		}
 
 		// Build URL with query parameters
@@ -286,19 +288,19 @@ export class HttpRequest implements INodeType {
 			const bodyContentType = context.evaluatedProperties
 				.bodyContentType as string;
 			switch (bodyContentType) {
-				case 'json': {
+				case "json": {
 					const jsonBody = context.evaluatedProperties.jsonBody as
 						| Record<string, unknown>
 						| undefined;
 					if (jsonBody !== undefined) {
 						body = JSON.stringify(jsonBody);
-						if (!headers['Content-Type']) {
-							headers['Content-Type'] = 'application/json';
+						if (!headers["Content-Type"]) {
+							headers["Content-Type"] = "application/json";
 						}
 					}
 					break;
 				}
-				case 'formData': {
+				case "formData": {
 					const formData = context.evaluatedProperties.formData as
 						| Record<string, unknown>
 						| undefined;
@@ -322,16 +324,16 @@ export class HttpRequest implements INodeType {
 							}
 						}
 						body = params.toString();
-						if (!headers['Content-Type']) {
-							headers['Content-Type'] =
-								'application/x-www-form-urlencoded';
+						if (!headers["Content-Type"]) {
+							headers["Content-Type"] = "application/x-www-form-urlencoded";
 						}
 					}
 					break;
 				}
-				case 'formUrlencoded': {
-					const formUrlencoded = context.evaluatedProperties
-						.formUrlencoded as Record<string, unknown> | undefined;
+				case "formUrlencoded": {
+					const formUrlencoded = context.evaluatedProperties.formUrlencoded as
+						| Record<string, unknown>
+						| undefined;
 					if (formUrlencoded) {
 						const params = new URLSearchParams();
 						for (const [key, value] of Object.entries(formUrlencoded)) {
@@ -340,24 +342,23 @@ export class HttpRequest implements INodeType {
 							}
 						}
 						body = params.toString();
-						if (!headers['Content-Type']) {
-							headers['Content-Type'] =
-								'application/x-www-form-urlencoded';
+						if (!headers["Content-Type"]) {
+							headers["Content-Type"] = "application/x-www-form-urlencoded";
 						}
 					}
 					break;
 				}
-				case 'raw': {
+				case "raw": {
 					const rawBody = context.evaluatedProperties.rawBody as
 						| string
 						| undefined;
 					const rawContentType =
 						(context.evaluatedProperties.rawContentType as string) ||
-						'application/json';
+						"application/json";
 					if (rawBody !== undefined) {
 						body = rawBody;
-						if (!headers['Content-Type']) {
-							headers['Content-Type'] = rawContentType;
+						if (!headers["Content-Type"]) {
+							headers["Content-Type"] = rawContentType;
 						}
 					}
 					break;
@@ -419,7 +420,7 @@ export class HttpRequest implements INodeType {
 		} catch (error) {
 			// Handle timeout or other errors
 			if (error instanceof Error) {
-				if (error.name === 'AbortError') {
+				if (error.name === "AbortError") {
 					throw new Error(`Request timeout after ${timeout}ms`);
 				}
 				if (neverError) {
@@ -430,7 +431,7 @@ export class HttpRequest implements INodeType {
 								json: {
 									error: error.message,
 									statusCode: 0,
-									statusText: 'Request Failed',
+									statusText: "Request Failed",
 								},
 							},
 						],
@@ -438,10 +439,9 @@ export class HttpRequest implements INodeType {
 				}
 				throw error;
 			}
-			throw new Error('Unknown error occurred during HTTP request');
+			throw new Error("Unknown error occurred during HTTP request");
 		} finally {
 			clearTimeout(timeoutId);
 		}
 	}
 }
-

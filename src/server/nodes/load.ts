@@ -5,19 +5,18 @@
  * Import this file early in the application to ensure nodes are registered
  */
 
-import { Agent } from './agent/Agent';
-import { TextInput } from './input/TextInput';
-import { Output } from './output/Output';
-import { ExecuteCommand } from './utility/ExecuteCommand';
-import { HttpRequest } from './utility/HttpRequest';
-import { IfElse } from './control/IfElse';
-import { Webhook } from './trigger/Webhook';
-import { nodeRegistry } from './registry';
-
+import { registerTool } from "../execution/requestHandler";
 // Agent tools
-import { calculatorTool } from '../tools/calculator';
-import { searchTool } from '../tools/search';
-import { registerTool } from '../execution/requestHandler';
+import { calculatorTool } from "../tools/calculator";
+import { searchTool } from "../tools/search";
+import { Agent } from "./agent/Agent";
+import { IfElse } from "./control/IfElse";
+import { TextInput } from "./input/TextInput";
+import { Output } from "./output/Output";
+import { nodeRegistry } from "./registry";
+import { Webhook } from "./trigger/Webhook";
+import { ExecuteCommand } from "./utility/ExecuteCommand";
+import { HttpRequest } from "./utility/HttpRequest";
 
 /**
  * Register all node types
@@ -34,7 +33,7 @@ export function loadNodes(): void {
 		description: textInputNode.description.description,
 		codex: textInputNode.description.codex,
 	});
-	console.log('✓ Registered text input node');
+	console.log("✓ Registered text input node");
 
 	// Output node
 	const outputNode = new Output();
@@ -47,7 +46,7 @@ export function loadNodes(): void {
 		description: outputNode.description.description,
 		codex: outputNode.description.codex,
 	});
-	console.log('✓ Registered output node');
+	console.log("✓ Registered output node");
 
 	// Agent node
 	const agentNode = new Agent();
@@ -60,7 +59,7 @@ export function loadNodes(): void {
 		description: agentNode.description.description,
 		codex: agentNode.description.codex,
 	});
-	console.log('✓ Registered agent node');
+	console.log("✓ Registered agent node");
 
 	// Execute Command node
 	const executeCommandNode = new ExecuteCommand();
@@ -73,7 +72,7 @@ export function loadNodes(): void {
 		description: executeCommandNode.description.description,
 		codex: executeCommandNode.description.codex,
 	});
-	console.log('✓ Registered execute command node');
+	console.log("✓ Registered execute command node");
 
 	// If/Else node
 	const ifElseNode = new IfElse();
@@ -86,7 +85,7 @@ export function loadNodes(): void {
 		description: ifElseNode.description.description,
 		codex: ifElseNode.description.codex,
 	});
-	console.log('✓ Registered if/else node');
+	console.log("✓ Registered if/else node");
 
 	// HTTP Request node
 	const httpRequestNode = new HttpRequest();
@@ -99,7 +98,7 @@ export function loadNodes(): void {
 		description: httpRequestNode.description.description,
 		codex: httpRequestNode.description.codex,
 	});
-	console.log('✓ Registered HTTP request node');
+	console.log("✓ Registered HTTP request node");
 
 	// Webhook Trigger node
 	const webhookNode = new Webhook();
@@ -112,14 +111,14 @@ export function loadNodes(): void {
 		description: webhookNode.description.description,
 		codex: webhookNode.description.codex,
 	});
-	console.log('✓ Registered webhook trigger node');
+	console.log("✓ Registered webhook trigger node");
 
 	// Register agent tools
 	registerTool(calculatorTool);
-	console.log('✓ Registered calculator tool');
+	console.log("✓ Registered calculator tool");
 
 	registerTool(searchTool);
-	console.log('✓ Registered search tool');
+	console.log("✓ Registered search tool");
 
 	// TODO: Register other node types here
 	// - LLM nodes

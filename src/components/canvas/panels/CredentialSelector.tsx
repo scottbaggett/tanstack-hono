@@ -4,9 +4,9 @@
  * Dropdown for selecting credentials with create/manage options
  */
 
-import { useState, useEffect } from 'react';
-import { LucideIcon } from '@/components/icon/LucideIcon';
-import type { ICredentialsResponse } from '@/types/credentials';
+import { useEffect, useState } from "react";
+import { LucideIcon } from "@/components/icon/LucideIcon";
+import type { ICredentialsResponse } from "@/types/credentials";
 
 interface CredentialSelectorProps {
 	credentialType: string;
@@ -30,7 +30,7 @@ export function CredentialSelector({
 		const fetchCredentials = async () => {
 			try {
 				setLoading(true);
-				const response = await fetch('/api/credentials');
+				const response = await fetch("/api/credentials");
 				const result = await response.json();
 
 				if (result.success) {
@@ -40,11 +40,11 @@ export function CredentialSelector({
 					);
 					setCredentials(filtered);
 				} else {
-					setError('Failed to load credentials');
+					setError("Failed to load credentials");
 				}
 			} catch (error) {
-				console.error('Failed to fetch credentials:', error);
-				setError('Failed to load credentials');
+				console.error("Failed to fetch credentials:", error);
+				setError("Failed to load credentials");
 			} finally {
 				setLoading(false);
 			}
@@ -73,7 +73,7 @@ export function CredentialSelector({
 
 	const handleCreateNew = () => {
 		// Open credentials page in new tab
-		window.open('/credentials', '_blank');
+		window.open("/credentials", "_blank");
 	};
 
 	if (loading) {
@@ -96,12 +96,12 @@ export function CredentialSelector({
 	return (
 		<div className="space-y-2">
 			<select
-				value={value?.id || ''}
+				value={value?.id || ""}
 				onChange={handleChange}
 				className="w-full px-3 py-2 bg-surface-3 border border-surface-6 rounded-lg text-surface-12 focus:outline-none focus:border-info-7"
 			>
 				<option value="">
-					{required ? 'Select credential...' : '(No credential)'}
+					{required ? "Select credential..." : "(No credential)"}
 				</option>
 				{credentials.map((credential) => (
 					<option key={credential.id} value={credential.id}>

@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+	createContext,
+	useCallback,
+	useContext,
+	useEffect,
+	useState,
+} from "react";
 
 type Theme = "light" | "dark" | "system";
 
@@ -60,12 +66,12 @@ export function ThemeProvider({
 		return defaultTheme;
 	});
 
-	function resolveTheme(themeValue: Theme): "light" | "dark" {
+	const resolveTheme = useCallback((themeValue: Theme): "light" | "dark" => {
 		if (themeValue === "system") {
 			return getSystemTheme();
 		}
 		return themeValue;
-	}
+	}, []);
 
 	const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => {
 		if (typeof window === "undefined") {
@@ -80,7 +86,7 @@ export function ThemeProvider({
 		const newResolved = resolveTheme(theme);
 		applyTheme(newResolved);
 		setResolvedTheme(newResolved);
-	}, [theme]);
+	}, [theme, resolveTheme]);
 
 	// Listen to system theme changes when theme is "system"
 	useEffect(() => {

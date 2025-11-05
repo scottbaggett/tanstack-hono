@@ -4,10 +4,10 @@
  * Handles incoming webhook requests and triggers workflow execution
  */
 
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { db } from "../db";
 import { workflows } from "../db/schema";
-import { eq } from "drizzle-orm";
 
 const app = new Hono();
 
@@ -19,7 +19,9 @@ const app = new Hono();
 app.all("/webhook/*", async (c) => {
 	// Get the full path after /webhook/
 	const fullPath = c.req.path;
-	const path = fullPath.replace(/^\/api\/webhook\//, "").replace(/^\/webhook\//, "");
+	const path = fullPath
+		.replace(/^\/api\/webhook\//, "")
+		.replace(/^\/webhook\//, "");
 	const method = c.req.method;
 
 	try {
@@ -48,9 +50,7 @@ app.all("/webhook/*", async (c) => {
 		}
 
 		// Get query parameters
-		const query = Object.fromEntries(
-			new URL(c.req.url).searchParams.entries()
-		);
+		const query = Object.fromEntries(new URL(c.req.url).searchParams.entries());
 
 		// Get headers (excluding sensitive ones)
 		const headers: Record<string, string> = {};
@@ -91,7 +91,7 @@ app.all("/webhook/*", async (c) => {
 				success: false,
 				error: error instanceof Error ? error.message : "Unknown error",
 			},
-			500
+			500,
 		);
 	}
 });
@@ -120,13 +120,12 @@ app.get("/webhooks/:workflowId", async (c) => {
 				: workflow.definition;
 
 		const webhookNodes = (definition.nodes || []).filter(
-			(node: any) => node.data?.nodeType === "webhook"
+			(node: any) => node.data?.nodeType === "webhook",
 		);
 
 		const baseUrl = process.env.WEBHOOK_URL || "http://localhost:3000";
 		const webhooks = webhookNodes.map((node: any) => {
-			const path =
-				node.data?.properties?.path || `${workflowId}/${node.id}`;
+			const path = node.data?.properties?.path || `${workflowId}/${node.id}`;
 			const method = node.data?.properties?.httpMethod || "POST";
 
 			return {
@@ -149,7 +148,7 @@ app.get("/webhooks/:workflowId", async (c) => {
 				success: false,
 				error: error instanceof Error ? error.message : "Unknown error",
 			},
-			500
+			500,
 		);
 	}
 });

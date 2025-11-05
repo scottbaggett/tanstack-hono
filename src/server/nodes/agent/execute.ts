@@ -4,26 +4,29 @@
  * P0 Implementation: Single-turn agent with LangGraph
  * Supports basic tool calling and deterministic IDs
  */
+/** biome-ignore-all lint/suspicious/noExplicitAny: initialState is a AgentGraphState */
 
-import type { IExecutionContext, INodeExecutionData } from "@/types/interfaces";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import type { Tool } from "@langchain/core/tools";
+import {
+	type AgentGraphState,
+	buildInitialState,
+	buildResumedState,
+	createAgentGraph,
+} from "@/server/agents/graph";
+import { createEventEmitter } from "@/server/observability/events";
 import type {
+	AgentOptions,
 	EngineRequest,
 	EngineResponse,
 	RequestResponseMetadata,
-	AgentOptions,
 } from "@/server/types/agent";
-import {
-	createAgentGraph,
-	buildInitialState,
-	buildResumedState,
-	type AgentGraphState,
-} from "@/server/agents/graph";
 import { generateToolCallId } from "@/server/utils/ids";
-import { createEventEmitter } from "@/server/observability/events";
 import {
 	getChatModel,
 	getTools /* , getOptionalMemory */,
 } from "@/server/utils/langchain";
+import type { IExecutionContext, INodeExecutionData } from "@/types/interfaces";
 
 /**
  * Main agent execution function
@@ -59,16 +62,16 @@ export async function executeAgent(
 	}
 
 	// Get model from properties or connection
-	let model;
+	let model: BaseChatModel | undefined;
 
 	// Get model from evaluatedProperties
 	const modelFromProperty = evaluatedProperties.model as string | undefined;
 
 	if (modelFromProperty) {
 		// Use model from node properties (simplified approach)
-		const { ChatOpenAI } = await import('@langchain/openai');
-		const { ChatAnthropic } = await import('@langchain/anthropic');
-		const { getModel } = await import('@/server/models/registry');
+		const { ChatOpenAI } = await import("@langchain/openai");
+		const { ChatAnthropic } = await import("@langchain/anthropic");
+		const { getModel } = await import("@/server/models/registry");
 
 		const modelConfig = getModel(modelFromProperty);
 		if (!modelConfig) {
@@ -76,8 +79,11 @@ export async function executeAgent(
 		}
 
 		// Create the appropriate model instance based on provider
-		if (modelConfig.provider === 'openai') {
-			const modelOptions: any = {
+		if (modelConfig.provider === "openai") {
+			const modelOptions: {
+				modelName: string;
+				temperature?: number;
+			} = {
 				modelName: modelFromProperty,
 			};
 
@@ -87,8 +93,11 @@ export async function executeAgent(
 			}
 
 			model = new ChatOpenAI(modelOptions);
-		} else if (modelConfig.provider === 'anthropic') {
-			const modelOptions: any = {
+		} else if (modelConfig.provider === "anthropic") {
+			const modelOptions: {
+				modelName: string;
+				temperature?: number;
+			} = {
 				modelName: modelFromProperty,
 			};
 
@@ -128,14 +137,14 @@ export async function executeAgent(
 		// Build LangGraph with real components
 		const graph = createAgentGraph({
 			model,
-			tools: langchainTools as any[], // LangChain tools
+			tools: langchainTools as unknown as Tool[], // LangChain tools
 			...options,
 		});
 
 		const app = graph.compile();
 
 		// Initial or resumed execution
-		let initialState;
+		let initialState: AgentGraphState;
 		if (response) {
 			// Resuming after tool execution
 			const previousState = buildInitialState(userPrompt, systemPrompt);

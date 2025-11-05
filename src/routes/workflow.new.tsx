@@ -5,9 +5,9 @@
  */
 
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
 import { useCreateWorkflow } from "@/hooks/use-workflows";
-import { useEffect } from "react";
 
 export const Route = createFileRoute("/workflow/new")({
 	component: NewWorkflowPage,
@@ -50,7 +50,10 @@ function NewWorkflowPage() {
 		};
 
 		create();
-	}, []);
+	}, [
+		createWorkflow.mutateAsync, // Redirect back to workflows list on error
+		navigate,
+	]);
 
 	return (
 		<div className="flex items-center justify-center h-screen">

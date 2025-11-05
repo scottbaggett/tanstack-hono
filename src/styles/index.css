@@ -1,9 +1,9 @@
 @import "tailwindcss";
-@plugin '@tailwindcss/typography';
-@import "tw-animate-css";
 @import "./colors.css";
 @import "./editor.css";
 @import "./node-palettes.css";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -146,7 +146,6 @@ code {
 [data-node-color] {
 	color: var(--color-node-foreground);
 	border-color: var(--color-node-border);
-
 }
 .dark {
 	--background: black;
@@ -162,10 +161,10 @@ code {
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+	* {
+		@apply border-border outline-ring/50;
 	}
-  body {
-    @apply bg-background text-foreground;
+	body {
+		@apply bg-background text-foreground;
 	}
 }

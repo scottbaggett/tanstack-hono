@@ -12,16 +12,18 @@
  * - GET /workflows/:workflowId/runs/:runId/events - Stream execution events
  */
 
+import { desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
-
-import type { IWorkflowDefinition } from "../../types/interfaces";
-import type { StreamEvent } from "../../types/execution";
-import { db } from "../db";
-import { workflows, workflowVersions, workflowRuns, nodeExecutions } from "../db/schema";
-import { eq, desc } from "drizzle-orm";
 import { getAuthUser } from "../auth/middleware";
+import { db } from "../db";
+import {
+	nodeExecutions,
+	workflowRuns,
+	workflows,
+	workflowVersions,
+} from "../db/schema";
 
 // ============================================================================
 // ROUTE HANDLER
@@ -51,9 +53,10 @@ workflowRoutes.get("/", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to list workflows",
+				error:
+					error instanceof Error ? error.message : "Failed to list workflows",
 			},
-			500
+			500,
 		);
 	}
 });
@@ -76,7 +79,7 @@ workflowRoutes.get("/:id", async (c) => {
 					success: false,
 					error: "Workflow not found",
 				},
-				404
+				404,
 			);
 		}
 
@@ -87,7 +90,7 @@ workflowRoutes.get("/:id", async (c) => {
 					success: false,
 					error: "Unauthorized",
 				},
-				403
+				403,
 			);
 		}
 
@@ -101,9 +104,10 @@ workflowRoutes.get("/:id", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to get workflow",
+				error:
+					error instanceof Error ? error.message : "Failed to get workflow",
 			},
-			500
+			500,
 		);
 	}
 });
@@ -120,7 +124,9 @@ workflowRoutes.post("/", async (c) => {
 			definition: z.object({
 				nodes: z.array(z.any()),
 				edges: z.array(z.any()),
-				viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
+				viewport: z
+					.object({ x: z.number(), y: z.number(), zoom: z.number() })
+					.optional(),
 			}),
 		});
 
@@ -142,7 +148,7 @@ workflowRoutes.post("/", async (c) => {
 				success: true,
 				data: result[0],
 			},
-			201
+			201,
 		);
 	} catch (error) {
 		console.error("Failed to create workflow:", error);
@@ -150,9 +156,10 @@ workflowRoutes.post("/", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to create workflow",
+				error:
+					error instanceof Error ? error.message : "Failed to create workflow",
 			},
-			400
+			400,
 		);
 	}
 });
@@ -171,7 +178,9 @@ workflowRoutes.put("/:id", async (c) => {
 				.object({
 					nodes: z.array(z.any()),
 					edges: z.array(z.any()),
-					viewport: z.object({ x: z.number(), y: z.number(), zoom: z.number() }).optional(),
+					viewport: z
+						.object({ x: z.number(), y: z.number(), zoom: z.number() })
+						.optional(),
 				})
 				.optional(),
 			status: z.enum(["draft", "published", "archived"]).optional(),
@@ -192,7 +201,7 @@ workflowRoutes.put("/:id", async (c) => {
 					success: false,
 					error: "Workflow not found",
 				},
-				404
+				404,
 			);
 		}
 
@@ -203,7 +212,7 @@ workflowRoutes.put("/:id", async (c) => {
 					success: false,
 					error: "Unauthorized",
 				},
-				403
+				403,
 			);
 		}
 
@@ -246,9 +255,10 @@ workflowRoutes.put("/:id", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to update workflow",
+				error:
+					error instanceof Error ? error.message : "Failed to update workflow",
 			},
-			400
+			400,
 		);
 	}
 });
@@ -272,7 +282,7 @@ workflowRoutes.delete("/:id", async (c) => {
 					success: false,
 					error: "Workflow not found",
 				},
-				404
+				404,
 			);
 		}
 
@@ -283,14 +293,11 @@ workflowRoutes.delete("/:id", async (c) => {
 					success: false,
 					error: "Unauthorized",
 				},
-				403
+				403,
 			);
 		}
 
-		const result = await db
-			.delete(workflows)
-			.where(eq(workflows.id, id))
-			.returning();
+		await db.delete(workflows).where(eq(workflows.id, id)).returning();
 
 		return c.json({
 			success: true,
@@ -302,9 +309,10 @@ workflowRoutes.delete("/:id", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to delete workflow",
+				error:
+					error instanceof Error ? error.message : "Failed to delete workflow",
 			},
-			500
+			500,
 		);
 	}
 });
@@ -318,7 +326,7 @@ workflowRoutes.get("/:workflowId/runs", async (c) => {
 			.select()
 			.from(workflowRuns)
 			.where(eq(workflowRuns.workflowId, workflowId))
-			.orderBy(desc(workflowRuns.createdAt));
+			.orderBy(desc(workflowRuns.startedAt));
 
 		return c.json({
 			success: true,
@@ -330,9 +338,12 @@ workflowRoutes.get("/:workflowId/runs", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to list workflow runs",
+				error:
+					error instanceof Error
+						? error.message
+						: "Failed to list workflow runs",
 			},
-			500
+			500,
 		);
 	}
 });
@@ -340,7 +351,7 @@ workflowRoutes.get("/:workflowId/runs", async (c) => {
 // GET /workflows/:workflowId/runs/:runId - Get run details
 workflowRoutes.get("/:workflowId/runs/:runId", async (c) => {
 	try {
-		const { workflowId, runId } = c.req.param();
+		const { runId } = c.req.param();
 
 		const run = await db
 			.select()
@@ -354,7 +365,7 @@ workflowRoutes.get("/:workflowId/runs/:runId", async (c) => {
 					success: false,
 					error: "Run not found",
 				},
-				404
+				404,
 			);
 		}
 
@@ -377,9 +388,10 @@ workflowRoutes.get("/:workflowId/runs/:runId", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to get workflow run",
+				error:
+					error instanceof Error ? error.message : "Failed to get workflow run",
 			},
-			500
+			500,
 		);
 	}
 });
@@ -402,16 +414,11 @@ workflowRoutes.post("/:id/run", async (c) => {
 					success: false,
 					error: "Workflow not found",
 				},
-				404
+				404,
 			);
 		}
 
-		// Get workflow definition (already parsed from JSONB)
-		const definition = workflow[0].definition;
-
 		// Create workflow run record
-		const runId = crypto.randomUUID();
-
 		const runRecord = await db
 			.insert(workflowRuns)
 			.values({
@@ -432,7 +439,7 @@ workflowRoutes.post("/:id/run", async (c) => {
 					message: "Workflow execution started",
 				},
 			},
-			202
+			202,
 		);
 	} catch (error) {
 		console.error("Failed to run workflow:", error);
@@ -440,16 +447,17 @@ workflowRoutes.post("/:id/run", async (c) => {
 		return c.json(
 			{
 				success: false,
-				error: error instanceof Error ? error.message : "Failed to run workflow",
+				error:
+					error instanceof Error ? error.message : "Failed to run workflow",
 			},
-			500
+			500,
 		);
 	}
 });
 
 // GET /workflows/:workflowId/runs/:runId/events - Stream execution events (SSE)
 workflowRoutes.get("/:workflowId/runs/:runId/events", (c) => {
-	const { workflowId, runId } = c.req.param();
+	const { runId } = c.req.param();
 
 	return stream(c, async (writer) => {
 		try {
@@ -462,48 +470,48 @@ workflowRoutes.get("/:workflowId/runs/:runId/events", (c) => {
 				.limit(1);
 
 			if (allEvents.length === 0) {
-				await writer.writeSSE({
-					data: JSON.stringify({
+				await writer.write(
+					`data: ${JSON.stringify({
 						success: false,
 						error: "Run not found",
-					}),
-				});
+					})}\n\n`,
+				);
 
 				return;
 			}
 
 			// For now, send a simple status update
 			// TODO: Stream events from WorkflowOrchestrator
-			await writer.writeSSE({
-				data: JSON.stringify({
+			await writer.write(
+				`data: ${JSON.stringify({
 					type: "status",
 					data: {
 						runId,
 						status: "streaming",
 					},
-				}),
-			});
+				})}\n\n`,
+			);
 
 			// Keep connection alive
 			await new Promise((resolve) => setTimeout(resolve, 30000));
 
-			await writer.writeSSE({
-				data: JSON.stringify({
+			await writer.write(
+				`data: ${JSON.stringify({
 					type: "done",
 					data: {
 						runId,
 					},
-				}),
-			});
+				})}\n\n`,
+			);
 		} catch (error) {
 			console.error("Stream error:", error);
 
-			await writer.writeSSE({
-				data: JSON.stringify({
+			await writer.write(
+				`data: ${JSON.stringify({
 					success: false,
 					error: error instanceof Error ? error.message : "Stream error",
-				}),
-			});
+				})}\n\n`,
+			);
 		}
 	});
 });

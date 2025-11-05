@@ -8,7 +8,10 @@
  * - Error handling
  */
 
-import type { IExecuteFunctions, INodeExecutionData, StreamEvent } from "../../../types/execution";
+import type {
+	IExecuteFunctions,
+	INodeExecutionData,
+} from "../../../types/execution";
 import type { INodeTypeDescription, IVersionedNodeType } from "../Node";
 import { Node, nodeLoader } from "../Node";
 
@@ -83,7 +86,9 @@ class LLMNode extends Node {
 		const temperature = context.getNodeParameter("temperature") as number;
 		const maxTokens = context.getNodeParameter("maxTokens") as number;
 
-		context.logInfo(`Using model: ${model}, temperature: ${temperature}, maxTokens: ${maxTokens}`);
+		context.logInfo(
+			`Using model: ${model}, temperature: ${temperature}, maxTokens: ${maxTokens}`,
+		);
 
 		// Get input
 		const inputs = context.getInputData();

@@ -1,13 +1,13 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1762296674625,
-      "tag": "20251104225114_brown_gertrude_yorkes",
-      "breakpoints": true
-    }
-  ]
+	"version": "7",
+	"dialect": "postgresql",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "7",
+			"when": 1762296674625,
+			"tag": "20251104225114_brown_gertrude_yorkes",
+			"breakpoints": true
+		}
+	]
 }

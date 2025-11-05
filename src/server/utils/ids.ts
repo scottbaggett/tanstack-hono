@@ -35,12 +35,12 @@ export async function generateToolCallId(
 	const data = encoder.encode(input);
 
 	// Use SHA-256 for collision resistance
-	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
 	const hashArray = new Uint8Array(hashBuffer);
 
 	// Convert to base64, take first 16 chars
 	const base64 = btoa(String.fromCharCode(...Array.from(hashArray)));
-	return base64.slice(0, 16).replace(/\+/g, '-').replace(/\//g, '_');
+	return base64.slice(0, 16).replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 /**
@@ -63,7 +63,7 @@ export function generateToolCallIdSync(
 	}
 
 	// Convert to base36 for shorter representation
-	return Math.abs(hash).toString(36).padStart(8, '0');
+	return Math.abs(hash).toString(36).padStart(8, "0");
 }
 
 // ============================================================================
@@ -80,18 +80,21 @@ export function generateToolCallIdSync(
  * @param input - Tool input parameters
  * @returns Hash string (8 chars)
  */
-export async function generateStepHash(tool: string, input: unknown): Promise<string> {
+export async function generateStepHash(
+	tool: string,
+	input: unknown,
+): Promise<string> {
 	// Stringify input in a canonical way (sorted keys)
 	const canonical = JSON.stringify(input, Object.keys(input as object).sort());
 	const combined = `${tool}:${canonical}`;
 
 	const encoder = new TextEncoder();
 	const data = encoder.encode(combined);
-	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+	const hashBuffer = await crypto.subtle.digest("SHA-256", data);
 	const hashArray = new Uint8Array(hashBuffer);
 
 	const base64 = btoa(String.fromCharCode(...Array.from(hashArray)));
-	return base64.slice(0, 8).replace(/\+/g, '-').replace(/\//g, '_');
+	return base64.slice(0, 8).replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 /**
@@ -108,7 +111,7 @@ export function generateStepHashSync(tool: string, input: unknown): string {
 		hash = hash & hash;
 	}
 
-	return Math.abs(hash).toString(36).padStart(8, '0');
+	return Math.abs(hash).toString(36).padStart(8, "0");
 }
 
 // ============================================================================
@@ -141,7 +144,7 @@ export function generateRequestId(): string {
  */
 export function generateExecutionId(): string {
 	const timestamp = Date.now().toString(36);
-	const uuid = crypto.randomUUID().split('-')[0]; // Take first segment
+	const uuid = crypto.randomUUID().split("-")[0]; // Take first segment
 	return `exec_${timestamp}_${uuid}`;
 }
 

@@ -5,14 +5,18 @@
  * flowing through the workflow execution.
  */
 
-import type { INodeExecutionData, INodeOutputData, INodeOutputDataSerialized } from "../../types/execution";
-import type { TypedValue, DataTypeId } from "../../types/datatypes";
+import type { DataTypeId, TypedValue } from "../../types/datatypes";
 import {
+	DATA_TYPE_METADATA,
+	deserializeValue,
 	inferDataType,
 	serializeValue,
-	deserializeValue,
-	DATA_TYPE_METADATA,
 } from "../../types/datatypes";
+import type {
+	INodeExecutionData,
+	INodeOutputData,
+	INodeOutputDataSerialized,
+} from "../../types/execution";
 
 // ============================================================================
 // TYPE CONVERSION
@@ -79,7 +83,9 @@ export function extractType(data: INodeExecutionData): DataTypeId {
  *
  * Converts all TypedValues to SerializedValues using appropriate serialization.
  */
-export function serializeOutputData(outputData: INodeOutputData): INodeOutputDataSerialized {
+export function serializeOutputData(
+	outputData: INodeOutputData,
+): INodeOutputDataSerialized {
 	const serialized: INodeOutputDataSerialized = {};
 
 	for (const [handleName, values] of Object.entries(outputData)) {
@@ -97,7 +103,9 @@ export function serializeOutputData(outputData: INodeOutputData): INodeOutputDat
  *
  * Converts SerializedValues back to TypedValues/raw values.
  */
-export function deserializeOutputData(serialized: INodeOutputDataSerialized): INodeOutputData {
+export function deserializeOutputData(
+	serialized: INodeOutputDataSerialized,
+): INodeOutputData {
 	const deserialized: INodeOutputData = {};
 
 	for (const [handleName, values] of Object.entries(serialized)) {
@@ -108,7 +116,7 @@ export function deserializeOutputData(serialized: INodeOutputDataSerialized): IN
 				// Fallback: return serialized data as-is
 				console.warn(
 					`Failed to deserialize ${handleName} (${value.dataType}):`,
-					error
+					error,
 				);
 				return {
 					dataType: value.dataType,
@@ -133,7 +141,7 @@ export function deserializeOutputData(serialized: INodeOutputDataSerialized): IN
  */
 export function validateDataType(
 	data: INodeExecutionData,
-	expectedType: DataTypeId | "any"
+	expectedType: DataTypeId | "any",
 ): { valid: boolean; error?: string } {
 	// "any" accepts all types
 	if (expectedType === "any") {
@@ -169,12 +177,25 @@ function canConvertType(from: DataTypeId, to: DataTypeId): boolean {
 
 	// Number conversions
 	if (to === "number" || to === "float" || to === "integer") {
-		return from === "number" || from === "float" || from === "integer" || from === "string";
+		return (
+			from === "number" ||
+			from === "float" ||
+			from === "integer" ||
+			from === "string"
+		);
 	}
 
 	// JSON can accept many types
 	if (to === "json") {
-		return ["string", "number", "float", "integer", "boolean", "array", "object"].includes(from);
+		return [
+			"string",
+			"number",
+			"float",
+			"integer",
+			"boolean",
+			"array",
+			"object",
+		].includes(from);
 	}
 
 	return false;
@@ -187,7 +208,10 @@ function canConvertType(from: DataTypeId, to: DataTypeId): boolean {
 /**
  * Get a human-readable summary of data for logging/display
  */
-export function summarizeData(data: INodeExecutionData, maxLength: number = 100): string {
+export function summarizeData(
+	data: INodeExecutionData,
+	maxLength: number = 100,
+): string {
 	const typed = toTypedValue(data);
 	const value = typed.value;
 	const type = typed.dataType;
@@ -235,9 +259,10 @@ export function summarizeData(data: INodeExecutionData, maxLength: number = 100)
 /**
  * Check if data respects the size limit for its type
  */
-export function checkSizeLimit(
-	data: INodeExecutionData
-): { valid: boolean; error?: string } {
+export function checkSizeLimit(data: INodeExecutionData): {
+	valid: boolean;
+	error?: string;
+} {
 	const typed = toTypedValue(data);
 	const metadata = DATA_TYPE_METADATA[typed.dataType];
 
@@ -278,7 +303,7 @@ export function checkSizeLimit(
  */
 export function serializeOutputDataSafely(
 	outputData: INodeOutputData,
-	logger?: Console
+	logger?: Console,
 ): INodeOutputDataSerialized {
 	try {
 		return serializeOutputData(outputData);
@@ -294,7 +319,9 @@ export function serializeOutputDataSafely(
  */
 export function validateOutputHandles(
 	outputData: INodeOutputData,
-	declaredOutputs: Array<{ name: string; type: DataTypeId | "any" }> | undefined
+	declaredOutputs:
+		| Array<{ name: string; type: DataTypeId | "any" }>
+		| undefined,
 ): { valid: boolean; errors: Array<{ handle: string; error: string }> } {
 	if (!declaredOutputs || declaredOutputs.length === 0) {
 		return { valid: true, errors: [] };

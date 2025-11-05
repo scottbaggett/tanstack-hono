@@ -4,8 +4,8 @@
  * Node configuration form with drag-drop support for inputs
  */
 
-import React from "react";
 import type { Node } from "@xyflow/react";
+import type React from "react";
 import { Input } from "@/components/ui/input";
 import { JsonEditor } from "@/components/ui/json-editor";
 import {
@@ -152,6 +152,7 @@ export function ParametersPanel({
 									{webhookUrl}
 								</div>
 								<button
+									type="button"
 									onClick={handleCopyWebhookUrl}
 									className="px-3 py-2 bg-surface-4 hover:bg-surface-5 rounded text-xs font-medium transition-colors"
 									title="Copy to clipboard"
@@ -181,12 +182,12 @@ export function ParametersPanel({
 
 							return (
 								<div key={credReq.name} className="space-y-2">
-									<label className="text-sm font-medium text-surface-12">
+									<p className="text-sm font-medium text-surface-12">
 										{credReq.name}
 										{credReq.required && (
 											<span className="text-red-9 ml-1">*</span>
 										)}
-									</label>
+									</p>
 									<CredentialSelector
 										credentialType={credReq.name}
 										value={credential || null}
@@ -336,9 +337,9 @@ export function ParametersPanel({
 
 							return (
 								<div key={property.name} className="space-y-2">
-									<label className="text-sm font-medium text-surface-12">
+									<p className="text-sm font-medium text-surface-12">
 										{property.displayName || property.name}
-									</label>
+									</p>
 									{property.description && (
 										<p className="text-xs text-surface-11">
 											{property.description}

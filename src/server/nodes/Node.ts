@@ -10,12 +10,11 @@
 
 import type {
 	IExecuteFunctions,
-	IWebhookFunctions,
-	IPollFunctions,
-	IWebhookResponseData,
 	INodeExecutionData,
+	IPollFunctions,
+	IWebhookFunctions,
+	IWebhookResponseData,
 } from "../../types/execution";
-import type { DataTypeId } from "../../types/datatypes";
 
 // ============================================================================
 // NODE TYPE DESCRIPTION
@@ -50,7 +49,7 @@ export interface INodeTypeDescription {
 	// Optional: specify number of input/output connection points for UI
 	// Most nodes have 1 input and 1 output (default)
 	// Start nodes might have 0 inputs, decision nodes might have multiple outputs
-	maxInputs?: number;  // Default: 1
+	maxInputs?: number; // Default: 1
 	maxOutputs?: number; // Default: 1
 
 	// === Properties/Parameters ===
@@ -109,7 +108,9 @@ export interface INodeType {
 	 * Execute the node with normal inputs/outputs
 	 * Optional - only implement if node performs regular execution
 	 */
-	execute?(context: IExecuteFunctions): Promise<INodeExecutionData[][] | void>;
+	execute?(
+		context: IExecuteFunctions,
+	): Promise<INodeExecutionData[][] | undefined>;
 
 	/**
 	 * Handle incoming webhooks
@@ -165,7 +166,9 @@ export abstract class Node implements INodeType {
 	/**
 	 * Execute the node (override for regular execution logic)
 	 */
-	execute?(context: IExecuteFunctions): Promise<INodeExecutionData[][] | void>;
+	execute?(
+		context: IExecuteFunctions,
+	): Promise<INodeExecutionData[][] | undefined>;
 
 	/**
 	 * Handle webhooks (override for webhook support)

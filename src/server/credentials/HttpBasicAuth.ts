@@ -4,35 +4,37 @@
  * Username/password authentication for HTTP requests
  */
 
-import type { ICredentialType } from '@/types/credentials';
+import type { ICredentialType } from "@/types/credentials";
 
 export class HttpBasicAuth implements ICredentialType {
-	name = 'httpBasicAuth';
-	displayName = 'HTTP Basic Auth';
-	icon = 'lock';
-	documentationUrl = 'https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication';
+	name = "httpBasicAuth";
+	displayName = "HTTP Basic Auth";
+	icon = "lock";
+	documentationUrl =
+		"https://developer.mozilla.org/en-US/docs/Web/HTTP/Authentication";
 
 	properties = [
 		{
-			displayName: 'Username',
-			name: 'username',
-			type: 'string' as const,
+			displayName: "Username",
+			name: "username",
+			type: "string" as const,
 			required: true,
-			placeholder: 'admin',
+			placeholder: "admin",
 		},
 		{
-			displayName: 'Password',
-			name: 'password',
-			type: 'password' as const,
+			displayName: "Password",
+			name: "password",
+			type: "password" as const,
 			required: true,
 		},
 	];
 
 	authenticate = {
-		type: 'generic' as const,
+		type: "generic" as const,
 		properties: {
 			headers: {
-				Authorization: '=Basic {{ Buffer.from($credentials.username + ":" + $credentials.password).toString("base64") }}',
+				Authorization:
+					'=Basic {{ Buffer.from($credentials.username + ":" + $credentials.password).toString("base64") }}',
 			},
 		},
 	};

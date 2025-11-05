@@ -5,8 +5,8 @@
  * Provides safe sandboxed evaluation with access to workflow context
  */
 
-import { parse, plan, celEnv } from '@bufbuild/cel';
-import type { ParsedExpr } from '@bufbuild/cel-spec/cel/expr/syntax_pb.js';
+import { celEnv, parse, plan } from "@bufbuild/cel";
+import type { ParsedExpr } from "@bufbuild/cel-spec/cel/expr/syntax_pb.js";
 
 // ============================================================================
 // TYPES
@@ -22,11 +22,14 @@ export interface ExpressionContext {
 		params?: Record<string, any>;
 	};
 	// Multiple inputs (when node has more than one connection)
-	inputs?: Record<string, {
-		json?: Record<string, any>;
-		binary?: Record<string, any>;
-		params?: Record<string, any>;
-	}>;
+	inputs?: Record<
+		string,
+		{
+			json?: Record<string, any>;
+			binary?: Record<string, any>;
+			params?: Record<string, any>;
+		}
+	>;
 	// Current node metadata
 	node?: {
 		id: string;
@@ -68,7 +71,9 @@ function getCachedExpression(expression: string): CachedExpression {
 		expressionCache.set(expression, cached);
 		return cached;
 	} catch (error) {
-		throw new Error(`Failed to compile CEL expression "${expression}": ${error}`);
+		throw new Error(
+			`Failed to compile CEL expression "${expression}": ${error}`,
+		);
 	}
 }
 
@@ -89,34 +94,69 @@ function getCachedExpression(expression: string): CachedExpression {
  */
 function convertCustomSyntaxToCEL(expression: string): string {
 	// Convert inputs.nodeId.json.field to inputs["nodeId"]["json"]["field"]
-	expression = expression.replace(/\binputs((?:\.\w+)+)/g, (_match, properties) => {
-		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
-		return `inputs${bracketProps}`;
-	});
+	expression = expression.replace(
+		/\binputs((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `inputs${bracketProps}`;
+		},
+	);
 
 	// Convert json.field.nested to json["field"]["nested"]
-	expression = expression.replace(/\bjson((?:\.\w+)+)/g, (_match, properties) => {
-		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
-		return `json${bracketProps}`;
-	});
+	expression = expression.replace(
+		/\bjson((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `json${bracketProps}`;
+		},
+	);
 
 	// Convert binary.field to binary["field"]
-	expression = expression.replace(/\bbinary((?:\.\w+)+)/g, (_match, properties) => {
-		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
-		return `binary${bracketProps}`;
-	});
+	expression = expression.replace(
+		/\bbinary((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `binary${bracketProps}`;
+		},
+	);
 
 	// Convert input.params.field to input["params"]["field"]
-	expression = expression.replace(/\binput((?:\.\w+)+)/g, (_match, properties) => {
-		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
-		return `input${bracketProps}`;
-	});
+	expression = expression.replace(
+		/\binput((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `input${bracketProps}`;
+		},
+	);
 
 	// Convert node.id to node["id"]
-	expression = expression.replace(/\bnode((?:\.\w+)+)/g, (_match, properties) => {
-		const bracketProps = properties.split('.').filter(Boolean).map((p: string) => `["${p}"]`).join('');
-		return `node${bracketProps}`;
-	});
+	expression = expression.replace(
+		/\bnode((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `node${bracketProps}`;
+		},
+	);
 
 	return expression;
 }
@@ -136,7 +176,7 @@ export function evaluateExpression(
 
 		// CEL returns a CelResult which is either the value or a CelError
 		// If it's an error, isCelError will help us detect it
-		if (typeof result === 'object' && result !== null && 'message' in result) {
+		if (typeof result === "object" && result !== null && "message" in result) {
 			return {
 				success: false,
 				error: result.message || String(result),
@@ -159,7 +199,7 @@ export function evaluateExpression(
  * Check if a string contains CEL expressions ({{ ... }})
  */
 export function hasExpressions(value: string): boolean {
-	if (typeof value !== 'string') return false;
+	if (typeof value !== "string") return false;
 	return /\$\{[^}]+\}|\{\{[^}]+\}\}/.test(value);
 }
 
@@ -168,14 +208,15 @@ export function hasExpressions(value: string): boolean {
  * Finds all patterns like {{expression}} or ${expression}
  */
 export function extractExpressions(template: string): string[] {
-	if (typeof template !== 'string') return [];
+	if (typeof template !== "string") return [];
 
 	const regex = /\$\{([^}]+)\}|\{\{([^}]+)\}\}/g;
 	const matches: string[] = [];
-	let match;
+	let match: RegExpExecArray | null = regex.exec(template);
 
-	while ((match = regex.exec(template)) !== null) {
+	while (match !== null) {
 		matches.push(match[1] || match[2]);
+		match = regex.exec(template);
 	}
 
 	return matches;
@@ -194,7 +235,7 @@ export function evaluateTemplate(
 	template: string,
 	context: ExpressionContext,
 ): EvaluationResult {
-	if (!template || typeof template !== 'string') {
+	if (!template || typeof template !== "string") {
 		return { success: true, value: template };
 	}
 
@@ -208,11 +249,12 @@ export function evaluateTemplate(
 
 		// Replace all expressions
 		const regex = /\$\{([^}]+)\}|\{\{([^}]+)\}\}/g;
-		let match;
+		let match: RegExpExecArray | null = regex.exec(template);
 
-		const replacements: Array<{ start: number; end: number; value: any }> = [];
+		const replacements: Array<{ start: number; end: number; value: unknown }> =
+			[];
 
-		while ((match = regex.exec(template)) !== null) {
+		while (match !== null) {
 			const expression = match[1] || match[2];
 			const evaluation = evaluateExpression(expression, context);
 
@@ -224,16 +266,18 @@ export function evaluateTemplate(
 			}
 
 			replacements.push({
-				start: match.index,
-				end: match.index + match[0].length,
+				start: match.index ?? 0,
+				end: (match.index ?? 0) + match[0].length,
 				value: evaluation.value,
 			});
+			match = regex.exec(template);
 		}
 
 		// Apply replacements in reverse order to maintain indices
 		for (let i = replacements.length - 1; i >= 0; i--) {
 			const { start, end, value } = replacements[i];
-			const stringValue = typeof value === 'string' ? value : JSON.stringify(value);
+			const stringValue =
+				typeof value === "string" ? value : JSON.stringify(value);
 			result = result.substring(0, start) + stringValue + result.substring(end);
 		}
 
@@ -258,7 +302,7 @@ export function evaluateProperties(
 
 	try {
 		for (const [key, value] of Object.entries(properties)) {
-			if (typeof value === 'string' && hasExpressions(value)) {
+			if (typeof value === "string" && hasExpressions(value)) {
 				// Evaluate string templates
 				const result = evaluateTemplate(value, context);
 				if (!result.success) {
@@ -268,7 +312,7 @@ export function evaluateProperties(
 					};
 				}
 				evaluated[key] = result.value;
-			} else if (typeof value === 'object' && value !== null) {
+			} else if (typeof value === "object" && value !== null) {
 				// Recursively handle nested objects (but not arrays for now)
 				const nested = evaluateProperties(value, context);
 				if (!nested.success) {
@@ -334,7 +378,7 @@ export function validateTemplate(template: string): {
 		if (!result.valid) {
 			errors.push({
 				expression: expr,
-				error: result.error || 'Invalid expression',
+				error: result.error || "Invalid expression",
 			});
 		}
 	}

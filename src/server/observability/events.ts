@@ -5,15 +5,13 @@
  * Enables debugging, monitoring, and LangSmith integration
  */
 
-import type { AgentEvent } from '@/server/types/agent';
+import type { AgentEvent } from "@/server/types/agent";
 
 // ============================================================================
 // Event Emitter Interface
 // ============================================================================
 
-export interface EventHandler {
-	(event: AgentEvent): void | Promise<void>;
-}
+export type EventHandler = (event: AgentEvent) => void | Promise<void>;
 
 export interface EventEmitterOptions {
 	/** Enable console logging of events */
@@ -65,11 +63,11 @@ export class AgentEventEmitter {
 				const result = handler(event);
 				if (result instanceof Promise) {
 					result.catch((error) => {
-						console.error('[EventEmitter] Handler error:', error);
+						console.error("[EventEmitter] Handler error:", error);
 					});
 				}
 			} catch (error) {
-				console.error('[EventEmitter] Handler error:', error);
+				console.error("[EventEmitter] Handler error:", error);
 			}
 		}
 	}
@@ -109,45 +107,49 @@ function consoleEventHandler(event: AgentEvent): void {
 
 	// Color-coded log levels
 	switch (event.t) {
-		case 'agent.plan':
-			console.log('[AGENT]', JSON.stringify(logEntry, null, 2));
+		case "agent.plan":
+			console.log("[AGENT]", JSON.stringify(logEntry, null, 2));
 			break;
 
-		case 'engine.request':
-			console.log('[ENGINE]', JSON.stringify(logEntry, null, 2));
+		case "engine.request":
+			console.log("[ENGINE]", JSON.stringify(logEntry, null, 2));
 			break;
 
-		case 'tool.start':
-			console.log('[TOOL]', `Starting ${event.tool}:`, JSON.stringify(logEntry, null, 2));
-			break;
-
-		case 'tool.success':
+		case "tool.start":
 			console.log(
-				'[TOOL]',
+				"[TOOL]",
+				`Starting ${event.tool}:`,
+				JSON.stringify(logEntry, null, 2),
+			);
+			break;
+
+		case "tool.success":
+			console.log(
+				"[TOOL]",
 				`✓ ${event.tool} (${event.ms}ms, ${event.size} bytes)`,
 				JSON.stringify(logEntry, null, 2),
 			);
 			break;
 
-		case 'tool.error':
+		case "tool.error":
 			console.error(
-				'[TOOL]',
+				"[TOOL]",
 				`✗ ${event.tool} failed:`,
 				event.error.message,
 				JSON.stringify(logEntry, null, 2),
 			);
 			break;
 
-		case 'agent.finish':
+		case "agent.finish":
 			console.log(
-				'[AGENT]',
+				"[AGENT]",
 				`Finished (${event.iteration} iterations, ${event.finalState})`,
 				JSON.stringify(logEntry, null, 2),
 			);
 			break;
 
 		default:
-			console.log('[EVENT]', JSON.stringify(logEntry, null, 2));
+			console.log("[EVENT]", JSON.stringify(logEntry, null, 2));
 	}
 }
 
@@ -209,7 +211,7 @@ function consoleEventHandler(event: AgentEvent): void {
  * Creates a handler that only processes specific event types
  */
 export function createFilteredHandler(
-	types: AgentEvent['t'][],
+	types: AgentEvent["t"][],
 	handler: EventHandler,
 ): EventHandler {
 	return (event) => {
@@ -254,17 +256,19 @@ export class EventAggregator {
 	 * Get summary statistics
 	 */
 	getSummary() {
-		const toolCalls = this.events.filter((e) => e.t === 'tool.start').length;
-		const toolSuccesses = this.events.filter((e) => e.t === 'tool.success').length;
-		const toolErrors = this.events.filter((e) => e.t === 'tool.error').length;
+		const toolCalls = this.events.filter((e) => e.t === "tool.start").length;
+		const toolSuccesses = this.events.filter(
+			(e) => e.t === "tool.success",
+		).length;
+		const toolErrors = this.events.filter((e) => e.t === "tool.error").length;
 
 		const totalMs = this.events
-			.filter((e) => e.t === 'tool.success')
-			.reduce((sum, e) => sum + (e.t === 'tool.success' ? e.ms : 0), 0);
+			.filter((e) => e.t === "tool.success")
+			.reduce((sum, e) => sum + (e.t === "tool.success" ? e.ms : 0), 0);
 
 		const totalSize = this.events
-			.filter((e) => e.t === 'tool.success')
-			.reduce((sum, e) => sum + (e.t === 'tool.success' ? e.size : 0), 0);
+			.filter((e) => e.t === "tool.success")
+			.reduce((sum, e) => sum + (e.t === "tool.success" ? e.size : 0), 0);
 
 		return {
 			toolCalls,
@@ -291,7 +295,9 @@ export class EventAggregator {
 /**
  * Create a default event emitter instance
  */
-export function createEventEmitter(options?: EventEmitterOptions): AgentEventEmitter {
+export function createEventEmitter(
+	options?: EventEmitterOptions,
+): AgentEventEmitter {
 	return new AgentEventEmitter(options);
 }
 
