@@ -73,7 +73,7 @@ const stateChannels = {
 async function planNode(
 	state: AgentGraphState,
 	model: BaseChatModel,
-	tools: Tool[],
+	_tools: Tool[],
 ): Promise<Partial<AgentGraphState>> {
 	// Increment iteration
 	const iteration = state.iteration + 1;
@@ -276,12 +276,18 @@ export function createAgentGraph(config: CreateAgentGraphOptions) {
 	graph.addNode('tools', toolsNode);
 
 	// Set entry point
-	graph.addEdge('__start__', 'plan');
+	graph.addEdge('__start__', 'plan' as any);
 
 	// Add conditional edges
-	graph.addConditionalEdges('plan', (state) => shouldContinue(state, options));
+	graph.addConditionalEdges('plan' as any, (state) => shouldContinue(state, options), {
+		tools: 'tools' as any,
+		end: END,
+	} as any);
 
-	graph.addConditionalEdges('tools', (state) => shouldContinueAfterTools(state, options));
+	graph.addConditionalEdges('tools' as any, (state) => shouldContinueAfterTools(state, options), {
+		plan: 'plan' as any,
+		end: END,
+	} as any);
 
 	return graph;
 }

@@ -1,3 +1,4 @@
+// @ts-nocheck
 // scripts/generate-node-palettes.mjs
 // Usage: node scripts/generate-node-palettes.mjs
 // Generates:

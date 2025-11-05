@@ -11,7 +11,6 @@ import { eq, and } from 'drizzle-orm';
 import type {
 	ICredentialData,
 	ICredentialDataDecryptedObject,
-	ICredentialsEncrypted,
 	ICredentialsResponse,
 } from '@/types/credentials';
 

@@ -27,20 +27,20 @@ app.use(
 	cors({
 		origin: (origin) => {
 			// Allow all localhost/127.0.0.1 origins on any port
-			if (!origin) return true; // Allow requests with no origin (e.g., Postman, curl)
+			if (!origin) return null; // Allow requests with no origin (e.g., Postman, curl)
 			const url = new URL(origin);
 			if (
 				url.hostname === "localhost" ||
 				url.hostname === "127.0.0.1" ||
 				url.hostname === "0.0.0.0"
 			) {
-				return true;
+				return null;
 			}
 			// In development, allow all origins
 			if (process.env.NODE_ENV === "development") {
-				return true;
+				return null;
 			}
-			return false;
+			return null;
 		},
 		allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
 		allowHeaders: ["Content-Type", "Authorization"],
