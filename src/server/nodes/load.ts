@@ -15,6 +15,7 @@ import { IfElse } from "./control/IfElse";
 import { TextInput } from "./input/TextInput";
 import { Output } from "./output/Output";
 import { nodeRegistry } from "./registry";
+import { ManualTrigger } from "./trigger/ManualTrigger";
 import { Webhook } from "./trigger/Webhook";
 import { ExecuteCommand } from "./utility/ExecuteCommand";
 import { HttpRequest } from "./utility/HttpRequest";
@@ -113,6 +114,19 @@ export function loadNodes(): void {
 		codex: httpRequestNode.description.codex,
 	});
 	console.log("✓ Registered HTTP request node");
+
+	// Manual Trigger node
+	const manualTriggerNode = new ManualTrigger();
+	nodeRegistry.register(manualTriggerNode, {
+		displayName: manualTriggerNode.description.displayName,
+		name: manualTriggerNode.description.name,
+		icon: manualTriggerNode.description.icon,
+		iconColor: manualTriggerNode.description.iconColor,
+		category: manualTriggerNode.description.category,
+		description: manualTriggerNode.description.description,
+		codex: manualTriggerNode.description.codex,
+	});
+	console.log("✓ Registered manual trigger node");
 
 	// Webhook Trigger node
 	const webhookNode = new Webhook();

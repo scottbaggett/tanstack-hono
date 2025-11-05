@@ -104,7 +104,7 @@ nodeExecuteRoutes.post("/:nodeId", async (c) => {
 				// Include both target node and upstream dependencies
 				return n.id === nodeId || upstreamNodeIds.has(n.id);
 			})
-			.map((n: any) => {
+			.map((n: any) =>
 				// Merge parameters into the test node's propertyValues (if not excluding it)
 				if (n.id === nodeId && !excludeTarget) {
 					return {
@@ -225,20 +225,6 @@ nodeExecuteRoutes.post("/:nodeId", async (c) => {
 			success: !hasError,
 			runData,
 		});
-	} catch (error) {
-		console.error("Node execution error:", error);
-		const errorMessage =
-			error instanceof Error ? error.message : "Execution failed";
-		const errorStack = error instanceof Error ? error.stack : undefined;
-		console.error("Full error:", errorMessage, errorStack);
-		return c.json(
-			{
-				success: false,
-				error: errorMessage,
-				stack: errorStack,
-			},
-			500,
-		);
 	}
 });
 
