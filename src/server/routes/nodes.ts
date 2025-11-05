@@ -18,14 +18,6 @@ nodesRoutes.get("/", (c) => {
 	const nodes = nodeRegistry.getAllDefinitions();
 
 	const nodeDefinitions = nodes.map((node) => {
-		// Handle dynamic inputs - if it's a function, call it with empty context
-		let inputs = [];
-		if (typeof node.inputs === 'function') {
-			inputs = node.inputs({ nodeId: 'preview', properties: {}, connectedInputs: {} });
-		} else if (Array.isArray(node.inputs)) {
-			inputs = node.inputs;
-		}
-
 		return {
 			id: node.name,
 			name: node.name,
@@ -35,8 +27,8 @@ nodesRoutes.get("/", (c) => {
 			icon: node.icon,
 			color: node.iconColor,
 			version: node.version,
-			inputs,
-			outputs: node.outputs || [],
+			maxInputs: node.maxInputs ?? 1,
+			maxOutputs: node.maxOutputs ?? 1,
 			properties: node.properties || [],
 			codex: node.codex,
 		};
@@ -81,14 +73,6 @@ nodesRoutes.get("/:id", (c) => {
 		);
 	}
 
-	// Handle dynamic inputs
-	let inputs = [];
-	if (typeof node.inputs === 'function') {
-		inputs = node.inputs({ nodeId: 'preview', properties: {}, connectedInputs: {} });
-	} else if (Array.isArray(node.inputs)) {
-		inputs = node.inputs;
-	}
-
 	return c.json({
 		success: true,
 		data: {
@@ -100,8 +84,8 @@ nodesRoutes.get("/:id", (c) => {
 			icon: node.icon,
 			color: node.iconColor,
 			version: node.version,
-			inputs,
-			outputs: node.outputs || [],
+			maxInputs: node.maxInputs ?? 1,
+			maxOutputs: node.maxOutputs ?? 1,
 			properties: node.properties || [],
 			codex: node.codex,
 		},
@@ -115,14 +99,22 @@ nodesRoutes.get("/category/:category", (c) => {
 	const category = c.req.param("category");
 	const nodes = nodeRegistry.getDefinitionsByCategory(category);
 
-	const filtered = nodes.map((node) => ({
-		id: node.type,
-		displayName: node.displayName,
-		description: node.description,
-		category: node.category,
-		icon: node.icon,
-		color: node.color,
-	}));
+	const filtered = nodes.map((node) => {
+		return {
+			id: node.name,
+			name: node.name,
+			displayName: node.displayName,
+			description: node.description,
+			category: node.category,
+			icon: node.icon,
+			color: node.iconColor,
+			version: node.version,
+			maxInputs: node.maxInputs ?? 1,
+			maxOutputs: node.maxOutputs ?? 1,
+			properties: node.properties || [],
+			codex: node.codex,
+		};
+	});
 
 	return c.json({
 		success: true,
