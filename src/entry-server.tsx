@@ -34,7 +34,7 @@ app.use(
 	cors({
 		origin: allowedOrigin,
 		credentials: true,
-	}),
+	})
 );
 
 // Setup API routes
@@ -49,7 +49,7 @@ if (process.env.NODE_ENV === "production") {
 		"/*",
 		serveStatic({
 			root: "./dist/client",
-		}),
+		})
 	);
 }
 
@@ -86,10 +86,11 @@ if (process.env.NODE_ENV === "production") {
 		},
 		(info) => {
 			console.log(
-				`Production server is running on http://${host}:${info.port}`,
+				`Production server is running on http://${host}:${info.port}`
 			);
-		},
+		}
 	);
 }
 
 export default app;
+export type AppType = typeof app;
