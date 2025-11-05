@@ -133,7 +133,6 @@ function RootComponent() {
 				<ThemeContextProvider>
 					<QueryClientProvider client={queryClient}>
 						<Outlet />
-						<TanStackRouterDevtools position="bottom-left" />
 					</QueryClientProvider>
 				</ThemeContextProvider>
 				<Scripts />
