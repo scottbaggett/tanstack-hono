@@ -89,20 +89,21 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 	});
 
 	return (
-		<div className="w-100 bg-editor-panel border-r overflow-y-auto h-full flex flex-col">
+		<div className="w-80 bg-editor-panel border-r overflow-y-auto h-full flex flex-col">
 			{/* Header */}
 			<div className="p-4 border-b">
-				<h2 className="text-lg font-semiboldmb-4">Nodes</h2>
+				<h2 className="text-lg font-semibold mb-2">Nodes</h2>
 				<Input
 					type="text"
 					placeholder="Search nodes..."
+					className="bg-transparent! border"
 					value={searchQuery}
 					onChange={(e) => setSearchQuery(e.target.value)}
 				/>
 			</div>
 
 			{/* Node Categories */}
-			<div className="flex-1 overflow-y-auto p-2">
+			<div className="flex-1 overflow-y-auto p-4">
 				{sortedCategories.length === 0 ? (
 					<div className="text-center text-muted-foreground py-8">
 						<p>No nodes found</p>
@@ -120,7 +121,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 								<Button
 									variant="ghost"
 									size="sm"
-									className="w-full justify-between text-muted-foreground hover:bg-muted"
+									className="w-full justify-between text-muted-foreground"
 								>
 									<span className="capitalize font-medium">{category}</span>
 									<LucideIcon
@@ -133,7 +134,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 									/>
 								</Button>
 							</CollapsibleTrigger>
-							<CollapsibleContent className="space-y-1 mt-1 pl-2">
+							<CollapsibleContent className="flex-col gap-2 flex">
 								{filteredCategories[category]?.map((node) => (
 									<NodeItem key={node.id} node={node} onDrag={onNodeDrag} />
 								))}
@@ -141,13 +142,6 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 						</Collapsible>
 					))
 				)}
-			</div>
-
-			{/* Footer Stats */}
-			<div className="p-4 border-t border-gray-800 text-xs text-gray-400">
-				<p>
-					Showing {filteredNodes.length} of {allNodes.length} nodes
-				</p>
 			</div>
 		</div>
 	);
@@ -176,21 +170,13 @@ function NodeItem({
 		<div
 			draggable
 			onDragStart={handleDragStart}
-			className="p-2 rounded bg-card hover:bg-accent cursor-grab active:cursor-grabbing transition-colors"
+			className="p-3 rounded bg-background shadow-xs border hover:border-surface-8 cursor-grab active:cursor-grabbing transition-colors"
 		>
-			<div className="flex items-start gap-2">
-				{node.icon && (
-					<LucideIcon
-						name={node.icon}
-						className="h-4 w-4 text-foreground mt-0.5 shrink-0"
-					/>
-				)}
+			<div className="flex items-center gap-4 ">
 				<div className="flex-1 min-w-0">
-					<div className="text-sm font-medium  truncate">
-						{node.displayName}
-					</div>
+					<div className="text-base font-bold truncate">{node.displayName}</div>
 					{node.description && (
-						<div className="text-xs text-muted-foreground line-clamp-2">
+						<div className="text-xs text-node-muted-foreground line-clamp-2">
 							{node.description}
 						</div>
 					)}
