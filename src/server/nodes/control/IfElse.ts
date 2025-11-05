@@ -17,12 +17,12 @@ import { evaluateExpression } from '@/server/lib/expressions';
 import { buildExpressionContext } from '@/server/execution/context';
 
 const baseDescription: INodeTypeBaseDescription = {
-	displayName: 'If/Else',
+	displayName: 'If',
 	name: 'ifElse',
 	icon: 'git-branch',
 	iconColor: 'standard-purple',
 	category: 'control',
-	description: 'Conditionally routes data based on evaluated expression',
+	description: 'Conditionally routes data to different outputs based on a condition',
 	codex: {
 		alias: ['Condition', 'Branch', 'Switch', 'If'],
 		categories: ['control'],
