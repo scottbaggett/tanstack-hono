@@ -54,7 +54,7 @@ export function ExecutionHeader({
 				{/* Left: Title and Status */}
 				<div className="flex items-center gap-4">
 					<Link
-						to="/workflow/$workflowId/executions"
+						to="/executions/$workflowId"
 						params={{ workflowId }}
 						className="text-muted-foreground hover:text-foreground"
 					>

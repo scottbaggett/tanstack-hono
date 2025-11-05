@@ -12,13 +12,14 @@
  * - GET /workflows/:workflowId/runs/:runId/events - Stream execution events
  */
 
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
 import { getAuthUser } from "../auth/middleware";
 import { db } from "../db";
 import {
+	executionEvents,
 	nodeExecutions,
 	workflowRuns,
 	workflows,
@@ -444,6 +445,112 @@ workflowRoutes
 					success: false,
 					error:
 						error instanceof Error ? error.message : "Failed to run workflow",
+				},
+				500,
+			);
+		}
+	})
+	.get("/:workflowId/runs/:runId/logs", async (c) => {
+		try {
+			const { runId } = c.req.param();
+			const nodeId = c.req.query("nodeId");
+			const level = c.req.query("level");
+			const limit = Number.parseInt(c.req.query("limit") || "1000", 10);
+			const offset = Number.parseInt(c.req.query("offset") || "0", 10);
+
+			// Build query conditions
+			const conditions = [eq(executionEvents.runId, runId)];
+
+			if (nodeId) {
+				conditions.push(eq(executionEvents.nodeId, nodeId));
+			}
+
+			// Filter by log level if provided
+			// For now, we'll filter by eventType or eventData.level
+			// This is a simplified version - in production, you'd want more sophisticated filtering
+
+			const events = await db
+				.select()
+				.from(executionEvents)
+				.where(conditions.length > 1 ? and(...conditions) : conditions[0]!)
+				.orderBy(executionEvents.timestamp)
+				.limit(limit)
+				.offset(offset);
+
+			// Transform events into log format
+			const logs = events
+				.map((event) => {
+					const eventData = event.eventData as any;
+
+					// Extract log information
+					let logLevel = "info";
+					let message = "";
+					let source = "system";
+
+					// Handle different event types
+					if (event.eventType === "log") {
+						logLevel = eventData.level || "info";
+						message = eventData.message || JSON.stringify(eventData);
+						source = eventData.source || "system";
+					} else if (event.eventType === "workflow_start") {
+						message = "Workflow run started";
+						source = "system";
+					} else if (event.eventType === "workflow_complete") {
+						message = "Workflow run finished: Success";
+						source = "system";
+					} else if (event.eventType === "workflow_error") {
+						logLevel = "error";
+						message = `Workflow run failed: ${eventData.message || "Unknown error"}`;
+						source = "system";
+					} else if (event.eventType === "node_start") {
+						message = `Node "${eventData.nodeName || event.nodeId || "unknown"}" started`;
+						source = "system";
+					} else if (event.eventType === "node_complete") {
+						message = `Node "${eventData.nodeName || event.nodeId || "unknown"}" finished`;
+						source = "system";
+					} else if (event.eventType === "node_error") {
+						logLevel = "error";
+						message = `Node "${eventData.nodeName || event.nodeId || "unknown"}" failed: ${eventData.message || "Unknown error"}`;
+						source = "system";
+					} else {
+						// Generic event
+						message = eventData.message || JSON.stringify(eventData);
+					}
+
+					// Filter by level if requested
+					if (level && logLevel !== level) {
+						return null;
+					}
+
+					return {
+						id: event.id,
+						timestamp: event.timestamp.toISOString(),
+						level: logLevel,
+						message,
+						nodeId: event.nodeId || undefined,
+						source,
+					};
+				})
+				.filter((log) => log !== null);
+
+			return c.json({
+				success: true,
+				data: {
+					logs,
+					total: logs.length,
+					hasMore: events.length === limit,
+				},
+			});
+		} catch (error) {
+			console.error("Failed to get execution logs:", error);
+
+			return c.json(
+				{
+					success: false,
+					error:
+						error instanceof Error
+							? error.message
+							: "Failed to get execution logs",
 				},
 				500,
 			);

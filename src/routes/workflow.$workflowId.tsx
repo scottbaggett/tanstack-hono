@@ -29,5 +29,6 @@ function WorkflowPage() {
 	// Ensure user is authenticated
 	useProtectedRoute();
 
+	// Render the workflow editor
 	return <Canvas workflowId={workflowId} selectedNodeId={nodeId} />;
 }

@@ -4,10 +4,11 @@
  * Toolbar with workflow actions: add node, delete node, save, etc.
  */
 
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { ChevronLeft } from "lucide-react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
 import { Button } from "@/components/ui/button";
+import { useExecuteWorkflow } from "@/hooks/use-workflows";
 
 interface CanvasToolbarProps {
 	onSave: () => void;
@@ -23,6 +24,37 @@ export function CanvasToolbar({
 	workflowName,
 	workflowId,
 }: CanvasToolbarProps) {
+	const navigate = useNavigate();
+	const executeWorkflow = useExecuteWorkflow();
+
+	const handleRun = async () => {
+		if (!workflowId) return;
+
+		try {
+			const result = await executeWorkflow.mutateAsync({
+				workflowId,
+				inputs: {},
+			});
+
+			// Navigate to the execution detail page
+			if (result?.runId) {
+				navigate({
+					to: "/executions/$workflowId/$runId",
+					params: { workflowId, runId: result.runId },
+				});
+			} else {
+				// Fallback: navigate to executions list
+				navigate({
+					to: "/executions/$workflowId",
+					params: { workflowId },
+				});
+			}
+		} catch (error) {
+			console.error("Failed to execute workflow:", error);
+			// Could show an error toast here
+		}
+	};
+
 	return (
 		<div className="flex items-center justify-between px-4 py-3 bg-background border-b">
 			{/* Left side - Navigation */}
@@ -41,17 +73,33 @@ export function CanvasToolbar({
 
 			{/* Right side - Actions */}
 			<div className="flex items-center gap-2">
+				{/* Run */}
+				{workflowId && (
+					<Button
+						variant="default"
+						size="sm"
+						onClick={handleRun}
+						disabled={executeWorkflow.isPending}
+					>
+						{executeWorkflow.isPending ? (
+							<LucideIcon name="loader-2" className="mr-2 h-4 w-4 animate-spin" />
+						) : (
+							<LucideIcon name="play" className="mr-2 h-4 w-4" />
+						)}
+						{executeWorkflow.isPending ? "Running..." : "Run"}
+					</Button>
+				)}
 				{/* Executions */}
 				{workflowId && (
-					<Link
-						to="/workflow/$workflowId/executions"
-						params={{ workflowId }}
-					>
-						<Button variant="outline" size="sm">
+					<Button variant="outline" size="sm" asChild>
+						<Link
+							to="/executions/$workflowId"
+							params={{ workflowId }}
+						>
 							<LucideIcon name="play-circle" className="mr-2 h-4 w-4" />
 							Executions
-						</Button>
-					</Link>
+						</Link>
+					</Button>
 				)}
 				{/* Save */}
 				<Button

@@ -1,7 +1,7 @@
 /**
  * Workflow Executions List Route
  *
- * Lists all execution runs for a workflow at /workflow/:workflowId/executions
+ * Lists all execution runs for a workflow at /executions/:workflowId
  */
 
 import { createFileRoute, Link } from "@tanstack/react-router";

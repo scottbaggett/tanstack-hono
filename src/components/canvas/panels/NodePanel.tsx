@@ -58,6 +58,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
 	}
 
 	const categoryOrder = [
+		"trigger",
 		"AI",
 		"input",
 		"output",

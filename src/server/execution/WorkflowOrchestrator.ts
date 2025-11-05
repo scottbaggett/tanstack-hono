@@ -308,6 +308,12 @@ export class WorkflowOrchestrator {
 			this.config.logger,
 		);
 
+		// For trigger nodes, pass workflow inputs via context
+		if (nodeType === "manualTrigger" || nodeType === "webhook") {
+			// Attach workflow inputs to execution context for trigger nodes
+			(executeFunctions as any).workflowInputs = this.config.inputs || {};
+		}
+
 		try {
 			// Execute the node
 			if (!nodeInstance.execute) {

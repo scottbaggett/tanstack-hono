@@ -153,7 +153,8 @@ export function useDeleteWorkflow() {
 }
 
 /**
- * Run a workflow
+ * Run a workflow (creates run record but doesn't execute)
+ * @deprecated Use useExecuteWorkflow instead for actual execution
  */
 export function useRunWorkflow() {
 	const queryClient = useQueryClient();
@@ -175,6 +176,43 @@ export function useRunWorkflow() {
 
 			if (!response.success) {
 				throw new Error(response.error || "Failed to run workflow");
+			}
+
+			return response.data;
+		},
+		onSuccess: (_, variables) => {
+			queryClient.invalidateQueries({ queryKey: ["workflows"] });
+			queryClient.invalidateQueries({
+				queryKey: ["workflow-runs", variables.workflowId],
+			});
+		},
+	});
+}
+
+/**
+ * Execute a workflow (actually runs the workflow)
+ */
+export function useExecuteWorkflow() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (input: {
+			workflowId: string;
+			inputs?: Record<string, unknown>;
+		}) => {
+			const { workflowId, inputs } = input;
+
+			const response = await apiRequest<{
+				workflowId: string;
+				runId: string;
+				status: string;
+			}>(`/api/execute/${workflowId}`, {
+				method: "POST",
+				body: JSON.stringify({ inputs }),
+			});
+
+			if (!response.success) {
+				throw new Error(response.error || "Failed to execute workflow");
 			}
 
 			return response.data;

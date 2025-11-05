@@ -1,7 +1,7 @@
 /**
  * Execution Detail Route
  *
- * Shows detailed execution view for a specific run at /workflow/:workflowId/executions/:runId
+ * Shows detailed execution view for a specific run at /executions/:workflowId/:runId
  */
 
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
