@@ -2,7 +2,7 @@
  * Execution Context Builder
  *
  * Builds ExecutionContext for node execution by:
- * - Evaluating CEL expressions in node properties
+ * - Evaluating JSONata expressions in node properties
  * - Gathering inputs from connected nodes
  * - Loading and decrypting credentials
  * - Preparing context with workflow state
@@ -67,8 +67,8 @@ export async function buildExecutionContext(
 		previousData: previousData,
 	};
 
-	// Evaluate all properties with CEL expressions
-	const evaluation = evaluateProperties(properties, expressionContext);
+	// Evaluate all properties with JSONata expressions
+	const evaluation = await evaluateProperties(properties, expressionContext);
 
 	if (!evaluation.success) {
 		throw new Error(

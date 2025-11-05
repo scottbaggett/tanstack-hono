@@ -231,7 +231,7 @@ Once registered on the backend, nodes:
 2. Can be dragged onto the canvas
 3. Show generic connection handles
 4. Can be configured via NodeConfigPanel
-5. Data structure is inspected at runtime using InputExplorer
+5. Data structure is inspected at runtime using NodeEditorInputs
 
 ## Color Palettes
 
@@ -437,12 +437,12 @@ Nodes use these CSS variables via Tailwind's `var()` function for full consisten
 1. Check that nodes are connected properly
 2. Verify upstream node returns `INodeExecutionData[][]` format
 3. Inspect execution output in browser console
-4. Use InputExplorer to see actual data structure
+4. Use NodeEditorInputs to see actual data structure
 5. Ensure downstream node accesses data via `item.json`
 
 ## Next Steps
 
-1. **Runtime Inspection** - Enhance InputExplorer to show $json structure
+1. **Runtime Inspection** - Enhance NodeEditorInputs to show $json structure
 2. **Execution** - Connect to backend workflow execution
 3. **Error Handling** - Display node errors in UI with context
 4. **History** - Add undo/redo functionality

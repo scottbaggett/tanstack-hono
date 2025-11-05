@@ -1,27 +1,37 @@
 /**
- * CEL Expression Evaluator
+ * JSONata Expression Evaluator
  *
- * Evaluates CEL (Common Expression Language) expressions for node properties
+ * Evaluates JSONata expressions for node properties
  * Provides safe sandboxed evaluation with access to workflow context
  */
 
-import { celEnv, parse, plan } from "@bufbuild/cel";
-import type { ParsedExpr } from "@bufbuild/cel-spec/cel/expr/syntax_pb.js";
+import jsonata from "jsonata";
+import type { Expression } from "jsonata";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface ExpressionContext {
-	// Output data from connected input node (single input)
+	// Workflow expression variables (JSONata natively supports $ prefix)
+	// Current item's JSON data (first input item)
+	$json?: Record<string, any>;
+	// Array of all items (access via $item[0], $item[1], etc.)
+	$item?: Array<{ json: Record<string, any>; binary?: Record<string, any> }>;
+	// Map of items by node name (access via $items["NodeName"])
+	$items?: Record<
+		string,
+		Array<{ json: Record<string, any>; binary?: Record<string, any> }>
+	>;
+	// Current node's parameters
+	$parameters?: Record<string, any>;
+
+	// Legacy support (deprecated - use $ prefixed versions above)
 	json?: Record<string, any>;
-	// Binary data from connected input node
 	binary?: Record<string, any>;
-	// Input context (params from connected node, multiple inputs)
 	input?: {
 		params?: Record<string, any>;
 	};
-	// Multiple inputs (when node has more than one connection)
 	inputs?: Record<
 		string,
 		{
@@ -50,29 +60,21 @@ export interface EvaluationResult {
 // EXPRESSION CACHE
 // ============================================================================
 
-// Cache parsed and planned expressions to avoid recompiling
-interface CachedExpression {
-	parsed: ParsedExpr;
-	evaluator: (ctx?: Record<string, any>) => any;
-}
+// Cache compiled JSONata expressions to avoid recompiling
+const expressionCache = new Map<string, Expression>();
 
-const expressionCache = new Map<string, CachedExpression>();
-const env = celEnv();
-
-function getCachedExpression(expression: string): CachedExpression {
+function getCachedExpression(expression: string): Expression {
 	if (expressionCache.has(expression)) {
 		return expressionCache.get(expression)!;
 	}
 
 	try {
-		const parsed = parse(expression);
-		const evaluator = plan(env, parsed);
-		const cached: CachedExpression = { parsed, evaluator };
-		expressionCache.set(expression, cached);
-		return cached;
+		const compiled = jsonata(expression);
+		expressionCache.set(expression, compiled);
+		return compiled;
 	} catch (error) {
 		throw new Error(
-			`Failed to compile CEL expression "${expression}": ${error}`,
+			`Failed to compile JSONata expression "${expression}": ${error}`,
 		);
 	}
 }
@@ -82,106 +84,19 @@ function getCachedExpression(expression: string): CachedExpression {
 // ============================================================================
 
 /**
- * Convert custom syntax to CEL-compatible bracket notation
- *
- * Patterns converted:
- * - json.field -> json["field"]
- * - json.field.nested -> json["field"]["nested"]
- * - binary.key -> binary["key"]
- * - input.params.field -> input["params"]["field"]
- * - node.id -> node["id"]
- * - inputs.nodeId.json.field -> inputs["nodeId"]["json"]["field"]
+ * Evaluate a JSONata expression with the given context
  */
-function convertCustomSyntaxToCEL(expression: string): string {
-	// Convert inputs.nodeId.json.field to inputs["nodeId"]["json"]["field"]
-	expression = expression.replace(
-		/\binputs((?:\.\w+)+)/g,
-		(_match, properties) => {
-			const bracketProps = properties
-				.split(".")
-				.filter(Boolean)
-				.map((p: string) => `["${p}"]`)
-				.join("");
-			return `inputs${bracketProps}`;
-		},
-	);
-
-	// Convert json.field.nested to json["field"]["nested"]
-	expression = expression.replace(
-		/\bjson((?:\.\w+)+)/g,
-		(_match, properties) => {
-			const bracketProps = properties
-				.split(".")
-				.filter(Boolean)
-				.map((p: string) => `["${p}"]`)
-				.join("");
-			return `json${bracketProps}`;
-		},
-	);
-
-	// Convert binary.field to binary["field"]
-	expression = expression.replace(
-		/\bbinary((?:\.\w+)+)/g,
-		(_match, properties) => {
-			const bracketProps = properties
-				.split(".")
-				.filter(Boolean)
-				.map((p: string) => `["${p}"]`)
-				.join("");
-			return `binary${bracketProps}`;
-		},
-	);
-
-	// Convert input.params.field to input["params"]["field"]
-	expression = expression.replace(
-		/\binput((?:\.\w+)+)/g,
-		(_match, properties) => {
-			const bracketProps = properties
-				.split(".")
-				.filter(Boolean)
-				.map((p: string) => `["${p}"]`)
-				.join("");
-			return `input${bracketProps}`;
-		},
-	);
-
-	// Convert node.id to node["id"]
-	expression = expression.replace(
-		/\bnode((?:\.\w+)+)/g,
-		(_match, properties) => {
-			const bracketProps = properties
-				.split(".")
-				.filter(Boolean)
-				.map((p: string) => `["${p}"]`)
-				.join("");
-			return `node${bracketProps}`;
-		},
-	);
-
-	return expression;
-}
-
-/**
- * Evaluate a CEL expression with the given context
- */
-export function evaluateExpression(
+export async function evaluateExpression(
 	expression: string,
 	context: ExpressionContext,
-): EvaluationResult {
+): Promise<EvaluationResult> {
 	try {
-		// Convert custom syntax to CEL before evaluating
-		const celExpression = convertCustomSyntaxToCEL(expression);
-		const { evaluator } = getCachedExpression(celExpression);
-		const result = evaluator(context);
+		// Trim whitespace from expression
+		const trimmedExpression = expression.trim();
+		const compiled = getCachedExpression(trimmedExpression);
 
-		// CEL returns a CelResult which is either the value or a CelError
-		// If it's an error, isCelError will help us detect it
-		if (typeof result === "object" && result !== null && "message" in result) {
-			return {
-				success: false,
-				error: result.message || String(result),
-			};
-		}
+		// JSONata's evaluate() returns a Promise - must await it
+		const result = await compiled.evaluate(context);
 
 		return {
 			success: true,
@@ -196,7 +111,7 @@ export function evaluateExpression(
 }
 
 /**
- * Check if a string contains CEL expressions ({{ ... }})
+ * Check if a string contains expressions ({{ ... }})
  */
 export function hasExpressions(value: string): boolean {
 	if (typeof value !== "string") return false;
@@ -204,7 +119,7 @@ export function hasExpressions(value: string): boolean {
 }
 
 /**
- * Extract CEL expressions from a template string
+ * Extract expressions from a template string
  * Finds all patterns like {{expression}} or ${expression}
  */
 export function extractExpressions(template: string): string[] {
@@ -223,18 +138,18 @@ export function extractExpressions(template: string): string[] {
 }
 
 /**
- * Evaluate a template string by replacing CEL expressions with their evaluated values
+ * Evaluate a template string by replacing JSONata expressions with their evaluated values
  * Supports both {{expression}} and ${expression} syntax
  *
  * Example:
- *   "Hello {{$parameter.name}}, you have {{$input.count}} items"
- *   with context { $parameter: { name: "Alice" }, $input: { count: 5 } }
+ *   "Hello {{$parameters.name}}, you have {{$json.count}} items"
+ *   with context { $parameters: { name: "Alice" }, $json: { count: 5 } }
  *   returns: "Hello Alice, you have 5 items"
  */
-export function evaluateTemplate(
+export async function evaluateTemplate(
 	template: string,
 	context: ExpressionContext,
-): EvaluationResult {
+): Promise<EvaluationResult> {
 	if (!template || typeof template !== "string") {
 		return { success: true, value: template };
 	}
@@ -256,7 +171,7 @@ export function evaluateTemplate(
 
 		while (match !== null) {
 			const expression = match[1] || match[2];
-			const evaluation = evaluateExpression(expression, context);
+			const evaluation = await evaluateExpression(expression, context);
 
 			if (!evaluation.success) {
 				return {
@@ -292,19 +207,19 @@ export function evaluateTemplate(
 
 /**
  * Evaluate all properties in an object, handling nested objects
- * Returns evaluated copy with all CEL expressions resolved
+ * Returns evaluated copy with all JSONata expressions resolved
  */
-export function evaluateProperties(
+export async function evaluateProperties(
 	properties: Record<string, any>,
 	context: ExpressionContext,
-): { success: boolean; values?: Record<string, any>; error?: string } {
+): Promise<{ success: boolean; values?: Record<string, any>; error?: string }> {
 	const evaluated: Record<string, any> = {};
 
 	try {
 		for (const [key, value] of Object.entries(properties)) {
 			if (typeof value === "string" && hasExpressions(value)) {
 				// Evaluate string templates
-				const result = evaluateTemplate(value, context);
+				const result = await evaluateTemplate(value, context);
 				if (!result.success) {
 					return {
 						success: false,
@@ -314,7 +229,7 @@ export function evaluateProperties(
 				evaluated[key] = result.value;
 			} else if (typeof value === "object" && value !== null) {
 				// Recursively handle nested objects (but not arrays for now)
-				const nested = evaluateProperties(value, context);
+				const nested = await evaluateProperties(value, context);
 				if (!nested.success) {
 					return {
 						success: false,
@@ -342,7 +257,7 @@ export function evaluateProperties(
 // ============================================================================
 
 /**
- * Validate a CEL expression without executing it
+ * Validate a JSONata expression without executing it
  */
 export function validateExpression(expression: string): {
 	valid: boolean;

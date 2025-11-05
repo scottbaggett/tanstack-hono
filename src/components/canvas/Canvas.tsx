@@ -15,6 +15,7 @@ import {
 	MiniMap,
 	type Node,
 	ReactFlow,
+	type ReactFlowInstance,
 	useEdgesState,
 	useNodesState,
 } from "@xyflow/react";
@@ -27,9 +28,9 @@ import {
 	useWorkflow,
 } from "@/hooks/use-workflows";
 import { CanvasToolbar } from "./CanvasToolbar";
-import { NodeEditorModal } from "./NodeEditorModal";
-import { NodePanel } from "./NodePanel";
+import { NodeEditorModal } from "./nodeEditorModal/NodeEditorModal";
 import { WorkflowNode } from "./nodes/WorkflowNode";
+import { NodePanel } from "./panels/NodePanel";
 
 interface CanvasProps {
 	workflowId?: string;
@@ -46,6 +47,7 @@ export function Canvas({
 	selectedNodeId,
 }: CanvasProps) {
 	const navigate = useNavigate();
+	const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
 	const [workflowId, setWorkflowId] = useState(initialWorkflowId);
 	const { data: workflow } = useWorkflow(workflowId || null);
 	const updateWorkflow = useUpdateWorkflow();
@@ -130,12 +132,12 @@ export function Canvas({
 									...node.data,
 									...data,
 								},
-							}
-						: node,
-				),
+						  }
+						: node
+				)
 			);
 		},
-		[setNodes],
+		[setNodes]
 	);
 
 	// Handle execution results from node test runs
@@ -175,14 +177,14 @@ export function Canvas({
 							executionStatus: hasError
 								? "error"
 								: hasSuccess
-									? "success"
-									: undefined,
+								? "success"
+								: undefined,
 						},
 					};
-				}),
+				})
 			);
 		},
-		[setNodes],
+		[setNodes]
 	);
 
 	// Update edge styles based on execution state
@@ -209,12 +211,12 @@ export function Canvas({
 						stroke: isSuccess
 							? "rgb(48, 164, 108)" // green-9
 							: hasError
-								? "rgb(229, 62, 62)" // red-9
-								: undefined,
+							? "rgb(229, 62, 62)" // red-9
+							: undefined,
 						strokeWidth: isSuccess || hasError ? 2 : 1,
 					},
 				};
-			}),
+			})
 		);
 	}, [nodes, setEdges]);
 
@@ -223,7 +225,7 @@ export function Canvas({
 		(connection: Connection) => {
 			setEdges((eds) => addEdge(connection, eds));
 		},
-		[setEdges],
+		[setEdges]
 	);
 
 	// Generate auto-incremented names based on node type
@@ -236,12 +238,12 @@ export function Canvas({
 			// Count existing nodes with same base name
 			const count = existingNodes.filter(
 				(n) =>
-					typeof n.data?.name === "string" && n.data.name.startsWith(baseName),
+					typeof n.data?.name === "string" && n.data.name.startsWith(baseName)
 			).length;
 
 			return count > 0 ? `${baseName} ${count + 1}` : baseName;
 		},
-		[nodesRegistry?.nodes],
+		[nodesRegistry?.nodes]
 	);
 
 	// Save workflow (create if doesn't exist, update if exists)
@@ -296,7 +298,7 @@ export function Canvas({
 
 				// Find the node definition from registry
 				const nodeDefinition = nodesRegistry?.nodes?.find(
-					(n) => n.id === nodeType,
+					(n) => n.id === nodeType
 				);
 
 				if (!nodeDefinition) {
@@ -311,6 +313,15 @@ export function Canvas({
 
 				// Generate human-readable name
 				const autoName = getAutoName(nodeType, nodes);
+
+				// Convert screen coordinates to flow coordinates
+				const position = reactFlowInstance.current?.screenToFlowPosition({
+					x: event.clientX,
+					y: event.clientY,
+				}) || {
+					x: event.clientX,
+					y: event.clientY,
+				};
 
 				// Create new node at drop position with full definition data
 				const newNode: Node = {
@@ -328,17 +339,14 @@ export function Canvas({
 						outputs: nodeDefinition.outputs,
 						properties: nodeDefinition.properties || [],
 					},
-					position: {
-						x: event.clientX - 100,
-						y: event.clientY - 100,
-					},
+					position,
 				};
 				setNodes((nds) => [...nds, newNode]);
 			} catch (error) {
 				console.error("Failed to drop node:", error);
 			}
 		},
-		[setNodes, nodesRegistry?.nodes, getAutoName, nodes],
+		[setNodes, nodesRegistry?.nodes, getAutoName, nodes]
 	);
 
 	return (
@@ -372,6 +380,10 @@ export function Canvas({
 						onEdgesChange={onEdgesChange}
 						onConnect={onConnect}
 						nodeTypes={nodeTypes}
+						onInit={(instance) => {
+							reactFlowInstance.current = instance;
+						}}
+						snapToGrid={true}
 						onNodeDoubleClick={(_, node) => {
 							// Navigate to node modal using search params
 							if (workflowId) {

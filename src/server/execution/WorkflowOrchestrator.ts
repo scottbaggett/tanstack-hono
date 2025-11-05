@@ -284,7 +284,7 @@ export class WorkflowOrchestrator {
 		this.config.logger.debug(`[${nodeId}] Input data:`, inputData);
 
 		// Evaluate expressions in node parameters
-		const evaluatedParameters = this.evaluateNodeParameters(
+		const evaluatedParameters = await this.evaluateNodeParameters(
 			nodeParameters,
 			inputData,
 			nodeId,
@@ -585,12 +585,12 @@ export class WorkflowOrchestrator {
 	 * Evaluate expressions in node parameters
 	 * Resolves {{expression}} syntax using data from connected nodes
 	 */
-	private evaluateNodeParameters(
+	private async evaluateNodeParameters(
 		parameters: Record<string, unknown>,
 		inputData: Record<string, INodeExecutionData[]>,
 		nodeId: string,
 		nodeType: string,
-	): Record<string, unknown> {
+	): Promise<Record<string, unknown>> {
 		// Build expression context from input data
 		const context: ExpressionContext = {
 			node: {
@@ -627,25 +627,41 @@ export class WorkflowOrchestrator {
 		}
 
 		// Recursively evaluate all string parameters
-		const evaluateValue = (value: unknown): unknown => {
+		const evaluateValue = async (value: unknown): Promise<unknown> => {
 			if (typeof value === "string") {
-				const result = evaluateTemplate(value, context);
+				const result = await evaluateTemplate(value, context);
+				if (!result.success) {
+					this.config.logger.error(
+						`[${nodeId}] Expression evaluation failed:`,
+						{
+							expression: value,
+							error: result.error,
+							context: JSON.stringify(context, null, 2),
+						}
+					);
+				}
 				return result.success ? result.value : value;
 			}
 			if (Array.isArray(value)) {
-				return value.map(evaluateValue);
+				return Promise.all(value.map(evaluateValue));
 			}
 			if (value && typeof value === "object") {
 				const evaluated: Record<string, unknown> = {};
 				for (const [k, v] of Object.entries(value)) {
-					evaluated[k] = evaluateValue(v);
+					evaluated[k] = await evaluateValue(v);
 				}
 				return evaluated;
 			}
 			return value;
 		};
 
-		return evaluateValue(parameters) as Record<string, unknown>;
+		const evaluated = await evaluateValue(parameters) as Record<string, unknown>;
+		this.config.logger.debug(`[${nodeId}] Evaluated parameters:`, {
+			original: parameters,
+			evaluated,
+			context: JSON.stringify(context, null, 2),
+		});
+		return evaluated;
 	}
 
 	/**

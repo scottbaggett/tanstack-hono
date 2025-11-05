@@ -12,9 +12,10 @@ import { useEffect, useState } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
 import { Button } from "@/components/ui/button";
 import type { NodeDefinition } from "@/hooks/use-node-registry";
-import { InputExplorer } from "./panels/InputExplorer";
-import { OutputPanel } from "./panels/OutputPanel";
-import { ParametersPanel } from "./panels/ParametersPanel";
+import type { INodeExecutionData } from "@/types/interfaces";
+import { ParametersPanel } from "../panels/ParametersPanel";
+import { NodeInputsPanel } from "./components/NodeInputsPanel";
+import { NodeOutputsPanel } from "./components/NodeOutputsPanel";
 
 interface NodeRegistryData {
 	nodes: NodeDefinition[];
@@ -52,13 +53,11 @@ export function NodeEditorModal({
 	executionCache,
 }: NodeEditorModalProps) {
 	const nodeData = selectedNode.data as Record<string, unknown>;
-	const [executionResult, setExecutionResult] = useState<Record<
-		string,
-		unknown
-	> | null>(null);
+	const [executionResult, setExecutionResult] =
+		useState<INodeExecutionData | null>(null);
 	const [allExecutionResults, setAllExecutionResults] = useState<Record<
 		string,
-		unknown
+		INodeExecutionData
 	> | null>(null);
 
 	// On mount, check if this node has cached execution data
@@ -156,7 +155,8 @@ export function NodeEditorModal({
 			);
 
 			// Call node execution API with workflow context
-			const response = await fetch(`/api/node-execute/${selectedNode.id}`, {
+			// Backend automatically executes all upstream nodes first (n8n-style)
+			const response = await fetch(`/api/execute/node/${selectedNode.id}`, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -200,6 +200,52 @@ export function NodeEditorModal({
 		}
 	};
 
+	const handleExecutePrevious = async () => {
+		setIsExecuting(true);
+		try {
+			// Call same endpoint but with excludeTarget flag
+			const response = await fetch(`/api/execute/node/${selectedNode.id}`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					workflowDefinition: {
+						nodes: allNodes,
+						edges: workflowEdges,
+					},
+					parameters: currentPropertyValues,
+					excludeTarget: true, // Execute upstream only, skip the target node
+				}),
+			});
+
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.error || "Execution failed");
+			}
+
+			const result = await response.json();
+
+			// Update execution cache with upstream results (target node not included)
+			if (result.runData) {
+				setAllExecutionResults(result.runData);
+				onExecutionComplete(selectedNode.id, result.runData);
+			}
+
+			// Clear current node's output since we didn't execute it
+			setExecutionResult(null);
+		} catch (error) {
+			console.error("Execute previous failed:", error);
+			const errorMessage =
+				error instanceof Error ? error.message : "Unknown error";
+			setExecutionResult({
+				error: errorMessage,
+			} as Record<string, unknown>);
+		} finally {
+			setIsExecuting(false);
+		}
+	};
+
 	return (
 		<div className="fixed inset-0 bg-overlay flex items-center justify-center z-50 pointer-events-none">
 			{/* Modal Container */}
@@ -216,25 +262,43 @@ export function NodeEditorModal({
 							</h2>
 						</div>
 					</div>
-					{/* Execute Button */}
-					<Button onClick={handleExecute} disabled={isExecuting} size="sm">
-						{isExecuting ? (
-							<LucideIcon
-								name="loader-2"
-								className="h-4 w-4 mr-2 animate-spin"
-							/>
-						) : (
-							<LucideIcon name="play" className="h-4 w-4 mr-2" />
-						)}
-						Execute Node
-					</Button>
+					{/* Execute Buttons */}
+					<div className="flex items-center gap-2">
+						<Button
+							onClick={handleExecutePrevious}
+							disabled={isExecuting}
+							size="sm"
+							variant="outline"
+						>
+							{isExecuting ? (
+								<LucideIcon
+									name="loader-2"
+									className="h-4 w-4 mr-2 animate-spin"
+								/>
+							) : (
+								<LucideIcon name="skip-back" className="h-4 w-4 mr-2" />
+							)}
+							Execute Previous
+						</Button>
+						<Button onClick={handleExecute} disabled={isExecuting} size="sm">
+							{isExecuting ? (
+								<LucideIcon
+									name="loader-2"
+									className="h-4 w-4 mr-2 animate-spin"
+								/>
+							) : (
+								<LucideIcon name="play" className="h-4 w-4 mr-2" />
+							)}
+							Execute Step
+						</Button>
+					</div>
 				</div>
 
 				{/* Three Panel Layout */}
 				<div className="flex-1 flex overflow-hidden">
 					{/* Left Panel - Input Explorer */}
 					<div className="w-1/4 border-r border-surface-6 overflow-y-auto">
-						<InputExplorer
+						<NodeInputsPanel
 							connectedNodes={connectedNodes}
 							executionResults={allExecutionResults || executionCache}
 						/>
@@ -248,12 +312,15 @@ export function NodeEditorModal({
 							nodeRegistry={nodeRegistry}
 							currentPropertyValues={currentPropertyValues}
 							onPropertyValuesChange={setCurrentPropertyValues}
+							executionResults={allExecutionResults?.[selectedNode.id]}
+							allExecutionResults={allExecutionResults || executionCache}
+							connectedNodes={connectedNodes}
 						/>
 					</div>
 
 					{/* Right Panel - Test & Output */}
 					<div className="w-1/3 border-l flex flex-col">
-						<OutputPanel executionResult={executionResult} />
+						<NodeOutputsPanel executionResult={executionResult || {}} />
 					</div>
 				</div>
 			</div>

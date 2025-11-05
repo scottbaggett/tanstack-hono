@@ -10,6 +10,7 @@ import { registerTool } from "../execution/requestHandler";
 import { calculatorTool } from "../tools/calculator";
 import { searchTool } from "../tools/search";
 import { Agent } from "./agent/Agent";
+import { StructuredOutput } from "./ai/StructuredOutput";
 import { IfElse } from "./control/IfElse";
 import { TextInput } from "./input/TextInput";
 import { Output } from "./output/Output";
@@ -60,6 +61,19 @@ export function loadNodes(): void {
 		codex: agentNode.description.codex,
 	});
 	console.log("✓ Registered agent node");
+
+	// Structured Output node
+	const structuredOutputNode = new StructuredOutput();
+	nodeRegistry.register(structuredOutputNode, {
+		displayName: structuredOutputNode.description.displayName,
+		name: structuredOutputNode.description.name,
+		icon: structuredOutputNode.description.icon,
+		iconColor: structuredOutputNode.description.iconColor,
+		category: structuredOutputNode.description.category,
+		description: structuredOutputNode.description.description,
+		codex: structuredOutputNode.description.codex,
+	});
+	console.log("✓ Registered structured output node");
 
 	// Execute Command node
 	const executeCommandNode = new ExecuteCommand();

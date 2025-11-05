@@ -47,15 +47,15 @@ export const WorkflowNode = memo(function WorkflowNode({
 					data.executionStatus === "success"
 						? "bg-green-10/50 border-green-9/50"
 						: data.executionStatus === "error"
-							? "bg-red-10/50 border-red-9/50"
-							: "bg-node/80 border-node-border/50"
+						? "bg-red-10/50 border-red-9/50"
+						: "bg-node/80 border-node-border/50"
 				}
 				${
 					isSelected
 						? "shadow-lg shadow-node-border"
 						: data.executionStatus
-							? ""
-							: "hover:border-node-border"
+						? ""
+						: "hover:border-node-border"
 				}
 				${isConnecting ? "opacity-50" : "opacity-100"}`}
 			>
@@ -93,8 +93,8 @@ export const WorkflowNode = memo(function WorkflowNode({
 
 				{/* Execution Status Badge */}
 				{data.executionStatus === "success" && (
-					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-green-9 border-2 border-surface-1 flex items-center justify-center">
-						<LucideIcon name="check" className="size-3 text-foreground" />
+					<div className="absolute bottom-1.5 right-1.5">
+						<LucideIcon name="check" className="size-5 text-foreground" />
 					</div>
 				)}
 				{data.executionStatus === "error" && (

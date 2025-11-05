@@ -9,119 +9,114 @@ import { nodeRegistry } from "../nodes/registry";
 // Load all nodes to ensure they are registered
 import "../nodes/load";
 
-export const nodesRoutes = new Hono();
+const nodesRoutes = new Hono();
 
 /**
  * GET /nodes - Get all available node definitions
  */
-nodesRoutes.get("/", (c) => {
-	const nodes = nodeRegistry.getAllDefinitions();
+nodesRoutes
+	.get("/", (c) => {
+		const nodes = nodeRegistry.getAllDefinitions();
 
-	const nodeDefinitions = nodes.map((node) => {
-		return {
-			id: node.name,
-			name: node.name,
-			displayName: node.displayName,
-			description: node.description,
-			category: node.category,
-			icon: node.icon,
-			color: node.iconColor,
-			version: node.version,
-			maxInputs: node.maxInputs ?? 1,
-			maxOutputs: node.maxOutputs ?? 1,
-			properties: node.properties || [],
-			codex: node.codex,
-		};
-	});
+		const nodeDefinitions = nodes.map((node) => {
+			return {
+				id: node.name,
+				name: node.name,
+				displayName: node.displayName,
+				description: node.description,
+				category: node.category,
+				icon: node.icon,
+				color: node.iconColor,
+				version: node.version,
+				maxInputs: node.maxInputs ?? 1,
+				maxOutputs: node.maxOutputs ?? 1,
+				properties: node.properties || [],
+				codex: node.codex,
+			};
+		});
 
-	// Group by category
-	const byCategory = nodeDefinitions.reduce(
-		(acc, node) => {
-			if (!acc[node.category]) {
-				acc[node.category] = [];
-			}
-			acc[node.category].push(node);
-			return acc;
-		},
-		{} as Record<string, typeof nodeDefinitions>,
-	);
-
-	return c.json({
-		success: true,
-		data: {
-			nodes: nodeDefinitions,
-			byCategory,
-			total: nodeDefinitions.length,
-		},
-	});
-});
-
-/**
- * GET /nodes/:id - Get a specific node definition
- */
-nodesRoutes.get("/:id", (c) => {
-	const nodeId = c.req.param("id");
-	const node = nodeRegistry.getDefinition(nodeId);
-
-	if (!node) {
-		return c.json(
-			{
-				success: false,
-				error: `Node "${nodeId}" not found`,
+		// Group by category
+		const byCategory = nodeDefinitions.reduce(
+			(acc, node) => {
+				if (!acc[node.category]) {
+					acc[node.category] = [];
+				}
+				acc[node.category].push(node);
+				return acc;
 			},
-			404,
+			{} as Record<string, typeof nodeDefinitions>,
 		);
-	}
 
-	return c.json({
-		success: true,
-		data: {
-			id: node.name,
-			name: node.name,
-			displayName: node.displayName,
-			description: node.description,
-			category: node.category,
-			icon: node.icon,
-			color: node.iconColor,
-			version: node.version,
-			maxInputs: node.maxInputs ?? 1,
-			maxOutputs: node.maxOutputs ?? 1,
-			properties: node.properties || [],
-			codex: node.codex,
-		},
+		return c.json({
+			success: true,
+			data: {
+				nodes: nodeDefinitions,
+				byCategory,
+				total: nodeDefinitions.length,
+			},
+		});
+	})
+	.get("/:id", (c) => {
+		const nodeId = c.req.param("id");
+		const node = nodeRegistry.getDefinition(nodeId);
+
+		if (!node) {
+			return c.json(
+				{
+					success: false,
+					error: `Node "${nodeId}" not found`,
+				},
+				404,
+			);
+		}
+
+		return c.json({
+			success: true,
+			data: {
+				id: node.name,
+				name: node.name,
+				displayName: node.displayName,
+				description: node.description,
+				category: node.category,
+				icon: node.icon,
+				color: node.iconColor,
+				version: node.version,
+				maxInputs: node.maxInputs ?? 1,
+				maxOutputs: node.maxOutputs ?? 1,
+				properties: node.properties || [],
+				codex: node.codex,
+			},
+		});
+	})
+	.get("/category/:category", (c) => {
+		const category = c.req.param("category");
+		const nodes = nodeRegistry.getDefinitionsByCategory(category);
+
+		const filtered = nodes.map((node) => {
+			return {
+				id: node.name,
+				name: node.name,
+				displayName: node.displayName,
+				description: node.description,
+				category: node.category,
+				icon: node.icon,
+				color: node.iconColor,
+				version: node.version,
+				maxInputs: node.maxInputs ?? 1,
+				maxOutputs: node.maxOutputs ?? 1,
+				properties: node.properties || [],
+				codex: node.codex,
+			};
+		});
+
+		return c.json({
+			success: true,
+			data: {
+				category,
+				nodes: filtered,
+				total: filtered.length,
+			},
+		});
 	});
-});
 
-/**
- * GET /nodes/category/:category - Get nodes in a specific category
- */
-nodesRoutes.get("/category/:category", (c) => {
-	const category = c.req.param("category");
-	const nodes = nodeRegistry.getDefinitionsByCategory(category);
-
-	const filtered = nodes.map((node) => {
-		return {
-			id: node.name,
-			name: node.name,
-			displayName: node.displayName,
-			description: node.description,
-			category: node.category,
-			icon: node.icon,
-			color: node.iconColor,
-			version: node.version,
-			maxInputs: node.maxInputs ?? 1,
-			maxOutputs: node.maxOutputs ?? 1,
-			properties: node.properties || [],
-			codex: node.codex,
-		};
-	});
-
-	return c.json({
-		success: true,
-		data: {
-			category,
-			nodes: filtered,
-			total: filtered.length,
-		},
-	});
-});
+export default nodesRoutes;

@@ -6,6 +6,8 @@
 
 import type { Node } from "@xyflow/react";
 import type React from "react";
+import { ExpressionInput } from "@/components/shared/ExpressionInput";
+import { SchemaBuilder } from "@/components/shared/SchemaBuilder";
 import { Input } from "@/components/ui/input";
 import { JsonEditor } from "@/components/ui/json-editor";
 import {
@@ -16,6 +18,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import type { INodeExecutionData } from "@/types/interfaces";
 import { CredentialSelector } from "./CredentialSelector";
 
 interface NodeProperty {
@@ -24,6 +27,8 @@ interface NodeProperty {
 	type: string;
 	default?: unknown;
 	description?: string;
+	noDataExpression?: boolean;
+	options?: Array<{ name: string; value: unknown; description?: string }>;
 }
 
 interface CredentialRequirement {
@@ -37,6 +42,9 @@ interface ParametersPanelProps {
 	nodeRegistry: any;
 	currentPropertyValues: Record<string, unknown>;
 	onPropertyValuesChange: (values: Record<string, unknown>) => void;
+	executionResults?: INodeExecutionData;
+	allExecutionResults?: Record<string, INodeExecutionData>;
+	connectedNodes?: Node[];
 }
 
 export function ParametersPanel({
@@ -45,6 +53,9 @@ export function ParametersPanel({
 	nodeRegistry,
 	currentPropertyValues,
 	onPropertyValuesChange,
+	executionResults: _executionResults,
+	allExecutionResults,
+	connectedNodes = [],
 }: ParametersPanelProps) {
 	const nodeData = selectedNode.data as Record<string, unknown>;
 	// Support both new nodeType and legacy nodeId
@@ -102,6 +113,88 @@ export function ParametersPanel({
 			handlePropertyChange(fieldName, expression);
 		}
 	};
+
+	// Build n8n-style expression context from connected input nodes
+	// Supports: $json, $item[index], $items["NodeName"], $parameters
+	const expressionContext = (() => {
+		if (!allExecutionResults) {
+			return undefined;
+		}
+
+		// Find first connected node with execution data
+		let firstNodeWithData = null;
+		for (const node of connectedNodes) {
+			const cacheEntry = allExecutionResults[node.id];
+			if (cacheEntry && Array.isArray(cacheEntry) && cacheEntry[0]) {
+				const nodeRun = cacheEntry[0];
+				if (!nodeRun.error && nodeRun.data) {
+					firstNodeWithData = { node, data: nodeRun.data };
+					break;
+				}
+			}
+		}
+
+		if (!firstNodeWithData) {
+			return undefined;
+		}
+
+		// Build $item array from all execution results
+		const $item: Array<{ json: Record<string, any>; binary?: Record<string, any> }> = [];
+		for (const node of connectedNodes) {
+			const cacheEntry = allExecutionResults[node.id];
+			if (cacheEntry && Array.isArray(cacheEntry) && cacheEntry[0]) {
+				const nodeRun = cacheEntry[0];
+				if (!nodeRun.error && nodeRun.data) {
+					$item.push({
+						json: nodeRun.data.json || {},
+						binary: nodeRun.data.binary,
+					});
+				}
+			}
+		}
+
+		// Build $items map by node name
+		const $items: Record<string, Array<{ json: Record<string, any>; binary?: Record<string, any> }>> = {};
+		for (const node of connectedNodes) {
+			const nodeName = (node.data?.displayName as string) || (node.data?.name as string) || node.id;
+			const cacheEntry = allExecutionResults[node.id];
+			if (cacheEntry && Array.isArray(cacheEntry) && cacheEntry[0]) {
+				const nodeRun = cacheEntry[0];
+				if (!nodeRun.error && nodeRun.data) {
+					$items[nodeName] = [{
+						json: nodeRun.data.json || {},
+						binary: nodeRun.data.binary,
+					}];
+				}
+			}
+		}
+
+		return {
+			// n8n-style syntax
+			$json: firstNodeWithData.data.json || {},
+			$item,
+			$items,
+			$parameters: currentPropertyValues,
+
+			// Legacy support
+			json: firstNodeWithData.data.json || {},
+			binary: firstNodeWithData.data.binary,
+			node: {
+				id: selectedNode.id,
+				type: nodeType,
+				version: 1,
+			},
+		};
+	})();
+
+	// Map connected nodes for autocomplete
+	const connectedNodesData = connectedNodes.map((node) => ({
+		id: node.id,
+		name:
+			(node.data?.displayName as string) ||
+			(node.data?.name as string) ||
+			node.id,
+	}));
 
 	const hasCredentials = credentialRequirements.length > 0;
 	const hasProperties = propertyDefinitions.length > 0;
@@ -231,6 +324,51 @@ export function ParametersPanel({
 							const renderInput = () => {
 								switch (property.type) {
 									case "json": {
+										// Use SchemaBuilder for schema property
+										if (property.name === "schema") {
+											return (
+												<SchemaBuilder
+													value={currentValue as any}
+													onChange={(val) =>
+														handlePropertyChange(property.name, val)
+													}
+													onGenerate={async (prompt) => {
+														try {
+															const response = await fetch("/api/schema/generate", {
+																method: "POST",
+																headers: {
+																	"Content-Type": "application/json",
+																},
+																body: JSON.stringify({ prompt }),
+															});
+
+															const result = await response.json();
+
+															if (!result.success) {
+																throw new Error(result.error || "Schema generation failed");
+															}
+
+															return result.data;
+														} catch (error) {
+															console.error("Schema generation failed:", error);
+															// Return a fallback schema on error
+															return {
+																name: "error_schema",
+																description: `Failed to generate from prompt: ${error instanceof Error ? error.message : "Unknown error"}`,
+																properties: {
+																	error: {
+																		type: "string",
+																		description: "Error message",
+																	},
+																},
+															};
+														}
+													}}
+												/>
+											);
+										}
+
+										// Regular JSON editor for other properties
 										return (
 											<JsonEditor
 												value={currentValue}
@@ -247,7 +385,7 @@ export function ParametersPanel({
 									}
 									case "select": {
 										// For select type, check if property has options
-										const options = (property as any).options || [];
+										const options = property.options || [];
 										if (options.length > 0) {
 											return (
 												<Select
@@ -262,7 +400,7 @@ export function ParametersPanel({
 														<SelectValue />
 													</SelectTrigger>
 													<SelectContent>
-														{options.map((opt: any) => (
+														{options.map((opt) => (
 															<SelectItem
 																key={String(opt.value)}
 																value={String(opt.value)}
@@ -274,18 +412,30 @@ export function ParametersPanel({
 												</Select>
 											);
 										}
-										// Fall through to text input if no options
+										// Fall through to ExpressionInput if no options (unless noDataExpression)
+										if (property.noDataExpression) {
+											return (
+												<Input
+													type="text"
+													value={String(currentValue)}
+													onChange={(e) =>
+														handlePropertyChange(property.name, e.target.value)
+													}
+													onDragOver={handleDragOver}
+													onDrop={(e) => handleDrop(e, property.name)}
+													placeholder={String(property.default || "")}
+													className="bg-surface-3"
+												/>
+											);
+										}
 										return (
-											<Input
-												type="text"
+											<ExpressionInput
 												value={String(currentValue)}
-												onChange={(e) =>
-													handlePropertyChange(property.name, e.target.value)
+												onChange={(val) =>
+													handlePropertyChange(property.name, val)
 												}
-												onDragOver={handleDragOver}
-												onDrop={(e) => handleDrop(e, property.name)}
-												placeholder={String(property.default || "")}
-												className="bg-surface-3"
+												executionContext={expressionContext}
+												connectedNodes={connectedNodesData}
 											/>
 										);
 									}
@@ -317,18 +467,30 @@ export function ParametersPanel({
 										);
 									}
 									default: {
-										// Default to text input
+										// Default to ExpressionInput for text (unless noDataExpression)
+										if (property.noDataExpression) {
+											return (
+												<Input
+													type="text"
+													value={String(currentValue)}
+													onChange={(e) =>
+														handlePropertyChange(property.name, e.target.value)
+													}
+													onDragOver={handleDragOver}
+													onDrop={(e) => handleDrop(e, property.name)}
+													placeholder={String(property.default || "")}
+													className="bg-surface-3"
+												/>
+											);
+										}
 										return (
-											<Input
-												type="text"
+											<ExpressionInput
 												value={String(currentValue)}
-												onChange={(e) =>
-													handlePropertyChange(property.name, e.target.value)
+												onChange={(val) =>
+													handlePropertyChange(property.name, val)
 												}
-												onDragOver={handleDragOver}
-												onDrop={(e) => handleDrop(e, property.name)}
-												placeholder={String(property.default || "")}
-												className="bg-surface-3"
+												executionContext={expressionContext}
+												connectedNodes={connectedNodesData}
 											/>
 										);
 									}
