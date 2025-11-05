@@ -1,27 +1,37 @@
 /**
- * CEL Expression Evaluator
+ * JSONata Expression Evaluator
  *
- * Evaluates CEL (Common Expression Language) expressions for node properties
+ * Evaluates JSONata expressions for node properties
  * Provides safe sandboxed evaluation with access to workflow context
  */
 
-import { celEnv, parse, plan } from "@bufbuild/cel";
-import type { ParsedExpr } from "@bufbuild/cel-spec/cel/expr/syntax_pb.js";
+import jsonata from "jsonata";
+import type { Expression } from "jsonata";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface ExpressionContext {
-	// Output data from connected input node (single input)
+	// Workflow expression variables (JSONata natively supports $ prefix)
+	// Current item's JSON data (first input item)
+	$json?: Record<string, any>;
+	// Array of all items (access via $item[0], $item[1], etc.)
+	$item?: Array<{ json: Record<string, any>; binary?: Record<string, any> }>;
+	// Map of items by node name (access via $items["NodeName"])
+	$items?: Record<
+		string,
+		Array<{ json: Record<string, any>; binary?: Record<string, any> }>
+	>;
+	// Current node's parameters
+	$parameters?: Record<string, any>;
+
+	// Legacy support (deprecated - use $ prefixed versions above)
 	json?: Record<string, any>;
-	// Binary data from connected input node
 	binary?: Record<string, any>;
-	// Input context (params from connected node, multiple inputs)
 	input?: {
 		params?: Record<string, any>;
 	};
-	// Multiple inputs (when node has more than one connection)
 	inputs?: Record<
 		string,
 		{
@@ -50,29 +60,21 @@ export interface EvaluationResult {
 // EXPRESSION CACHE
 // ============================================================================
 
-// Cache parsed and planned expressions to avoid recompiling
-interface CachedExpression {
-	parsed: ParsedExpr;
-	evaluator: (ctx?: Record<string, any>) => any;
-}
+// Cache compiled JSONata expressions to avoid recompiling
+const expressionCache = new Map<string, Expression>();
 
-const expressionCache = new Map<string, CachedExpression>();
-const env = celEnv();
-
-function getCachedExpression(expression: string): CachedExpression {
+function getCachedExpression(expression: string): Expression {
 	if (expressionCache.has(expression)) {
 		return expressionCache.get(expression)!;
 	}
 
 	try {
-		const parsed = parse(expression);
-		const evaluator = plan(env, parsed);
-		const cached: CachedExpression = { parsed, evaluator };
-		expressionCache.set(expression, cached);
-		return cached;
+		const compiled = jsonata(expression);
+		expressionCache.set(expression, compiled);
+		return compiled;
 	} catch (error) {
 		throw new Error(
-			`Failed to compile CEL expression "${expression}": ${error}`,
+			`Failed to compile JSONata expression "${expression}": ${error}`,
 		);
 	}
 }
@@ -85,14 +87,74 @@ function getCachedExpression(expression: string): CachedExpression {
  * Convert custom syntax to CEL-compatible bracket notation
  *
  * Patterns converted:
+ * n8n-style syntax:
+ * - $json.field -> $json["field"]
+ * - $item[0].json.field -> $item[0]["json"]["field"]
+ * - $items["NodeName"][0].json -> $items["NodeName"][0]["json"]
+ * - $parameters.field -> $parameters["field"]
+ *
+ * Legacy syntax (deprecated):
  * - json.field -> json["field"]
- * - json.field.nested -> json["field"]["nested"]
  * - binary.key -> binary["key"]
  * - input.params.field -> input["params"]["field"]
  * - node.id -> node["id"]
  * - inputs.nodeId.json.field -> inputs["nodeId"]["json"]["field"]
  */
 function convertCustomSyntaxToCEL(expression: string): string {
+	// Convert $json.field to $json["field"]
+	expression = expression.replace(
+		/\$json((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `$json${bracketProps}`;
+		},
+	);
+
+	// Convert $parameters.field to $parameters["field"]
+	expression = expression.replace(
+		/\$parameters((?:\.\w+)+)/g,
+		(_match, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `$parameters${bracketProps}`;
+		},
+	);
+
+	// Convert $item[0].json.field to $item[0]["json"]["field"]
+	expression = expression.replace(
+		/\$item\[(\d+)\]((?:\.\w+)+)/g,
+		(_match, index, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `$item[${index}]${bracketProps}`;
+		},
+	);
+
+	// Convert $items["NodeName"][0].json.field to $items["NodeName"][0]["json"]["field"]
+	expression = expression.replace(
+		/\$items\["([^"]+)"\]\[(\d+)\]((?:\.\w+)+)/g,
+		(_match, nodeName, index, properties) => {
+			const bracketProps = properties
+				.split(".")
+				.filter(Boolean)
+				.map((p: string) => `["${p}"]`)
+				.join("");
+			return `$items["${nodeName}"][${index}]${bracketProps}`;
+		},
+	);
+
+	// Legacy support below (deprecated)
+
 	// Convert inputs.nodeId.json.field to inputs["nodeId"]["json"]["field"]
 	expression = expression.replace(
 		/\binputs((?:\.\w+)+)/g,

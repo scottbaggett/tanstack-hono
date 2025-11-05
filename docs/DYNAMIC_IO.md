@@ -124,9 +124,9 @@ const source = items[0].json.metadata.source; // "input"
 
 ## Runtime Data Discovery
 
-### Using InputExplorer
+### Using NodeEditorInputs
 
-The InputExplorer tool shows you the actual data structure after execution:
+The NodeEditorInputs tool shows you the actual data structure after execution:
 
 **1. Run the workflow**
 ```
@@ -140,7 +140,7 @@ TextInput node executes and produces:
 }
 ```
 
-**2. View in InputExplorer**
+**2. View in NodeEditorInputs**
 Click on the node to see its output structure
 
 **3. Build expressions**
@@ -217,7 +217,7 @@ Both structures are valid - downstream nodes handle gracefully.
 - No rigid contracts
 
 ### 3. Discoverability
-- InputExplorer shows actual data
+- NodeEditorInputs shows actual data
 - Build expressions from real structures
 - See exactly what's available
 

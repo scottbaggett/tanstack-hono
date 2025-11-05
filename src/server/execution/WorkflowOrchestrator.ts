@@ -308,6 +308,12 @@ export class WorkflowOrchestrator {
 			this.config.logger,
 		);
 
+		// For trigger nodes, pass workflow inputs via context
+		if (nodeType === "manualTrigger" || nodeType === "webhook") {
+			// Attach workflow inputs to execution context for trigger nodes
+			(executeFunctions as any).workflowInputs = this.config.inputs || {};
+		}
+
 		try {
 			// Execute the node
 			if (!nodeInstance.execute) {
@@ -630,6 +636,16 @@ export class WorkflowOrchestrator {
 		const evaluateValue = (value: unknown): unknown => {
 			if (typeof value === "string") {
 				const result = evaluateTemplate(value, context);
+				if (!result.success) {
+					this.config.logger.error(
+						`[${nodeId}] Expression evaluation failed:`,
+						{
+							expression: value,
+							error: result.error,
+							context: JSON.stringify(context, null, 2),
+						}
+					);
+				}
 				return result.success ? result.value : value;
 			}
 			if (Array.isArray(value)) {
@@ -645,7 +661,13 @@ export class WorkflowOrchestrator {
 			return value;
 		};
 
-		return evaluateValue(parameters) as Record<string, unknown>;
+		const evaluated = evaluateValue(parameters) as Record<string, unknown>;
+		this.config.logger.debug(`[${nodeId}] Evaluated parameters:`, {
+			original: parameters,
+			evaluated,
+			context: JSON.stringify(context, null, 2),
+		});
+		return evaluated;
 	}
 
 	/**

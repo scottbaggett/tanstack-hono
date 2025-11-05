@@ -10,10 +10,12 @@ import { registerTool } from "../execution/requestHandler";
 import { calculatorTool } from "../tools/calculator";
 import { searchTool } from "../tools/search";
 import { Agent } from "./agent/Agent";
+import { StructuredOutput } from "./ai/StructuredOutput";
 import { IfElse } from "./control/IfElse";
 import { TextInput } from "./input/TextInput";
 import { Output } from "./output/Output";
 import { nodeRegistry } from "./registry";
+import { ManualTrigger } from "./trigger/ManualTrigger";
 import { Webhook } from "./trigger/Webhook";
 import { ExecuteCommand } from "./utility/ExecuteCommand";
 import { HttpRequest } from "./utility/HttpRequest";
@@ -61,6 +63,19 @@ export function loadNodes(): void {
 	});
 	console.log("✓ Registered agent node");
 
+	// Structured Output node
+	const structuredOutputNode = new StructuredOutput();
+	nodeRegistry.register(structuredOutputNode, {
+		displayName: structuredOutputNode.description.displayName,
+		name: structuredOutputNode.description.name,
+		icon: structuredOutputNode.description.icon,
+		iconColor: structuredOutputNode.description.iconColor,
+		category: structuredOutputNode.description.category,
+		description: structuredOutputNode.description.description,
+		codex: structuredOutputNode.description.codex,
+	});
+	console.log("✓ Registered structured output node");
+
 	// Execute Command node
 	const executeCommandNode = new ExecuteCommand();
 	nodeRegistry.register(executeCommandNode, {
@@ -99,6 +114,19 @@ export function loadNodes(): void {
 		codex: httpRequestNode.description.codex,
 	});
 	console.log("✓ Registered HTTP request node");
+
+	// Manual Trigger node
+	const manualTriggerNode = new ManualTrigger();
+	nodeRegistry.register(manualTriggerNode, {
+		displayName: manualTriggerNode.description.displayName,
+		name: manualTriggerNode.description.name,
+		icon: manualTriggerNode.description.icon,
+		iconColor: manualTriggerNode.description.iconColor,
+		category: manualTriggerNode.description.category,
+		description: manualTriggerNode.description.description,
+		codex: manualTriggerNode.description.codex,
+	});
+	console.log("✓ Registered manual trigger node");
 
 	// Webhook Trigger node
 	const webhookNode = new Webhook();

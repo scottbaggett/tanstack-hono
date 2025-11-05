@@ -14,6 +14,7 @@ interface SchemaTreeProps {
 	data: Record<string, unknown>;
 	path?: string;
 	nodeName?: string;
+	draggable?: boolean;
 }
 
 type DataType = "string" | "number" | "boolean" | "object" | "array" | "null";
@@ -75,16 +76,21 @@ interface TreeNodeProps {
 	value: unknown;
 	path: string;
 	level: number;
+	draggable?: boolean;
+	nodeName?: string;
 }
 
-function TreeNode({ label, value, path, level }: TreeNodeProps) {
+function TreeNode({ label, value, path, level, draggable, nodeName }: TreeNodeProps) {
 	const [isExpanded, setIsExpanded] = useState(level < 2); // Auto-expand first 2 levels
 	const type = getDataType(value);
 	const isExpandable = type === "object" || type === "array";
 
 	const handleDragStart = (e: React.DragEvent) => {
 		e.stopPropagation();
-		const expression = `{{ ${path} }}`;
+		// Generate n8n-style expression: $items["NodeName"][0].json.field
+		const expression = nodeName
+			? `{{ $items["${nodeName}"][0].${path} }}`
+			: `{{ ${path} }}`;
 		e.dataTransfer.setData("text/plain", expression);
 		e.dataTransfer.effectAllowed = "copy";
 	};
@@ -128,10 +134,14 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 				{/* Label chip - draggable */}
 				<button
 					type="button"
-					draggable={!isExpandable}
-					onDragStart={handleDragStart}
+					draggable={draggable && !isExpandable}
+					onDragStart={draggable ? handleDragStart : undefined}
 					className={`px-2 py-0.5 rounded text-xs font-medium bg-surface-4 text-surface-12 ${
-						!isExpandable ? "cursor-grab active:cursor-grabbing" : ""
+						!isExpandable
+							? draggable
+								? "cursor-grab active:cursor-grabbing"
+								: "cursor-default"
+							: ""
 					} group-hover:bg-surface-5 transition-colors`}
 				>
 					{label}
@@ -165,6 +175,8 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 									value={item}
 									path={`${path}[${index}]`}
 									level={level + 1}
+									draggable={draggable}
+									nodeName={nodeName}
 								/>
 						  ))
 						: Object.entries(value as Record<string, unknown>).map(
@@ -175,6 +187,8 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 										value={val}
 										path={`${path}.${key}`}
 										level={level + 1}
+										draggable={draggable}
+										nodeName={nodeName}
 									/>
 								)
 						  )}
@@ -184,7 +198,12 @@ function TreeNode({ label, value, path, level }: TreeNodeProps) {
 	);
 }
 
-export function SchemaTree({ data, path = "json" }: SchemaTreeProps) {
+export function SchemaTree({
+	data,
+	path = "json",
+	nodeName,
+	draggable = true,
+}: SchemaTreeProps) {
 	if (!data || typeof data !== "object") {
 		return (
 			<div className="p-4 text-center text-xs text-surface-10">
@@ -202,6 +221,8 @@ export function SchemaTree({ data, path = "json" }: SchemaTreeProps) {
 					value={value}
 					path={`${path}.${key}`}
 					level={0}
+					draggable={draggable}
+					nodeName={nodeName}
 				/>
 			))}
 		</div>

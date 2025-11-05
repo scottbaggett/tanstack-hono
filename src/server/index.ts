@@ -16,6 +16,7 @@ import { authMiddleware } from "./auth/middleware";
 import { authRoutes } from "./routes/auth";
 import { executeRoutes } from "./routes/execute";
 import { nodesRoutes } from "./routes/nodes";
+import schemaRoutes from "./routes/schema";
 import { webhookRoutes } from "./routes/webhooks";
 import { workflowRoutes } from "./routes/workflows";
 // Load nodes to ensure they are registered
@@ -71,6 +72,7 @@ app.route("/api/auth", authRoutes);
 // Public API routes
 app.route("/api/nodes", nodesRoutes);
 app.route("/api/execute", executeRoutes);
+app.route("/api/schema", schemaRoutes);
 
 // Webhook routes (public - receives external requests)
 app.route("/api", webhookRoutes);

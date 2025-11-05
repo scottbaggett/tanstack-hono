@@ -253,14 +253,14 @@ console.log(items[0].json.text); // "HELLO WORLD"
 
 ## Runtime Data Inspection
 
-The **InputExplorer** tool shows the actual `INodeExecutionData` structure:
+The **NodeEditorInputs** tool shows the actual `INodeExecutionData` structure:
 
 1. Run a workflow
 2. Click on any node
 3. View the execution output showing the `json` and `binary` properties
 4. Use this to build correct expressions
 
-Example InputExplorer output:
+Example NodeEditorInputs output:
 ```json
 {
   "json": {

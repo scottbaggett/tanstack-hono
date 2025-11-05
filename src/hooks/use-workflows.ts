@@ -6,7 +6,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
-import type { Workflow, WorkflowsListResponse } from "@/server/types/api";
+import type {
+	Workflow,
+	WorkflowsListResponse,
+	WorkflowRun,
+	WorkflowRunsListResponse,
+} from "@/server/types/api";
 
 /**
  * Fetch all workflows for the current user
@@ -148,7 +153,8 @@ export function useDeleteWorkflow() {
 }
 
 /**
- * Run a workflow
+ * Run a workflow (creates run record but doesn't execute)
+ * @deprecated Use useExecuteWorkflow instead for actual execution
  */
 export function useRunWorkflow() {
 	const queryClient = useQueryClient();
@@ -174,8 +180,106 @@ export function useRunWorkflow() {
 
 			return response.data;
 		},
-		onSuccess: () => {
+		onSuccess: (_, variables) => {
 			queryClient.invalidateQueries({ queryKey: ["workflows"] });
+			queryClient.invalidateQueries({
+				queryKey: ["workflow-runs", variables.workflowId],
+			});
 		},
+	});
+}
+
+/**
+ * Execute a workflow (actually runs the workflow)
+ */
+export function useExecuteWorkflow() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (input: {
+			workflowId: string;
+			inputs?: Record<string, unknown>;
+		}) => {
+			const { workflowId, inputs } = input;
+
+			const response = await apiRequest<{
+				workflowId: string;
+				runId: string;
+				status: string;
+			}>(`/api/execute/${workflowId}`, {
+				method: "POST",
+				body: JSON.stringify({ inputs }),
+			});
+
+			if (!response.success) {
+				throw new Error(response.error || "Failed to execute workflow");
+			}
+
+			return response.data;
+		},
+		onSuccess: (_, variables) => {
+			queryClient.invalidateQueries({ queryKey: ["workflows"] });
+			queryClient.invalidateQueries({
+				queryKey: ["workflow-runs", variables.workflowId],
+			});
+		},
+	});
+}
+
+/**
+ * Fetch all workflow runs for a specific workflow
+ */
+export function useWorkflowRuns(workflowId: string | null) {
+	return useQuery({
+		queryKey: ["workflow-runs", workflowId],
+		queryFn: async () => {
+			if (!workflowId) throw new Error("Workflow ID is required");
+
+			const response = await apiRequest<WorkflowRun[]>(
+				`/api/workflows/${workflowId}/runs`,
+				{
+					method: "GET",
+				},
+			);
+
+			if (!response.success) {
+				throw new Error(response.error || "Failed to fetch workflow runs");
+			}
+
+			// API returns { success: true, data: WorkflowRun[] }
+			return (response.data as WorkflowRun[]) || [];
+		},
+		enabled: !!workflowId && typeof window !== "undefined",
+	});
+}
+
+/**
+ * Fetch a single workflow run by ID
+ */
+export function useWorkflowRun(
+	workflowId: string | null,
+	runId: string | null,
+) {
+	return useQuery({
+		queryKey: ["workflow-runs", workflowId, runId],
+		queryFn: async () => {
+			if (!workflowId || !runId) {
+				throw new Error("Workflow ID and Run ID are required");
+			}
+
+			const response = await apiRequest<{
+				run: WorkflowRun;
+				executions: unknown[];
+			}>(`/api/workflows/${workflowId}/runs/${runId}`, {
+				method: "GET",
+			});
+
+			if (!response.success) {
+				throw new Error(response.error || "Failed to fetch workflow run");
+			}
+
+			return response.data;
+		},
+		enabled: !!workflowId && !!runId && typeof window !== "undefined",
 	});
 }

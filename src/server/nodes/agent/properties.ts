@@ -5,13 +5,13 @@
  */
 
 import { getModelNames } from "@/server/models/registry";
-import type { NodeProperty } from "@/types/interfaces";
+import type { INodeProperty } from "@/types/interfaces";
 
 // Get all available models from registry
 const allModelNames = getModelNames();
 const modelOptions = allModelNames.map((name) => ({ name, value: name }));
 
-export const agentProperties: NodeProperty[] = [
+export const agentProperties: INodeProperty[] = [
 	{
 		displayName: "Model",
 		name: "model",
@@ -26,17 +26,6 @@ export const agentProperties: NodeProperty[] = [
 		type: "string",
 		default: "You are a helpful AI assistant.",
 		description: "System prompt that guides the agent behavior",
-	},
-	{
-		displayName: "Prompt Type",
-		name: "promptType",
-		type: "select",
-		default: "define",
-		options: [
-			{ name: "From Previous Node", value: "auto" },
-			{ name: "Define Below", value: "define" },
-		],
-		description: "Where the agent prompt comes from",
 	},
 	{
 		displayName: "User Prompt",
@@ -64,6 +53,7 @@ export const agentProperties: NodeProperty[] = [
 		name: "outputParserNotice",
 		type: "notice",
 		default: "",
+		noDataExpression: true,
 		displayOptions: {
 			show: {
 				hasOutputParser: [true],
@@ -111,3 +101,5 @@ export const agentProperties: NodeProperty[] = [
 		description: "Controls response randomness (0-2)",
 	},
 ];
+
+// TODO: Move specific model paramters to individual model settings from model registry

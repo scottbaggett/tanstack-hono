@@ -18,7 +18,8 @@ interface WorkflowNodeProps {
 		description?: string;
 		icon?: string;
 		color?: string;
-		executionStatus?: "success" | "error";
+		executionStatus?: "pending" | "running" | "completed" | "failed" | "skipped" | "success" | "error";
+		stage?: number;
 	};
 	isConnecting?: boolean;
 	isSelected?: boolean;
@@ -44,18 +45,24 @@ export const WorkflowNode = memo(function WorkflowNode({
 				flex items-center justify-center
 				transition-all duration-200 size-24
 				${
-					data.executionStatus === "success"
+					data.executionStatus === "completed" || data.executionStatus === "success"
 						? "bg-green-10/50 border-green-9/50"
-						: data.executionStatus === "error"
-							? "bg-red-10/50 border-red-9/50"
-							: "bg-node/80 border-node-border/50"
+						: data.executionStatus === "failed" || data.executionStatus === "error"
+						? "bg-red-10/50 border-red-9/50"
+						: data.executionStatus === "running"
+						? "bg-yellow-10/50 border-yellow-9/50"
+						: data.executionStatus === "pending"
+						? "bg-gray-10/50 border-gray-9/50 opacity-60"
+						: data.executionStatus === "skipped"
+						? "bg-gray-10/30 border-gray-9/30 opacity-40"
+						: "bg-node/80 border-node-border/50"
 				}
 				${
 					isSelected
 						? "shadow-lg shadow-node-border"
 						: data.executionStatus
-							? ""
-							: "hover:border-node-border"
+						? ""
+						: "hover:border-node-border"
 				}
 				${isConnecting ? "opacity-50" : "opacity-100"}`}
 			>
@@ -92,14 +99,35 @@ export const WorkflowNode = memo(function WorkflowNode({
 				)}
 
 				{/* Execution Status Badge */}
-				{data.executionStatus === "success" && (
-					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-green-9 border-2 border-surface-1 flex items-center justify-center">
-						<LucideIcon name="check" className="size-3 text-foreground" />
+				{(data.executionStatus === "completed" || data.executionStatus === "success") && (
+					<div className="absolute bottom-1.5 right-1.5">
+						<LucideIcon name="check" className="size-5 text-foreground" />
 					</div>
 				)}
-				{data.executionStatus === "error" && (
+				{(data.executionStatus === "failed" || data.executionStatus === "error") && (
 					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-red-9 border-2 border-surface-1 flex items-center justify-center">
 						<LucideIcon name="x" className="size-3 text-foreground" />
+					</div>
+				)}
+				{data.executionStatus === "running" && (
+					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-yellow-9 border-2 border-surface-1 flex items-center justify-center">
+						<LucideIcon name="loader-2" className="size-3 text-foreground animate-spin" />
+					</div>
+				)}
+				{data.executionStatus === "pending" && (
+					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-gray-9 border-2 border-surface-1 flex items-center justify-center">
+						<LucideIcon name="clock" className="size-3 text-foreground" />
+					</div>
+				)}
+				{data.executionStatus === "skipped" && (
+					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-gray-9/50 border-2 border-surface-1 flex items-center justify-center">
+						<LucideIcon name="skip-forward" className="size-3 text-foreground" />
+					</div>
+				)}
+				{/* Stage Indicator */}
+				{data.stage !== undefined && (
+					<div className="absolute -top-2 -left-2 size-6 rounded-full bg-primary border-2 border-surface-1 flex items-center justify-center text-xs font-semibold">
+						{data.stage}
 					</div>
 				)}
 			</div>

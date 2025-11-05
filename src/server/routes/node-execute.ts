@@ -11,15 +11,15 @@ import type { OrchestrationConfig } from "../execution/WorkflowOrchestrator";
 import { WorkflowOrchestrator } from "../execution/WorkflowOrchestrator";
 import "@/server/nodes/load"; // Ensure nodes are loaded
 
-export const nodeExecuteRoutes = new Hono();
+const nodeExecuteRoutes = new Hono();
 
 /**
- * POST /nodes/:testNodeId/execute - Execute a node with upstream context
+ * POST /nodes/:nodeId/execute - Execute a node with upstream context
  *
  * Request body:
  * {
  *   "workflowDefinition": { "nodes": [...], "edges": [...] },
- *   "testNodeId": "node-123",
+ *   "nodeId": "node-123",
  *   "parameters": { "param1": "value1", ... },
  *   "pinnedData": { "upstream-node-id": {...} }
  * }
@@ -31,15 +31,15 @@ export const nodeExecuteRoutes = new Hono();
  * 4. Execute the test node with new parameters
  * 5. Return the test node's output
  */
-nodeExecuteRoutes.post("/:testNodeId", async (c) => {
-	const testNodeId = c.req.param("testNodeId");
+nodeExecuteRoutes.post("/:nodeId", async (c) => {
+	const nodeId = c.req.param("nodeId");
 
 	try {
 		const body = await c.req.json();
-		const { workflowDefinition, parameters = {}, pinnedData = {} } = body;
+		const { workflowDefinition, parameters = {} } = body;
 
 		console.log("Node execute request:", {
-			testNodeId,
+			nodeId,
 			bodyKeys: Object.keys(body),
 			hasWorkflowDef: !!workflowDefinition,
 		});
@@ -56,13 +56,16 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 
 		// Find the test node in the definition
 		const testNodeDef = workflowDefinition.nodes.find(
-			(n: any) => n.id === testNodeId,
+			(n: any) => n.id === nodeId,
 		);
+
+		console.log("Test node definition:", testNodeDef);
+
 		if (!testNodeDef) {
 			return c.json(
 				{
 					success: false,
-					error: `Test node "${testNodeId}" not found in workflow`,
+					error: `Test node "${nodeId}" not found in workflow`,
 				},
 				404,
 			);
@@ -82,15 +85,15 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 			}
 		};
 
-		findUpstream(testNodeId);
+		findUpstream(nodeId);
 
 		// Build modified workflow: only include test node and its upstream dependencies
 		const nodes = (workflowDefinition.nodes as any[]) || [];
 		const nodesToExecute = nodes
-			.filter((n: any) => n.id === testNodeId || upstreamNodeIds.has(n.id))
+			.filter((n: any) => n.id === nodeId || upstreamNodeIds.has(n.id))
 			.map((n: any) => {
 				// Merge parameters into the test node's propertyValues
-				if (n.id === testNodeId) {
+				if (n.id === nodeId) {
 					return {
 						...n,
 						data: {
@@ -106,7 +109,7 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 			});
 
 		// Build node ID set for quick lookup
-		const nodeIdSet = new Set([testNodeId, ...upstreamNodeIds]);
+		const nodeIdSet = new Set([nodeId, ...upstreamNodeIds]);
 
 		const modifiedDefinition = {
 			nodes: nodesToExecute,
@@ -123,7 +126,7 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 
 		// Create orchestration config
 		const config: OrchestrationConfig = {
-			workflowId: `test-node-${testNodeId}`,
+			workflowId: `test-node-${nodeId}`,
 			runId,
 			definition: modifiedDefinition,
 			inputs: {},
@@ -140,18 +143,18 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 		const result = await orchestrator.orchestrate();
 
 		// Extract output from test node
-		const nodeResult = result.nodeResults.get(testNodeId);
+		const nodeResult = result.nodeResults.get(nodeId);
 
 		if (!nodeResult) {
 			console.error("[NODE-EXECUTE] Node result not found:", {
-				testNodeId,
+				nodeId,
 				availableNodes: Array.from(result.nodeResults.keys()),
 				executionErrors: result.errors,
 			});
 			return c.json(
 				{
 					success: false,
-					error: `No execution result found for node ${testNodeId}`,
+					error: `No execution result found for node ${nodeId}`,
 					debug: {
 						availableNodes: Array.from(result.nodeResults.keys()),
 						errors: result.errors.map((e) => e.error.message),
@@ -161,39 +164,50 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 			);
 		}
 
-		// Extract the main output data
-		const mainOutput = nodeResult.data?.main?.[0];
+		// Build runData for ALL executed nodes (not just the target node)
+		// This allows the UI to update execution cache and expression context
+		const runData: Record<string, any> = {};
+
+		for (const [executedNodeId, executedResult] of result.nodeResults.entries()) {
+			const mainOutput = executedResult.data?.main?.[0];
+			const hasError = executedResult.status === "error";
+
+			runData[executedNodeId] = [
+				{
+					data: hasError
+						? null
+						: {
+								json: mainOutput?.json || {},
+								binary: mainOutput?.binary || null,
+							},
+					error:
+						hasError && executedResult.error
+							? {
+									message: executedResult.error.message,
+									stack: executedResult.error.stack,
+									name: executedResult.error.name,
+								}
+							: null,
+					startTime: executedResult.startTime,
+					executionTime: executedResult.durationMs,
+					metadata: {
+						executedAt: new Date(executedResult.endTime).toISOString(),
+					},
+				},
+			];
+		}
+
+		// Add metadata to the target node result
+		if (runData[nodeId]?.[0]) {
+			runData[nodeId][0].metadata.upstreamNodes = Array.from(upstreamNodeIds);
+		}
+
 		const hasError = nodeResult.status === "error";
 
 		// Clean response structure matching n8n format
 		return c.json({
 			success: !hasError,
-			runData: {
-				[testNodeId]: [
-					{
-						data: hasError
-							? null
-							: {
-									json: mainOutput?.json || {},
-									binary: mainOutput?.binary || null,
-								},
-						error:
-							hasError && nodeResult.error
-								? {
-										message: nodeResult.error.message,
-										stack: nodeResult.error.stack,
-										name: nodeResult.error.name,
-									}
-								: null,
-						startTime: nodeResult.startTime,
-						executionTime: nodeResult.durationMs,
-						metadata: {
-							executedAt: new Date(nodeResult.endTime).toISOString(),
-							upstreamNodes: Array.from(upstreamNodeIds),
-						},
-					},
-				],
-			},
+			runData,
 		});
 	} catch (error) {
 		console.error("Node execution error:", error);
@@ -211,3 +225,5 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 		);
 	}
 });
+
+export default nodeExecuteRoutes;
