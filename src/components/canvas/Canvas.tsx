@@ -75,6 +75,11 @@ export function Canvas({
 	const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 	const [showConfig, setShowConfig] = useState(false);
 
+	// Track execution results per node (for visual indicators and input data)
+	const [executionCache, setExecutionCache] = useState<
+		Record<string, Record<string, unknown>>
+	>({});
+
 	// Track the last synced definition to prevent unnecessary updates
 	const lastSyncedDefinitionRef = useRef<string>("");
 
@@ -132,6 +137,81 @@ export function Canvas({
 		},
 		[setNodes]
 	);
+
+	// Handle execution results from node test runs
+	const handleExecutionComplete = useCallback(
+		(_nodeId: string, runData: Record<string, unknown>) => {
+			// Merge the runData into execution cache
+			// runData is the full execution result with all nodes that were executed
+			setExecutionCache((cache) => {
+				const newCache = { ...cache };
+				// Merge each node's execution data
+				for (const [nodeId, nodeData] of Object.entries(runData)) {
+					newCache[nodeId] = nodeData as Record<string, unknown>;
+				}
+				return newCache;
+			});
+
+			// Mark all executed nodes with their execution status (success or error)
+			setNodes((nds) =>
+				nds.map((node) => {
+					const nodeRunData = runData[node.id];
+					if (!nodeRunData) return node;
+
+					// Extract the first run result (runData[nodeId] is an array)
+					const runResult = Array.isArray(nodeRunData)
+						? nodeRunData[0]
+						: null;
+					if (!runResult) return node;
+
+					// Determine execution status: success if data exists, error if error exists
+					const hasError = runResult.error !== null && runResult.error !== undefined;
+					const hasSuccess = runResult.data !== null && runResult.data !== undefined;
+
+					return {
+						...node,
+						data: {
+							...node.data,
+							executionStatus: hasError ? "error" : hasSuccess ? "success" : undefined,
+						},
+					};
+				})
+			);
+		},
+		[setNodes]
+	);
+
+	// Update edge styles based on execution state
+	useEffect(() => {
+		setEdges((eds) =>
+			eds.map((edge) => {
+				const sourceNode = nodes.find((n) => n.id === edge.source);
+				const targetNode = nodes.find((n) => n.id === edge.target);
+
+				const sourceStatus = sourceNode?.data?.executionStatus;
+				const targetStatus = targetNode?.data?.executionStatus;
+
+				// Edge is green only if both nodes executed successfully
+				const isSuccess = sourceStatus === "success" && targetStatus === "success";
+				// Edge is red if either node has an error
+				const hasError = sourceStatus === "error" || targetStatus === "error";
+
+				return {
+					...edge,
+					animated: isSuccess,
+					style: {
+						...edge.style,
+						stroke: isSuccess
+							? "rgb(48, 164, 108)" // green-9
+							: hasError
+								? "rgb(229, 62, 62)" // red-9
+								: undefined,
+						strokeWidth: isSuccess || hasError ? 2 : 1,
+					},
+				};
+			})
+		);
+	}, [nodes, setEdges]);
 
 	// Handle new connections
 	const onConnect = useCallback(
@@ -361,6 +441,7 @@ export function Canvas({
 						}
 					}}
 					onUpdateNode={handleUpdateNodeData}
+					onExecutionComplete={handleExecutionComplete}
 					workflowEdges={
 						edges as Array<{
 							source: string;
@@ -371,6 +452,7 @@ export function Canvas({
 					}
 					allNodes={nodes}
 					nodeRegistry={nodesRegistry}
+					executionCache={executionCache}
 				/>
 			)}
 		</div>
