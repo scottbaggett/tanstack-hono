@@ -16,12 +16,12 @@ import type { Tool } from "@langchain/core/tools";
 // Note: BufferMemory was removed in LangChain 1.0 - using LangGraph state instead
 // import { BufferMemory } from "langchain/memory";
 
-import type { IWorkflowDefinition } from "../../types/interfaces";
-import type { INodeExecutionData } from "../../types/execution";
+import type { IWorkflowDefinition, INodeExecutionData } from "../../types/interfaces";
 import type { StreamEvent } from "../../types/execution";
 import { nodeRegistry } from "../nodes/registry";
 import { ExecuteFunctions } from "./ExecuteFunctions";
 import { resolveInputs } from "./InputResolver";
+import { evaluateTemplate, type ExpressionContext } from "../lib/expressions";
 import type {
 	EngineRequest,
 	RequestResponseMetadata,
@@ -280,13 +280,21 @@ export class WorkflowOrchestrator {
 
 		this.config.logger.debug(`[${nodeId}] Input data:`, inputData);
 
+		// Evaluate expressions in node parameters
+		const evaluatedParameters = this.evaluateNodeParameters(
+			nodeParameters,
+			inputData,
+			nodeId,
+			nodeType
+		);
+
 		// Create execution context
 		const executeFunctions = new ExecuteFunctions(
 			nodeId,
 			nodeType,
 			nodeVersion,
 			this.config.runId,
-			nodeParameters,
+			evaluatedParameters,
 			inputData,
 			{}, // nodeCredentials - TODO: Extract from node config
 			this.state,
@@ -564,6 +572,71 @@ export class WorkflowOrchestrator {
 		};
 
 		return context;
+	}
+
+	/**
+	 * Evaluate expressions in node parameters
+	 * Resolves {{expression}} syntax using data from connected nodes
+	 */
+	private evaluateNodeParameters(
+		parameters: Record<string, unknown>,
+		inputData: Record<string, INodeExecutionData[]>,
+		nodeId: string,
+		nodeType: string
+	): Record<string, unknown> {
+		// Build expression context from input data
+		const context: ExpressionContext = {
+			node: {
+				id: nodeId,
+				type: nodeType,
+				version: 1,
+			},
+		};
+
+		// Get first input's data for simple json/binary access
+		const inputKeys = Object.keys(inputData);
+		if (inputKeys.length > 0) {
+			const firstInput = inputData[inputKeys[0]];
+			if (firstInput && firstInput[0]) {
+				context.json = firstInput[0].json as Record<string, any>;
+				context.binary = firstInput[0].binary as Record<string, any> | undefined;
+			}
+		}
+
+		// Add all inputs for multi-input access
+		if (inputKeys.length > 1) {
+			context.inputs = {};
+			for (const key of inputKeys) {
+				const input = inputData[key];
+				if (input && input[0]) {
+					context.inputs[key] = {
+						json: input[0].json as Record<string, any>,
+						binary: input[0].binary as Record<string, any> | undefined,
+					};
+				}
+			}
+		}
+
+		// Recursively evaluate all string parameters
+		const evaluateValue = (value: unknown): unknown => {
+			if (typeof value === 'string') {
+				const result = evaluateTemplate(value, context);
+				return result.success ? result.value : value;
+			}
+			if (Array.isArray(value)) {
+				return value.map(evaluateValue);
+			}
+			if (value && typeof value === 'object') {
+				const evaluated: Record<string, unknown> = {};
+				for (const [k, v] of Object.entries(value)) {
+					evaluated[k] = evaluateValue(v);
+				}
+				return evaluated;
+			}
+			return value;
+		};
+
+		return evaluateValue(parameters) as Record<string, unknown>;
 	}
 
 	/**
