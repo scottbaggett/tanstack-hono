@@ -56,7 +56,34 @@ See `docs/agents/` for full implementation plan and status.
 
 ### Development Rules
 
-- We are EARLY in the build, do not worry about backward compatibility!
+- We are EARLY in build, do not worry about backward compatibility!
 - Don't commit your work until you are asked.
 - Tool registration happens in `src/server/nodes/load.ts`
 - All tools must have Zod schemas for validation
+
+### Testing Guidelines
+
+- **Use Vitest** for all new tests (project standard)
+- **Test location**: Place tests in `__tests__/` directories next to source files
+- **Test structure**: Use `describe/it/expect` pattern from Vitest
+- **Test naming**: Name files `*.test.ts` (not `test-*.ts`)
+- **Manual test files**: Convert root-level `test-*.ts` files to proper Vitest tests
+- **Run tests**: Use `npm test` to run Vitest, `npm run test:ui` for watch mode
+- **Coverage**: Aim for test coverage on core utilities and business logic
+
+#### Test File Organization
+```
+src/server/lib/
+├── crypto.ts
+├── expressions.ts
+└── __tests__/
+    ├── credentials.test.ts
+    └── expressions.test.ts
+```
+
+#### Test Patterns
+- **Unit tests**: Test individual functions in isolation
+- **Integration tests**: Test component interactions
+- **Error cases**: Always test failure scenarios
+- **Edge cases**: Test boundary conditions and invalid inputs
+- **Security tests**: For encryption/auth, test wrong keys, tampered data

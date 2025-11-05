@@ -58,8 +58,54 @@ export async function executeAgent(
 		throw new Error("Agent execution cancelled");
 	}
 
-	// Get real LangChain components from connections
-	const model = await getChatModel(context);
+	// Get model from properties or connection
+	let model;
+
+	// Get model from evaluatedProperties
+	const modelFromProperty = evaluatedProperties.model as string | undefined;
+
+	if (modelFromProperty) {
+		// Use model from node properties (simplified approach)
+		const { ChatOpenAI } = await import('@langchain/openai');
+		const { ChatAnthropic } = await import('@langchain/anthropic');
+		const { getModel } = await import('@/server/models/registry');
+
+		const modelConfig = getModel(modelFromProperty);
+		if (!modelConfig) {
+			throw new Error(`Unknown model: ${modelFromProperty}`);
+		}
+
+		// Create the appropriate model instance based on provider
+		if (modelConfig.provider === 'openai') {
+			const modelOptions: any = {
+				modelName: modelFromProperty,
+			};
+
+			// Only add temperature if the model supports it
+			if (modelConfig.supports_temp) {
+				modelOptions.temperature = temperature || 0.7;
+			}
+
+			model = new ChatOpenAI(modelOptions);
+		} else if (modelConfig.provider === 'anthropic') {
+			const modelOptions: any = {
+				modelName: modelFromProperty,
+			};
+
+			// Only add temperature if the model supports it
+			if (modelConfig.supports_temp) {
+				modelOptions.temperature = temperature || 0.7;
+			}
+
+			model = new ChatAnthropic(modelOptions);
+		} else {
+			throw new Error(`Unsupported provider: ${modelConfig.provider}`);
+		}
+	} else {
+		// Fall back to connection-based model
+		model = await getChatModel(context);
+	}
+
 	const langchainTools = await getTools(context);
 	// const memory = await getOptionalMemory(context); // TODO: Implement memory support
 
@@ -163,13 +209,10 @@ export async function executeAgent(
 			finalState: "success",
 		});
 
+		// Clean output structure: just the result for downstream nodes
 		const result: INodeExecutionData = {
 			json: {
-				status: "success",
 				output: finalState.finalOutput || "No output",
-				iterations: iterationCount + 1,
-				systemPrompt,
-				userPrompt,
 			},
 		};
 

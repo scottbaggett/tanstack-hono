@@ -2,7 +2,7 @@
  * Workflow Node Component
  *
  * Represents a single node in the workflow canvas
- * Displays node inputs and outputs as connection handles
+ * Single input/output handles for simple data flow
  * Uses node palette colors from @src/styles/node-palettes.css
  */
 
@@ -18,8 +18,6 @@ interface WorkflowNodeProps {
 		description?: string;
 		icon?: string;
 		color?: string;
-		inputs?: Array<{ name: string; displayName: string; type: string }>;
-		outputs?: Array<{ name: string; displayName: string; type: string }>;
 	};
 	isConnecting?: boolean;
 	isSelected?: boolean;
@@ -48,18 +46,33 @@ export const WorkflowNode = memo(function WorkflowNode({
 				${isSelected ? "shadow-lg shadow-node-border" : "hover:border-node-border"}
 				${isConnecting ? "opacity-50" : "opacity-100"}`}
 			>
-				<div className="absolute top-0 left-0 right-0 bottom-0">
-					<Handle
-						type="target"
-						position={Position.Left}
-						className="size-4!"
-						style={{
-							border: "none",
-							background: "var(--color-node-input)",
-						}}
-					/>
-					<Handle type="source" position={Position.Right} />
-				</div>
+				{/* Single Input Handle (Left Side) */}
+				<Handle
+					type="target"
+					position={Position.Left}
+					id="input"
+					className="size-3 -translate-x-1/2 hover:scale-125 transition-transform"
+					style={{
+						border: "2px solid var(--color-node-border)",
+						background: "var(--color-node-input)",
+						top: "50%",
+						left: 0,
+					}}
+				/>
+
+				{/* Single Output Handle (Right Side) */}
+				<Handle
+					type="source"
+					position={Position.Right}
+					id="output"
+					className="size-3 translate-x-1/2 hover:scale-125 transition-transform"
+					style={{
+						border: "2px solid var(--color-node-border)",
+						background: "var(--color-node-output)",
+						top: "50%",
+						right: 0,
+					}}
+				/>
 
 				{nodeIcon && (
 					<LucideIcon name={nodeIcon} className="size-10 shrink-0 " />

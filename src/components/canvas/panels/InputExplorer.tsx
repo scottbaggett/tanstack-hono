@@ -88,16 +88,10 @@ export function InputExplorer({
 					const isExpanded = expandedNodes.has(node.id);
 
 					// Extract json data from execution results
-					// Results are [[{ json: {...}, binary: {...} }]]
-					const jsonData =
-						nodeResults && Array.isArray(nodeResults)
-							? nodeResults[0]?.[0]?.json
-							: null;
-
-					const binaryData =
-						nodeResults && Array.isArray(nodeResults)
-							? nodeResults[0]?.[0]?.binary
-							: null;
+					// nodeResults is the runData array: [{ data: { json, binary }, ... }]
+					const nodeRun = Array.isArray(nodeResults) ? nodeResults[0] : null;
+					const jsonData = nodeRun?.data?.json || null;
+					const binaryData = nodeRun?.data?.binary || null;
 
 					return (
 						<div key={node.id} className="border-b border-surface-6">

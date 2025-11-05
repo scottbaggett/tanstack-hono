@@ -75,8 +75,6 @@ async function planNode(
 	model: BaseChatModel,
 	tools: Tool[],
 ): Promise<Partial<AgentGraphState>> {
-	console.log(`[PLAN] Iteration ${state.iteration + 1}`);
-
 	// Increment iteration
 	const iteration = state.iteration + 1;
 

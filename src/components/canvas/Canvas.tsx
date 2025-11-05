@@ -18,7 +18,7 @@ import {
 	useEdgesState,
 	useNodesState,
 } from "@xyflow/react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "@xyflow/react/dist/style.css";
 import { useNodeRegistry } from "@/hooks/use-node-registry";
 import {
@@ -74,12 +74,26 @@ export function Canvas({
 
 	const [selectedNode, setSelectedNode] = useState<Node | null>(null);
 	const [showConfig, setShowConfig] = useState(false);
-	const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(
-		null
-	);
 
-	// Sync nodes and edges when workflow loads
+	// Track the last synced definition to prevent unnecessary updates
+	const lastSyncedDefinitionRef = useRef<string>("");
+
+	// Sync nodes and edges when workflow loads (only if definition actually changed)
 	useEffect(() => {
+		// Create a hash of the current definition to compare
+		const currentDefinitionHash = JSON.stringify({
+			nodes: workflow?.definition?.nodes,
+			edges: workflow?.definition?.edges,
+		});
+
+		// Only sync if the definition actually changed
+		if (currentDefinitionHash === lastSyncedDefinitionRef.current) {
+			return;
+		}
+
+		// Update last synced definition
+		lastSyncedDefinitionRef.current = currentDefinitionHash;
+
 		if (
 			workflow?.definition?.nodes &&
 			Array.isArray(workflow.definition.nodes)
@@ -98,44 +112,6 @@ export function Canvas({
 		setNodes,
 		setEdges,
 	]);
-
-	// Auto-save workflow when nodes or edges change
-	useEffect(() => {
-		// Skip auto-save if workflow hasn't loaded yet
-		if (!workflowId) return;
-
-		// Skip auto-save during initial load
-		if (nodes.length === 0 && edges.length === 0) return;
-
-		// Clear existing timer
-		if (autoSaveTimer) {
-			clearTimeout(autoSaveTimer);
-		}
-
-		// Set new timer to save after 1 second of inactivity
-		const timer = setTimeout(async () => {
-			try {
-				await updateWorkflow.mutateAsync({
-					workflowId,
-					definition: {
-						nodes,
-						edges,
-						viewport: { x: 0, y: 0, zoom: 1 },
-					},
-				});
-				console.log("Workflow auto-saved");
-			} catch (error) {
-				console.error("Auto-save failed:", error);
-			}
-		}, 1000);
-
-		setAutoSaveTimer(timer);
-
-		// Cleanup timer on unmount
-		return () => {
-			if (timer) clearTimeout(timer);
-		};
-	}, [nodes, edges, workflowId, autoSaveTimer, updateWorkflow]); // Only depend on nodes, edges, and workflowId
 
 	// Handle node property updates
 	const handleUpdateNodeData = useCallback(
@@ -209,19 +185,23 @@ export function Canvas({
 	// Save workflow (create if doesn't exist, update if exists)
 	const handleSave = useCallback(async () => {
 		try {
+			const definition = {
+				nodes,
+				edges,
+				viewport: { x: 0, y: 0, zoom: 1 },
+			};
+
 			if (!workflowId) {
 				// Create new workflow
 				const result = await createWorkflow.mutateAsync({
 					name: "Untitled Workflow",
 					description: "Created from canvas",
-					definition: {
-						nodes,
-						edges,
-						viewport: { x: 0, y: 0, zoom: 1 },
-					},
+					definition,
 				});
 				if (result?.id) {
 					setWorkflowId(result.id);
+					// Update last synced definition to match what we just saved
+					lastSyncedDefinitionRef.current = JSON.stringify(definition);
 					// Navigate to the workflow URL so it persists on refresh
 					await navigate({
 						to: "/workflow/$workflowId",
@@ -232,12 +212,10 @@ export function Canvas({
 				// Update existing workflow
 				await updateWorkflow.mutateAsync({
 					workflowId,
-					definition: {
-						nodes,
-						edges,
-						viewport: { x: 0, y: 0, zoom: 1 },
-					},
+					definition,
 				});
+				// Update last synced definition to match what we just saved
+				lastSyncedDefinitionRef.current = JSON.stringify(definition);
 			}
 		} catch (error) {
 			console.error("Failed to save workflow:", error);
@@ -252,15 +230,15 @@ export function Canvas({
 			if (!data) return;
 
 			try {
-				const { nodeId } = JSON.parse(data);
+				const { nodeId: nodeType } = JSON.parse(data);
 
 				// Find the node definition from registry
 				const nodeDefinition = nodesRegistry?.nodes?.find(
-					(n) => n.id === nodeId
+					(n) => n.id === nodeType
 				);
 
 				if (!nodeDefinition) {
-					console.warn(`Node definition not found for: ${nodeId}`);
+					console.warn(`Node definition not found for: ${nodeType}`);
 					return;
 				}
 
@@ -270,16 +248,16 @@ export function Canvas({
 					`node-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
 				// Generate human-readable name
-				const autoName = getAutoName(nodeId, nodes);
+				const autoName = getAutoName(nodeType, nodes);
 
 				// Create new node at drop position with full definition data
 				const newNode: Node = {
 					id: nodeInstanceId,
 					type: "workflow",
 					data: {
-						label: nodeDefinition.displayName || nodeId,
+						label: nodeDefinition.displayName || nodeType,
 						name: autoName,
-						nodeId,
+						nodeType,
 						displayName: nodeDefinition.displayName,
 						description: nodeDefinition.description,
 						icon: nodeDefinition.icon,

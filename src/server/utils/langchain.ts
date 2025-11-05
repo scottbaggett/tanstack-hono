@@ -8,9 +8,8 @@ import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMemory } from '@langchain/core/memory';
 import { DynamicStructuredTool } from '@langchain/core/tools';
-import type { ExecutionContext } from '@/types/interfaces';
+import type { IExecutionContext } from '@/types/interfaces';
 import type { AgentTool } from '@/server/types/agent';
-import { z } from 'zod';
 
 // ============================================================================
 // Model Configuration
@@ -32,7 +31,7 @@ export interface ModelConfig {
  * @returns Configured BaseChatModel instance
  */
 export async function getChatModel(
-	context: ExecutionContext,
+	context: IExecutionContext,
 	inputKey: string = 'languageModel',
 ): Promise<BaseChatModel> {
 	const modelInput = context.inputs[inputKey];
@@ -128,7 +127,7 @@ export function convertToLangChainTool(tool: AgentTool): DynamicStructuredTool {
  * @returns Array of LangChain tools
  */
 export async function getTools(
-	context: ExecutionContext,
+	context: IExecutionContext,
 	inputKey: string = 'tools',
 ): Promise<DynamicStructuredTool[]> {
 	const toolsInput = context.inputs[inputKey];
@@ -166,7 +165,7 @@ export async function getTools(
  * @returns BaseMemory instance or undefined
  */
 export async function getMemory(
-	context: ExecutionContext,
+	context: IExecutionContext,
 	inputKey: string = 'memory',
 ): Promise<BaseMemory | undefined> {
 	const memoryInput = context.inputs[inputKey];
@@ -184,7 +183,7 @@ export async function getMemory(
  * Get optional memory (returns undefined instead of throwing)
  */
 export async function getOptionalMemory(
-	context: ExecutionContext,
+	context: IExecutionContext,
 	inputKey: string = 'memory',
 ): Promise<BaseMemory | undefined> {
 	try {
@@ -206,7 +205,7 @@ export async function getOptionalMemory(
  * @returns Output parser instance or undefined
  */
 export async function getOutputParser(
-	context: ExecutionContext,
+	context: IExecutionContext,
 	inputKey: string = 'outputParser',
 ): Promise<any | undefined> {
 	const parserInput = context.inputs[inputKey];
@@ -227,7 +226,7 @@ export async function getOutputParser(
  * Get all connected tools including registered tools
  */
 export async function getAllTools(
-	context: ExecutionContext,
+	context: IExecutionContext,
 ): Promise<DynamicStructuredTool[]> {
 	const connectedTools = await getTools(context);
 

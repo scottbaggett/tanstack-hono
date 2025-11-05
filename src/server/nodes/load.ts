@@ -6,6 +6,7 @@
  */
 
 import { Agent } from './agent/Agent';
+import { ChatModel } from './model/ChatModel';
 import { TextInput } from './input/TextInput';
 import { Output } from './output/Output';
 import { ExecuteCommand } from './utility/ExecuteCommand';
@@ -48,6 +49,19 @@ export function loadNodes(): void {
 		codex: outputNode.description.codex,
 	});
 	console.log('✓ Registered output node');
+
+	// Chat Model node
+	const chatModelNode = new ChatModel();
+	nodeRegistry.register(chatModelNode, {
+		displayName: chatModelNode.description.displayName,
+		name: chatModelNode.description.name,
+		icon: chatModelNode.description.icon,
+		iconColor: chatModelNode.description.iconColor,
+		category: chatModelNode.description.category,
+		description: chatModelNode.description.description,
+		codex: chatModelNode.description.codex,
+	});
+	console.log('✓ Registered chat model node');
 
 	// Agent node
 	const agentNode = new Agent();

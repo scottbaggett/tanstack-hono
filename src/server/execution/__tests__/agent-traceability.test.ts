@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { WorkflowOrchestrator } from "../src/server/execution/WorkflowOrchestrator";
 import type { OrchestrationConfig } from "../src/server/execution/WorkflowOrchestrator";
-import type { WorkflowDefinition } from "../src/types/workflow";
+import type { IWorkflowDefinition } from "../src/types/interfaces";
 
 describe("Agent Traceability", () => {
 	let config: OrchestrationConfig;

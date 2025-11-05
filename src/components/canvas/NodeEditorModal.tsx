@@ -48,9 +48,28 @@ export function NodeEditorModal({
 	> | null>(null);
 	const [isExecuting, setIsExecuting] = useState(false);
 	// Track current form values (may differ from saved values)
+	// Initialize with defaults from property definitions, then override with saved values
 	const [currentPropertyValues, setCurrentPropertyValues] = useState<
 		Record<string, unknown>
-	>((nodeData.propertyValues as Record<string, unknown>) || {});
+	>(() => {
+		const nodeType = (selectedNode.data as any).nodeType || (selectedNode.data as any).nodeId;
+		const registryNode = nodeRegistry?.nodes?.find((n: any) => n.id === nodeType);
+		const properties = Array.isArray(registryNode?.properties) ? registryNode.properties : [];
+
+		// Build defaults from property definitions
+		const defaults: Record<string, unknown> = {};
+		for (const prop of properties) {
+			if (prop && typeof prop === 'object' && 'name' in prop && 'default' in prop) {
+				defaults[prop.name] = prop.default;
+			}
+		}
+
+		// Merge defaults with saved values (saved values take precedence)
+		return {
+			...defaults,
+			...((nodeData.propertyValues as Record<string, unknown>) || {}),
+		};
+	});
 
 	// Handle escape key to close modal
 	useEffect(() => {
@@ -121,8 +140,13 @@ export function NodeEditorModal({
 			}
 
 			const result = await response.json();
-			setExecutionResult(result.data.output);
-			setAllExecutionResults(result.data.results || {});
+			// Extract data from runData structure: runData[nodeId][0]
+			const nodeRun = result.runData?.[selectedNode.id]?.[0];
+			if (nodeRun) {
+				// Pass the entire nodeRun (contains both data and error)
+				setExecutionResult(nodeRun.error ? { error: nodeRun.error } : nodeRun.data);
+			}
+			setAllExecutionResults(result.runData || {});
 		} catch (error) {
 			console.error("Execution failed:", error);
 			const errorMessage =

@@ -47,10 +47,12 @@ export function ParametersPanel({
 	onPropertyValuesChange,
 }: ParametersPanelProps) {
 	const nodeData = selectedNode.data as Record<string, unknown>;
-	const nodeId = nodeData.nodeId as string;
+	// Support both new nodeType and legacy nodeId
+	const nodeType = (nodeData.nodeType || nodeData.nodeId) as string;
 
 	// Look up property and credential definitions from registry
-	const registryNode = nodeRegistry?.nodes?.find((n: any) => n.id === nodeId);
+	const registryNode = nodeRegistry?.nodes?.find((n: any) => n.id === nodeType);
+
 	const propertyDefinitions = Array.isArray(registryNode?.properties)
 		? (registryNode.properties as NodeProperty[])
 		: [];
@@ -96,7 +98,6 @@ export function ParametersPanel({
 	const handleDrop = (e: React.DragEvent, fieldName: string) => {
 		e.preventDefault();
 		const expression = e.dataTransfer.getData("text/plain");
-		console.log("Dropped:", expression, "on", fieldName);
 		if (expression) {
 			handlePropertyChange(fieldName, expression);
 		}
@@ -106,7 +107,7 @@ export function ParametersPanel({
 	const hasProperties = propertyDefinitions.length > 0;
 
 	// Check if this is a webhook node
-	const isWebhookNode = nodeId === "webhook";
+	const isWebhookNode = nodeType === "webhook";
 
 	// Generate webhook URL if this is a webhook node
 	const webhookUrl = isWebhookNode

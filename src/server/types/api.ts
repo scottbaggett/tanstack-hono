@@ -28,7 +28,7 @@ export type ApiResponse<T = unknown> = z.infer<typeof ApiResponseSchema> & {
 
 export const UserSchema = z.object({
 	id: z.string(),
-	email: z.email(),
+	email: z.string().email(),
 	username: z.string(),
 	fullName: z.string().nullable(),
 });
@@ -36,7 +36,7 @@ export const UserSchema = z.object({
 export type User = z.infer<typeof UserSchema>;
 
 export const RegisterRequestSchema = z.object({
-	email: z.email("Invalid email address"),
+	email: z.string().email("Invalid email address"),
 	username: z.string().min(3).max(100),
 	password: z.string().min(8),
 	fullName: z.string().max(255).optional(),
@@ -45,7 +45,7 @@ export const RegisterRequestSchema = z.object({
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 
 export const LoginRequestSchema = z.object({
-	email: z.email("Invalid email address"),
+	email: z.string().email("Invalid email address"),
 	password: z.string().min(1),
 });
 
@@ -70,7 +70,7 @@ export type AuthResponse = z.infer<typeof AuthResponseSchema>;
  * TODO: Create proper Zod schemas matching IWorkflowNode and IWorkflowEdge
  */
 export const WorkflowDefinitionSchema = z.object({
-	nodes: z.record(z.any()), // TODO: Proper IWorkflowNode schema
+	nodes: z.record(z.any(), z.any()), // TODO: Proper IWorkflowNode schema
 	edges: z.array(z.any()), // TODO: Proper IWorkflowEdge schema
 	viewport: z
 		.object({
@@ -139,7 +139,7 @@ export const WorkflowRunSchema = z.object({
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
 
 export const RunWorkflowRequestSchema = z.object({
-	inputs: z.record(z.unknown()).optional(),
+	inputs: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type RunWorkflowRequest = z.infer<typeof RunWorkflowRequestSchema>;
@@ -160,7 +160,7 @@ export const ExecutionEventSchema = z.object({
 	id: z.string(),
 	type: z.string(),
 	timestamp: z.string(),
-	data: z.record(z.unknown()).optional(),
+	data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ExecutionEvent = z.infer<typeof ExecutionEventSchema>;

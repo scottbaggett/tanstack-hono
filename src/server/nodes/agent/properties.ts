@@ -5,8 +5,21 @@
  */
 
 import type { NodeProperty } from '@/types/interfaces';
+import { getModelNames, getModelsByProvider } from '@/server/models/registry';
+
+// Get all available models from registry
+const allModelNames = getModelNames();
+const modelOptions = allModelNames.map(name => ({ name, value: name }));
 
 export const agentProperties: NodeProperty[] = [
+	{
+		displayName: 'Model',
+		name: 'model',
+		type: 'select',
+		default: 'gpt-5-mini',
+		options: modelOptions,
+		description: 'The AI model to use for the agent',
+	},
 	{
 		displayName: 'System Prompt',
 		name: 'systemPrompt',

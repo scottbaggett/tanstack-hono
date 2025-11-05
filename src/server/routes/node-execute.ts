@@ -6,9 +6,10 @@
  */
 
 import { Hono } from "hono";
-import { nodeRegistry } from "../nodes/registry";
-import { executeWorkflow } from "../execution/engine";
-import type { INodeType } from "@/types/interfaces";
+import { WorkflowOrchestrator } from "../execution/WorkflowOrchestrator";
+import type { OrchestrationConfig } from "../execution/WorkflowOrchestrator";
+import crypto from "crypto";
+import "@/server/nodes/load"; // Ensure nodes are loaded
 
 export const nodeExecuteRoutes = new Hono();
 
@@ -87,45 +88,106 @@ nodeExecuteRoutes.post("/:testNodeId", async (c) => {
 		const nodes = (workflowDefinition.nodes as any[]) || [];
 		const nodesToExecute = nodes.filter(
 			(n: any) => n.id === testNodeId || upstreamNodeIds.has(n.id),
-		);
+		).map((n: any) => {
+			// Merge parameters into the test node's propertyValues
+			if (n.id === testNodeId) {
+				return {
+					...n,
+					data: {
+						...n.data,
+						propertyValues: {
+							...(n.data?.propertyValues || {}),
+							...parameters,
+						},
+					},
+				};
+			}
+			return n;
+		});
+
+		// Build node ID set for quick lookup
+		const nodeIdSet = new Set([testNodeId, ...upstreamNodeIds]);
 
 		const modifiedDefinition = {
 			nodes: nodesToExecute,
 			edges: edges.filter(
 				(e: any) =>
-					upstreamNodeIds.has(e.source) ||
-					e.source === testNodeId ||
-					upstreamNodeIds.has(e.target),
+					// Both source and target must be in our node set
+					nodeIdSet.has(e.source) && nodeIdSet.has(e.target)
 			),
+			viewport: { x: 0, y: 0, zoom: 1 },
 		};
 
-		// Execute workflow up to and including the test node
-		const startTime = Date.now();
-		const executionResult = await executeWorkflow(
-			modifiedDefinition,
-			{},
-			c.req.raw.signal,
-			pinnedData,
-		);
-		const duration = Date.now() - startTime;
+		// Create a run ID for this execution (node testing - no workflow_runs record needed)
+		const runId = crypto.randomUUID();
+
+		// Create orchestration config
+		const config: OrchestrationConfig = {
+			workflowId: `test-node-${testNodeId}`,
+			runId,
+			definition: modifiedDefinition,
+			inputs: {},
+			langchainModels: new Map(),
+			langchainEmbeddings: new Map(),
+			langchainTools: [],
+			secrets: new Map(),
+			logger: console,
+			skipPersistence: true, // Don't persist to DB for node testing
+		};
+
+		// Execute workflow using WorkflowOrchestrator
+		const orchestrator = new WorkflowOrchestrator(config);
+		const result = await orchestrator.orchestrate();
 
 		// Extract output from test node
-		const testNodeOutput =
-			executionResult.results && executionResult.results[testNodeId]
-				? executionResult.results[testNodeId]
-				: null;
+		const nodeResult = result.nodeResults.get(testNodeId);
 
+		if (!nodeResult) {
+			console.error('[NODE-EXECUTE] Node result not found:', {
+				testNodeId,
+				availableNodes: Array.from(result.nodeResults.keys()),
+				executionErrors: result.errors,
+			});
+			return c.json(
+				{
+					success: false,
+					error: `No execution result found for node ${testNodeId}`,
+					debug: {
+						availableNodes: Array.from(result.nodeResults.keys()),
+						errors: result.errors.map(e => e.error.message),
+					}
+				},
+				500
+			);
+		}
+
+		// Extract the main output data
+		const mainOutput = nodeResult.data?.main?.[0];
+		const hasError = nodeResult.status === "error";
+
+		// Clean response structure matching n8n format
 		return c.json({
-			success: true,
-			data: {
-				nodeId: testNodeId,
-				output: testNodeOutput,
-				// Include all execution results for the frontend to use
-				results: executionResult.results || {},
-				duration,
-				executedAt: new Date().toISOString(),
-				upstreamNodesExecuted: Array.from(upstreamNodeIds),
-				pinnedDataUsed: Object.keys(pinnedData),
+			success: !hasError,
+			runData: {
+				[testNodeId]: [
+					{
+						data: hasError ? null : {
+							json: mainOutput?.json || {},
+							binary: mainOutput?.binary || null,
+						},
+						error: hasError && nodeResult.error ? {
+							message: nodeResult.error.message,
+							stack: nodeResult.error.stack,
+							name: nodeResult.error.name,
+						} : null,
+						startTime: nodeResult.startTime,
+						executionTime: nodeResult.durationMs,
+						metadata: {
+							executedAt: new Date(nodeResult.endTime).toISOString(),
+							upstreamNodes: Array.from(upstreamNodeIds),
+						},
+					},
+				],
 			},
 		});
 	} catch (error) {

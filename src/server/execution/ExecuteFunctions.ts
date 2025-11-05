@@ -62,6 +62,12 @@ export class ExecuteFunctions implements IExecuteFunctions {
 		return { ...this.nodeParameters };
 	}
 
+	// Compatibility: Provide evaluatedProperties as alias to nodeParameters
+	// This supports both IExecuteFunctions and IExecutionContext patterns
+	get evaluatedProperties(): Record<string, unknown> {
+		return this.nodeParameters;
+	}
+
 	// === Credentials ===
 
 	async getCredentials(type: string): Promise<Record<string, any>> {

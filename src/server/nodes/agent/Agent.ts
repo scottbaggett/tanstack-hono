@@ -49,8 +49,16 @@ export class Agent implements INodeType {
 				name: 'AI Agent',
 				color: 'standard-purple',
 			},
-			maxInputs: 1,   // One input connection
+			maxInputs: 1,   // One input connection for data flow
 			maxOutputs: 1,  // One output connection
+			inputs: [],  // No specialized inputs - using properties instead
+			outputs: [
+				{
+					displayName: 'Output',
+					name: 'output',
+					type: 'main',
+				},
+			],
 			properties: agentProperties,
 			hints: [
 				{

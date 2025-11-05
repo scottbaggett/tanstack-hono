@@ -13,22 +13,24 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { Embeddings } from "@langchain/core/embeddings";
 import type { Tool } from "@langchain/core/tools";
-import { BufferMemory } from "langchain/memory";
+// Note: BufferMemory was removed in LangChain 1.0 - using LangGraph state instead
+// import { BufferMemory } from "langchain/memory";
 
-import type { WorkflowDefinition } from "../../types/workflow";
+import type { IWorkflowDefinition } from "../../types/interfaces";
 import type { INodeExecutionData } from "../../types/execution";
 import type { StreamEvent } from "../../types/execution";
-import { nodeLoader } from "../nodes/Node";
+import { nodeRegistry } from "../nodes/registry";
 import { ExecuteFunctions } from "./ExecuteFunctions";
 import { resolveInputs } from "./InputResolver";
 import type {
 	EngineRequest,
-	EngineResponse,
 	RequestResponseMetadata,
 } from "../types/agent";
 import { handleEngineRequest } from "./requestHandler";
 import type { IExecutionContext } from "../../types/interfaces";
 import type { InternalTraceData, InternalStep } from "../db/schema";
+import { db } from "../db";
+import { nodeExecutions } from "../db/schema";
 
 // ============================================================================
 // TYPES
@@ -37,13 +39,14 @@ import type { InternalTraceData, InternalStep } from "../db/schema";
 export interface OrchestrationConfig {
 	workflowId: string;
 	runId: string;
-	definition: WorkflowDefinition;
+	definition: IWorkflowDefinition;
 	inputs?: Record<string, unknown>;
 	langchainModels: Map<string, BaseLanguageModel>;
 	langchainEmbeddings: Map<string, Embeddings>;
 	langchainTools: Tool[];
 	secrets: Map<string, string>;
 	logger: Console;
+	skipPersistence?: boolean; // Skip database persistence (for testing)
 }
 
 export type NodeExecutionMode = "execute" | "webhook" | "poll";
@@ -55,13 +58,16 @@ export interface NodeExecutionResult {
 	nodeId: string;
 	nodeType: string;
 	status: "success" | "error" | "skipped";
-	inputs: Record<string, unknown>;
-	outputs?: Record<string, INodeExecutionData[]>;
-	error?: Error;
-	events: StreamEvent[];
-	durationMs: number;
+	// Execution metadata
 	startTime: number;
 	endTime: number;
+	durationMs: number;
+	// Data flow
+	inputData: Record<string, unknown>; // Data received from upstream nodes
+	data?: Record<string, INodeExecutionData[]>; // Result data per output handle (n8n: resultData)
+	// Execution context
+	error?: Error;
+	events: StreamEvent[];
 	/** Agent-specific: Internal trace of agent loop iterations */
 	internalTrace?: InternalTraceData;
 }
@@ -96,26 +102,33 @@ export class WorkflowOrchestrator {
 	 * Conversation memory scoped to this workflow run
 	 * Shared across all agent nodes in the workflow
 	 * Created at run start, destroyed at run end (not persisted)
+	 *
+	 * Note: Disabled for LangChain 1.0 - memory is now handled via LangGraph state
 	 */
-	private conversationMemory?: BufferMemory;
+	// private conversationMemory?: BufferMemory;
 
 	constructor(private config: OrchestrationConfig) {
 		// Initialize memory if any agent node has memory input connected
-		this.conversationMemory = this.initializeMemoryIfNeeded();
+		// Disabled for LangChain 1.0 upgrade
+		// this.conversationMemory = this.initializeMemoryIfNeeded();
 	}
 
 	/**
 	 * Check if any agent node has a memory input connected
 	 * If so, create a BufferMemory instance for this run
+	 *
+	 * Note: Disabled for LangChain 1.0 - memory is now handled via LangGraph state
 	 */
+	/*
 	private initializeMemoryIfNeeded(): BufferMemory | undefined {
 		const { nodes } = this.config.definition;
 		const { edges } = this.config.definition;
 
 		// Check if any agent node has a memory connection
-		const hasMemoryConnection = Object.values(nodes).some((node) => {
+		const hasMemoryConnection = nodes.some((node) => {
 			// Check if this is an agent node
-			if (node.data?.nodeType !== "agent") return false;
+			const nodeType = (node.data as any)?.nodeType || node.type;
+			if (nodeType !== "agent") return false;
 
 			// Check if any edge targets this node's memory input
 			return edges.some(
@@ -138,6 +151,7 @@ export class WorkflowOrchestrator {
 
 		return undefined;
 	}
+	*/
 
 	/**
 	 * Execute the workflow
@@ -158,7 +172,7 @@ export class WorkflowOrchestrator {
 
 			// Execute each node
 			for (const nodeId of executionOrder) {
-				const node = this.config.definition.nodes[nodeId];
+				const node = this.config.definition.nodes.find(n => n.id === nodeId);
 
 				if (!node) {
 					const error = new Error(
@@ -186,6 +200,9 @@ export class WorkflowOrchestrator {
 			}
 
 			const endTime = Date.now();
+
+			// Persist node executions to database
+			await this.persistNodeExecutions();
 
 			return {
 				workflowId: this.config.workflowId,
@@ -234,16 +251,25 @@ export class WorkflowOrchestrator {
 	 */
 	private async executeNode(nodeId: string, nodeData: any): Promise<void> {
 		const startTime = Date.now();
-		const nodeType = nodeData.data?.nodeType;
-		const nodeVersion = nodeData.data?.nodeVersion || 1;
-		const nodeParameters = nodeData.data?.nodeInputs || {};
+		// Node type is stored in data.nodeType (or legacy data.nodeId for backward compatibility)
+		const nodeType = nodeData.data?.nodeType || nodeData.data?.nodeId;
+		const nodeVersion = nodeData.data?.nodeVersion || nodeData.version || 1;
+		// Merge nodeInputs (connection-based) with propertyValues (user-entered in UI)
+		const nodeParameters = {
+			...(nodeData.data?.nodeInputs || {}),
+			...(nodeData.data?.propertyValues || {}),
+		};
+
+		if (!nodeType) {
+			throw new Error(`Node ${nodeId} is missing nodeType/nodeId in data. Node data: ${JSON.stringify(nodeData.data)}`);
+		}
 
 		this.config.logger.info(
 			`[${nodeId}] Starting execution (type: ${nodeType})`,
 		);
 
 		// Get node implementation
-		const nodeInstance = nodeLoader.getCurrentNodeType(nodeType);
+		const nodeInstance = nodeRegistry.getNodeType(nodeType);
 
 		if (!nodeInstance) {
 			throw new Error(`Node type "${nodeType}" not found in registry`);
@@ -386,6 +412,13 @@ export class WorkflowOrchestrator {
 					haltReason: currentIteration > maxIterations ? "max_iterations" : undefined,
 				};
 
+				// Convert agent result to outputs format
+				// Agent returns INodeExecutionData[][], we need to store as outputs
+				const agentOutputData = result as INodeExecutionData[][];
+				if (agentOutputData && agentOutputData[0]) {
+					executeFunctions.setOutput('main', agentOutputData[0]);
+				}
+
 				// Collect outputs and store with trace
 				const outputs = executeFunctions.getCollectedOutputs();
 				const events = executeFunctions.getCollectedEvents();
@@ -396,8 +429,8 @@ export class WorkflowOrchestrator {
 					nodeId,
 					nodeType,
 					status: "success",
-					inputs: inputData as Record<string, unknown>,
-					outputs,
+					inputData: inputData as Record<string, unknown>,
+					data: outputs,
 					internalTrace, // NEW: Store agent's internal trace
 					events,
 					durationMs: endTime - startTime,
@@ -416,7 +449,17 @@ export class WorkflowOrchestrator {
 			this.config.logger.info(`[${nodeId}] Execution successful`);
 
 			// Collect outputs
-			const outputs = executeFunctions.getCollectedOutputs();
+			let outputs = executeFunctions.getCollectedOutputs();
+
+			// If node returned data directly (legacy pattern), convert it
+			if (result && Array.isArray(result) && result.length > 0) {
+				// result is [[{ json: {...} }]] format
+				if (!outputs.main || outputs.main.length === 0) {
+					executeFunctions.setOutput('main', result[0]);
+					outputs = executeFunctions.getCollectedOutputs();
+				}
+			}
+
 			const events = executeFunctions.getCollectedEvents();
 
 			// Store node state for downstream nodes
@@ -429,8 +472,8 @@ export class WorkflowOrchestrator {
 				nodeId,
 				nodeType,
 				status: "success",
-				inputs: inputData as Record<string, unknown>,
-				outputs,
+				inputData: inputData as Record<string, unknown>,
+				data: outputs,
 				events,
 				durationMs: endTime - startTime,
 				startTime,
@@ -450,7 +493,7 @@ export class WorkflowOrchestrator {
 				nodeId,
 				nodeType,
 				status: "error",
-				inputs: inputData as Record<string, unknown>,
+				inputData: inputData as Record<string, unknown>,
 				error: error instanceof Error ? error : new Error(String(error)),
 				events: [],
 				durationMs: endTime - startTime,
@@ -529,8 +572,8 @@ export class WorkflowOrchestrator {
 	private prepareInputData(
 		nodeId: string,
 	): Record<string, INodeExecutionData[]> {
-		const node = this.config.definition.nodes[nodeId];
-		const nodeInputs = node.data?.nodeInputs || {};
+		const node = this.config.definition.nodes.find(n => n.id === nodeId);
+		const nodeInputs = (node?.data as any)?.nodeInputs || {};
 
 		// Resolve inputs using InputResolver
 		// This handles both direct edge connections and {{variable}} placeholders
@@ -580,7 +623,7 @@ export class WorkflowOrchestrator {
 	 * Get execution order using topological sort (Kahn's algorithm)
 	 */
 	private getExecutionOrder(): string[] {
-		const nodes = Object.keys(this.config.definition.nodes);
+		const nodes = this.config.definition.nodes.map(n => n.id);
 		const edges = this.config.definition.edges;
 
 		// Build adjacency list and in-degree map
@@ -631,9 +674,48 @@ export class WorkflowOrchestrator {
 		}
 
 		if (order.length !== nodes.length) {
+			this.config.logger.error('[ORCHESTRATOR] Topological sort failed:', {
+				nodesCount: nodes.length,
+				orderCount: order.length,
+				nodes,
+				edges,
+				inDegree: Array.from(inDegree.entries()),
+			});
 			throw new Error("Workflow contains a cycle or is invalid");
 		}
 
 		return order;
+	}
+
+	/**
+	 * Persist node execution results to database
+	 */
+	private async persistNodeExecutions(): Promise<void> {
+		// Skip persistence if configured (e.g., for node testing)
+		if (this.config.skipPersistence) {
+			this.config.logger.debug('[ORCHESTRATOR] Skipping database persistence (skipPersistence=true)');
+			return;
+		}
+
+		try {
+			for (const [nodeId, result] of this.nodeResults.entries()) {
+				await db.insert(nodeExecutions).values({
+					runId: this.config.runId,
+					nodeId,
+					nodeType: result.nodeType,
+					status: result.status,
+					inputs: result.inputData as any,
+					outputs: result.data as any,
+					internalTrace: result.internalTrace,
+					startedAt: new Date(result.startTime),
+					completedAt: new Date(result.endTime),
+					errorMessage: result.status === 'error' ? 'Execution failed' : undefined,
+				});
+			}
+			this.config.logger.info(`[ORCHESTRATOR] Persisted ${this.nodeResults.size} node execution(s) to database`);
+		} catch (error) {
+			this.config.logger.error('[ORCHESTRATOR] Failed to persist node executions:', error);
+			// Don't throw - persistence failure shouldn't break workflow execution
+		}
 	}
 }

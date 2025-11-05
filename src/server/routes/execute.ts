@@ -6,9 +6,12 @@
 
 import { Hono } from 'hono';
 import { db } from '@/server/db';
-import { workflows } from '@/server/db/schema';
+import { workflows, workflowRuns } from '@/server/db/schema';
 import { eq } from 'drizzle-orm';
-import { executeWorkflow, getWorkflowOutput } from '@/server/execution/engine';
+import { WorkflowOrchestrator } from '@/server/execution/WorkflowOrchestrator';
+import type { OrchestrationConfig } from '@/server/execution/WorkflowOrchestrator';
+import crypto from 'crypto';
+import '@/server/nodes/load'; // Ensure nodes are loaded
 
 export const executeRoutes = new Hono();
 
@@ -56,28 +59,74 @@ executeRoutes.post('/:id', async (c) => {
 			);
 		}
 
+		// Create a run ID for this execution
+		const runId = crypto.randomUUID();
+
+		// Create workflow run record
+		await db.insert(workflowRuns).values({
+			id: runId,
+			workflowId: workflowId,
+			status: 'running',
+			inputs: body.inputs || {},
+		});
+
 		// Create abort signal for this execution (5 minute timeout)
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000);
 
 		try {
-			// Execute workflow
-			const result = await executeWorkflow(definition, body.inputs, controller.signal);
+			// Create orchestration config
+			const config: OrchestrationConfig = {
+				workflowId,
+				runId,
+				definition,
+				inputs: body.inputs || {},
+				langchainModels: new Map(),
+				langchainEmbeddings: new Map(),
+				langchainTools: [],
+				secrets: new Map(),
+				logger: console,
+			};
 
-			// Get final output
-			const output = getWorkflowOutput(result.results, result.executedNodes);
+			// Execute workflow using WorkflowOrchestrator
+			const orchestrator = new WorkflowOrchestrator(config);
+			const result = await orchestrator.orchestrate();
+
+			// Update workflow run status
+			await db
+				.update(workflowRuns)
+				.set({
+					status: result.status === 'success' ? 'completed' : 'error',
+					outputs: result.finalOutputs as any,
+					completedAt: new Date(),
+					durationMs: result.totalDurationMs,
+				})
+				.where(eq(workflowRuns.id, runId));
 
 			return c.json({
-				success: result.success,
+				success: result.status === 'success',
 				data: {
 					workflowId,
-					status: result.success ? 'completed' : 'failed',
-					executedNodes: result.executedNodes,
-					output,
-					results: result.results,
-					error: result.error,
+					runId,
+					status: result.status,
+					nodeResults: Array.from(result.nodeResults.values()),
+					outputs: result.finalOutputs,
+					errors: result.errors,
+					durationMs: result.totalDurationMs,
 				},
 			});
+		} catch (error) {
+			// Update workflow run with error
+			await db
+				.update(workflowRuns)
+				.set({
+					status: 'error',
+					errorMessage: error instanceof Error ? error.message : 'Execution failed',
+					completedAt: new Date(),
+				})
+				.where(eq(workflowRuns.id, runId));
+
+			throw error;
 		} finally {
 			clearTimeout(timeoutId);
 		}

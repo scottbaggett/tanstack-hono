@@ -16,23 +16,12 @@ import { Hono } from "hono";
 import { stream } from "hono/streaming";
 import { z } from "zod";
 
-import type { WorkflowDefinition } from "../../types/workflow";
+import type { IWorkflowDefinition } from "../../types/interfaces";
 import type { StreamEvent } from "../../types/execution";
 import { db } from "../db";
 import { workflows, workflowVersions, workflowRuns, nodeExecutions } from "../db/schema";
 import { eq, desc } from "drizzle-orm";
 import { getAuthUser } from "../auth/middleware";
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-interface ExecutionContext {
-	workflowId: string;
-	runId: string;
-	definition: WorkflowDefinition;
-	onEvent?: (event: StreamEvent) => void;
-}
 
 // ============================================================================
 // ROUTE HANDLER

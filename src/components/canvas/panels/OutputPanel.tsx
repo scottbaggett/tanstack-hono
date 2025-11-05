@@ -17,14 +17,13 @@ type ViewMode = "schema" | "table" | "json";
 export function OutputPanel({ executionResult }: OutputPanelProps) {
 	const [viewMode, setViewMode] = useState<ViewMode>("schema");
 
-	// Extract json data from execution results
-	// Results are [[{ json: {...}, binary: {...} }]]
-	const jsonData =
-		executionResult && Array.isArray(executionResult)
-			? executionResult[0]?.[0]?.json
-			: null;
+	// Extract json data and error from execution result
+	// executionResult is { json: {...}, binary: {...} } or { error: {...} }
+	const jsonData = executionResult?.json || null;
+	const errorData = executionResult?.error || null;
 
 	const hasData = jsonData && typeof jsonData === "object";
+	const hasError = errorData && typeof errorData === "object";
 
 	return (
 		<div className="flex flex-col h-full">
@@ -58,7 +57,33 @@ export function OutputPanel({ executionResult }: OutputPanelProps) {
 
 			{/* Content */}
 			<div className="flex-1 overflow-y-auto">
-				{!hasData ? (
+				{hasError ? (
+					<div className="flex flex-col items-start px-4 py-4">
+						<div className="w-full space-y-3">
+							<div className="flex items-center gap-2">
+								<div className="w-2 h-2 rounded-full bg-red-9" />
+								<p className="text-sm text-red-11 font-semibold">
+									Execution Error
+								</p>
+							</div>
+							<div className="bg-red-2 border border-red-6 rounded p-4">
+								<p className="text-sm text-red-12 font-semibold">
+									{errorData.message}
+								</p>
+							</div>
+							{errorData.stack && (
+								<details className="w-full">
+									<summary className="text-xs text-surface-11 cursor-pointer hover:text-surface-12 font-medium">
+										View stack trace
+									</summary>
+									<pre className="text-xs text-surface-11 mt-3 p-3 bg-surface-3 rounded overflow-x-auto whitespace-pre-wrap font-mono border border-surface-6">
+										{errorData.stack}
+									</pre>
+								</details>
+							)}
+						</div>
+					</div>
+				) : !hasData ? (
 					<div className="flex flex-col items-center justify-center h-full px-4">
 						<div className="text-center">
 							<p className="text-sm text-surface-11 font-semibold">

@@ -120,7 +120,7 @@ app.get("/webhooks/:workflowId", async (c) => {
 				: workflow.definition;
 
 		const webhookNodes = (definition.nodes || []).filter(
-			(node: any) => node.data?.nodeId === "webhook"
+			(node: any) => node.data?.nodeType === "webhook"
 		);
 
 		const baseUrl = process.env.WEBHOOK_URL || "http://localhost:3000";

@@ -79,7 +79,7 @@ export default defineConfig(({ mode }) => {
 		server: {
 			host,
 			port,
-			allowedHosts: ["localhost:3000", "c9492d523d3d.ngrok.app"],
+			allowedHosts: ["localhost:3000", "5d2299222a5f.ngrok.app"],
 
 		},
 		// Ensure proper dev server handling

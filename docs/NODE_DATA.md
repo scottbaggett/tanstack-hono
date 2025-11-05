@@ -6,7 +6,9 @@ This document explains how data flows through nodes and how to reference it usin
 
 ## Node Execution Data Structure
 
-Every node execution returns data in this format:
+### Internal Format (Node Implementation)
+
+Nodes internally return data in the n8n-compatible format:
 
 ```typescript
 INodeExecutionData[][] = [
@@ -18,6 +20,32 @@ INodeExecutionData[][] = [
   ]
 ]
 ```
+
+### API Response Format (Simplified)
+
+When you execute nodes via the API, the response uses a simplified structure:
+
+```json
+{
+  "success": true,
+  "runData": {
+    "nodeId": [
+      {
+        "data": {
+          "json": { /* your data */ },
+          "binary": null
+        },
+        "error": null,
+        "startTime": 1762304740814,
+        "executionTime": 209,
+        "metadata": {}
+      }
+    ]
+  }
+}
+```
+
+See [DATA_FLOW.md](./DATA_FLOW.md) for complete API structure details.
 
 **Example - TextInput node outputs:**
 ```javascript
