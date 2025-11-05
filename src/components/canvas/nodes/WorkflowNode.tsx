@@ -18,6 +18,7 @@ interface WorkflowNodeProps {
 		description?: string;
 		icon?: string;
 		color?: string;
+		executionStatus?: "success" | "error";
 	};
 	isConnecting?: boolean;
 	isSelected?: boolean;
@@ -40,10 +41,22 @@ export const WorkflowNode = memo(function WorkflowNode({
 				className={`
 				relative
 				rounded-lg border-2 cursor-pointer
-				bg-node/80 flex items-center justify-center
+				flex items-center justify-center
 				transition-all duration-200 size-24
-				bg-node-background border-node-border/50
-				${isSelected ? "shadow-lg shadow-node-border" : "hover:border-node-border"}
+				${
+					data.executionStatus === "success"
+						? "bg-green-10/50 border-green-9/50"
+						: data.executionStatus === "error"
+							? "bg-red-10/50 border-red-9/50"
+							: "bg-node/80 border-node-border/50"
+				}
+				${
+					isSelected
+						? "shadow-lg shadow-node-border"
+						: data.executionStatus
+							? ""
+							: "hover:border-node-border"
+				}
 				${isConnecting ? "opacity-50" : "opacity-100"}`}
 			>
 				{/* Single Input Handle (Left Side) */}
@@ -76,6 +89,18 @@ export const WorkflowNode = memo(function WorkflowNode({
 
 				{nodeIcon && (
 					<LucideIcon name={nodeIcon} className="size-10 shrink-0 " />
+				)}
+
+				{/* Execution Status Badge */}
+				{data.executionStatus === "success" && (
+					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-green-9 border-2 border-surface-1 flex items-center justify-center">
+						<LucideIcon name="check" className="size-3 text-foreground" />
+					</div>
+				)}
+				{data.executionStatus === "error" && (
+					<div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-red-9 border-2 border-surface-1 flex items-center justify-center">
+						<LucideIcon name="x" className="size-3 text-foreground" />
+					</div>
 				)}
 			</div>
 
