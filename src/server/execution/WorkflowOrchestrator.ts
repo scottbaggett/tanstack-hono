@@ -650,40 +650,53 @@ export class WorkflowOrchestrator {
 		nodeId: string,
 		nodeType: string,
 	): Promise<Record<string, unknown>> {
-		// Build expression context from input data
+		// Build $items map: node name -> execution data
+		const $items: Record<string, INodeExecutionData[]> = {};
+
+		// Map node IDs to node names from workflow definition
+		const nodeIdToName = new Map<string, string>();
+		for (const node of this.config.definition.nodes) {
+			// Use label, displayName, name, or fallback to node type
+			const nodeName = (node.data as any)?.label ||
+							 (node.data as any)?.displayName ||
+							 (node.data as any)?.name ||
+							 node.type;
+			nodeIdToName.set(node.id, nodeName);
+		}
+
+		// Populate $items with data from all nodes in state
+		for (const [stateNodeId, nodeOutputs] of Object.entries(this.state)) {
+			const nodeName = nodeIdToName.get(stateNodeId) || stateNodeId;
+			// Get the main output (usually the 'output' handle)
+			const mainOutput = nodeOutputs.output || nodeOutputs.main || Object.values(nodeOutputs)[0];
+			if (mainOutput && Array.isArray(mainOutput)) {
+				$items[nodeName] = mainOutput as INodeExecutionData[];
+			}
+		}
+
+		// Build $item array from all connected inputs
+		const $item: INodeExecutionData[] = [];
+		const inputKeys = Object.keys(inputData);
+		for (const key of inputKeys) {
+			const input = inputData[key];
+			if (input && Array.isArray(input) && input.length > 0) {
+				$item.push(...input);
+			}
+		}
+
+		// Get first input's data for $json
+		let $json: Record<string, any> | undefined;
+		if ($item.length > 0) {
+			$json = $item[0].json as Record<string, any>;
+		}
+
+		// Build expression context (n8n-style, all variables use $ prefix)
 		const context: ExpressionContext = {
-			node: {
-				id: nodeId,
-				type: nodeType,
-				version: 1,
-			},
+			$json,
+			$item: $item as Array<{ json: Record<string, any>; binary?: Record<string, any> }>,
+			$items: $items as Record<string, Array<{ json: Record<string, any>; binary?: Record<string, any> }>>,
+			$parameters: parameters,
 		};
-
-    // Get first input's data for simple json/binary access
-    const inputKeys = Object.keys(inputData);
-    if (inputKeys.length > 0) {
-      const firstInput = inputData[inputKeys[0]];
-      if (firstInput?.[0]) {
-        context.json = firstInput[0].json as Record<string, any>;
-        context.binary = firstInput[0].binary as
-          | Record<string, any>
-          | undefined;
-      }
-    }
-
-    // Add all inputs for multi-input access
-    if (inputKeys.length > 1) {
-      context.inputs = {};
-      for (const key of inputKeys) {
-        const input = inputData[key];
-        if (input?.[0]) {
-          context.inputs[key] = {
-            json: input[0].json as Record<string, any>,
-            binary: input[0].binary as Record<string, any> | undefined,
-          };
-        }
-      }
-    }
 
 		// Recursively evaluate all string parameters
 		const evaluateValue = async (value: unknown): Promise<unknown> => {

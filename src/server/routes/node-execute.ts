@@ -180,50 +180,15 @@ nodeExecuteRoutes.post("/:nodeId", async (c) => {
 			);
 		}
 
-		// Build runData for ALL executed nodes (not just the target node)
-		// This allows the UI to update execution cache and expression context
-		const runData: Record<string, any> = {};
-
-		for (const [executedNodeId, executedResult] of result.nodeResults.entries()) {
-			const mainOutput = executedResult.data?.main?.[0];
-			const hasError = executedResult.status === "error";
-
-			runData[executedNodeId] = [
-				{
-					data: hasError
-						? null
-						: {
-								json: mainOutput?.json || {},
-								binary: mainOutput?.binary || null,
-							},
-					error:
-						hasError && executedResult.error
-							? {
-									message: executedResult.error.message,
-									stack: executedResult.error.stack,
-									name: executedResult.error.name,
-								}
-							: null,
-					startTime: executedResult.startTime,
-					executionTime: executedResult.durationMs,
-					metadata: {
-						executedAt: new Date(executedResult.endTime).toISOString(),
-					},
-				},
-			];
-		}
-
-		// Add metadata to the target node result (if it was executed)
-		if (!excludeTarget && runData[nodeId]?.[0]) {
-			runData[nodeId][0].metadata.upstreamNodes = Array.from(upstreamNodeIds);
-		}
+		// Convert Map to Record for JSON serialization
+		const nodeResults = Object.fromEntries(result.nodeResults);
 
 		const hasError = nodeResult?.status === "error" || false;
 
-		// Clean response structure matching n8n format
+		// Return real NodeExecutionResult structure
 		return c.json({
 			success: !hasError,
-			runData,
+			nodeResults, // Real NodeExecutionResult structure for all executed nodes
 		});
 	} catch (error) {
 		console.error("Node execution error:", error);

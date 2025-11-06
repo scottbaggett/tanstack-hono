@@ -20,6 +20,7 @@ export interface ExecutionStreamEvent {
   stage?: number;
   error?: string;
   durationMs?: number;
+  nodeResults?: Record<string, unknown>; // Real NodeExecutionResult structure
 }
 
 export function useExecutionStream() {
@@ -28,6 +29,7 @@ export function useExecutionStream() {
     Map<string, NodeExecutionStatus>
   >(new Map());
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [nodeResults, setNodeResults] = useState<Record<string, unknown>>({});
   const eventSourceRef = useRef<EventSource | null>(null);
 
   const executeWorkflow = useCallback(
@@ -40,6 +42,7 @@ export function useExecutionStream() {
       setIsExecuting(true);
       setNodeStatuses(new Map());
       setCurrentRunId(null);
+      setNodeResults({});
 
       return new Promise((resolve, reject) => {
         // Create EventSource connection for SSE
@@ -92,7 +95,12 @@ export function useExecutionStream() {
                   runId: data.runId,
                   status: data.status,
                   durationMs: data.durationMs,
+                  hasNodeResults: !!data.nodeResults,
                 });
+                // Store final node results for caching
+                if (data.nodeResults) {
+                  setNodeResults(data.nodeResults);
+                }
                 setIsExecuting(false);
                 eventSource.close();
                 resolve({
@@ -132,6 +140,7 @@ export function useExecutionStream() {
     setIsExecuting(false);
     setNodeStatuses(new Map());
     setCurrentRunId(null);
+    setNodeResults({});
   }, []);
 
   return {
@@ -139,6 +148,7 @@ export function useExecutionStream() {
     isExecuting,
     nodeStatuses,
     currentRunId,
+    nodeResults, // Final execution results for caching
     cleanup,
   };
 }

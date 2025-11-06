@@ -50,6 +50,32 @@ export function NodeInputsPanel({
     );
   }
 
+  // Build camelCase variable names with duplicate handling
+  const nodeVariableNames = new Map<string, string>();
+  const nodeNameCounts: Record<string, number> = {};
+
+  for (const node of connectedNodes) {
+    const nodeName =
+      (node.data?.displayName as string) ||
+      (node.data?.name as string) ||
+      node.id;
+
+    // Convert to camelCase
+    let camelCaseName = nodeName
+      .replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => char.toUpperCase())
+      .replace(/^[A-Z]/, (char) => char.toLowerCase());
+
+    // Handle duplicate names
+    if (nodeNameCounts[camelCaseName]) {
+      nodeNameCounts[camelCaseName]++;
+      camelCaseName = `${camelCaseName}${nodeNameCounts[camelCaseName]}`;
+    } else {
+      nodeNameCounts[camelCaseName] = 1;
+    }
+
+    nodeVariableNames.set(node.id, camelCaseName);
+  }
+
   return (
     <div className="flex flex-col h-full">
       {/* Header with Tabs */}
@@ -82,6 +108,7 @@ export function NodeInputsPanel({
       {/* Content */}
       <div className="flex-1 overflow-y-auto no-scrollbar break-after-all">
         {connectedNodes.map((node) => {
+          const variableName = nodeVariableNames.get(node.id) || node.id;
           const nodeResults = executionResults?.[node.id];
           const nodeName =
             (node.data?.displayName as string) ||
@@ -90,10 +117,13 @@ export function NodeInputsPanel({
           const isExpanded = expandedNodes.has(node.id);
 
           // Extract json data from execution results
-          // nodeResults is the runData array: [{ data: { json, binary }, ... }]
-          const nodeRun = Array.isArray(nodeResults) ? nodeResults[0] : null;
-          const jsonData = nodeRun?.data?.json || null;
-          const binaryData = nodeRun?.data?.binary || null;
+          // nodeResults is NodeExecutionResult: { data: { main: [{ json, binary }], ... }, ... }
+          const nodeResult = nodeResults as any;
+          // Get first item from main or output handle
+          const firstItem =
+            nodeResult?.data?.main?.[0] || nodeResult?.data?.output?.[0];
+          const jsonData = firstItem?.json || null;
+          const binaryData = firstItem?.binary || null;
 
           return (
             <div key={node.id} className="border-b border-surface-6">
@@ -142,7 +172,7 @@ export function NodeInputsPanel({
                           <SchemaTree
                             data={jsonData}
                             path="json"
-                            nodeName={nodeName}
+                            nodeName={variableName}
                             draggable={true}
                           />
                         </div>
@@ -186,7 +216,7 @@ export function NodeInputsPanel({
                                         className="border-b border-surface-5 hover:bg-surface-2"
                                         draggable
                                         onDragStart={(e) => {
-                                          const path = `{{ $items["${nodeName}"][0].json.${key} }}`;
+                                          const path = `{{ ${variableName}.${key} }}`;
                                           e.dataTransfer.setData(
                                             "text/plain",
                                             path,
@@ -241,7 +271,7 @@ export function NodeInputsPanel({
                             onDragStart={(e) => {
                               e.dataTransfer.setData(
                                 "text/plain",
-                                `{{ $items["${nodeName}"][0].binary.${key} }}`,
+                                `{{ ${variableName}.binary.${key} }}`,
                               );
                             }}
                             className="px-2 py-1 text-xs hover:bg-surface-3 rounded cursor-grab"

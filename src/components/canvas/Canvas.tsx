@@ -148,6 +148,17 @@ export function Canvas({
     }
   }, [executionStream?.nodeStatuses, setNodes, executionStream]);
 
+  // Update execution cache when workflow execution completes
+  useEffect(() => {
+    if (executionStream && Object.keys(executionStream.nodeResults).length > 0) {
+      // Merge nodeResults into execution cache
+      setExecutionCache((cache) => ({
+        ...cache,
+        ...(executionStream.nodeResults as Record<string, Record<string, unknown>>),
+      }));
+    }
+  }, [executionStream?.nodeResults]);
+
   // Sync nodes and edges when workflow loads (only if definition actually changed)
   useEffect(() => {
     // Create a hash of the current definition to compare
@@ -205,33 +216,28 @@ export function Canvas({
 
   // Handle execution results from node test runs
   const handleExecutionComplete = useCallback(
-    (_nodeId: string, runData: Record<string, unknown>) => {
-      // Merge the runData into execution cache
-      // runData is the full execution result with all nodes that were executed
+    (_nodeId: string, nodeResults: Record<string, unknown>) => {
+      // Merge the nodeResults into execution cache
+      // nodeResults is Record<string, NodeExecutionResult> with all executed nodes
       setExecutionCache((cache) => {
         const newCache = { ...cache };
-        // Merge each node's execution data
-        for (const [nodeId, nodeData] of Object.entries(runData)) {
-          newCache[nodeId] = nodeData as Record<string, unknown>;
+        // Merge each node's execution result
+        for (const [nodeId, nodeResult] of Object.entries(nodeResults)) {
+          newCache[nodeId] = nodeResult as Record<string, unknown>;
         }
         return newCache;
       });
 
-      // Mark all executed nodes with their execution status (success or error)
+      // Mark all executed nodes with their execution status
       setNodes((nds) =>
         nds.map((node) => {
-          const nodeRunData = runData[node.id];
-          if (!nodeRunData) return node;
+          const nodeResult = nodeResults[node.id] as any;
+          if (!nodeResult) return node;
 
-          // Extract the first run result (runData[nodeId] is an array)
-          const runResult = Array.isArray(nodeRunData) ? nodeRunData[0] : null;
-          if (!runResult) return node;
-
-          // Determine execution status: success if data exists, error if error exists
-          const hasError =
-            runResult.error !== null && runResult.error !== undefined;
-          const hasSuccess =
-            runResult.data !== null && runResult.data !== undefined;
+          // Status is directly on NodeExecutionResult
+          const status = nodeResult.status;
+          const hasError = status === "error" || nodeResult.error;
+          const hasSuccess = status === "success" && nodeResult.data;
 
           return {
             ...node,

@@ -1,53 +1,20 @@
 /**
- * JSONata Expression Evaluator
+ * JavaScript Expression Evaluator (n8n-style)
  *
- * Evaluates JSONata expressions for node properties
- * Provides safe sandboxed evaluation with access to workflow context
+ * Evaluates JavaScript expressions for node properties
+ * Simple, powerful, and familiar to users
+ * Works in both browser and server environments
  */
-
-import type { Expression } from "jsonata";
-import jsonata from "jsonata";
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
 export interface ExpressionContext {
-  // Workflow expression variables (JSONata natively supports $ prefix)
-  // Current item's JSON data (first input item)
-  $json?: Record<string, any>;
-  // Array of all items (access via $item[0], $item[1], etc.)
-  $item?: Array<{ json: Record<string, any>; binary?: Record<string, any> }>;
-  // Map of items by node name (access via $items["NodeName"])
-  $items?: Record<
-    string,
-    Array<{ json: Record<string, any>; binary?: Record<string, any> }>
-  >;
-  // Current node's parameters
-  $parameters?: Record<string, any>;
-
-  // Legacy support (deprecated - use $ prefixed versions above)
-  json?: Record<string, any>;
-  binary?: Record<string, any>;
-  input?: {
-    params?: Record<string, any>;
-  };
-  inputs?: Record<
-    string,
-    {
-      json?: Record<string, any>;
-      binary?: Record<string, any>;
-      params?: Record<string, any>;
-    }
-  >;
-  // Current node metadata
-  node?: {
-    id: string;
-    type: string;
-    version: number;
-  };
-  // Additional context (state, previous results, etc.)
-  [key: string]: any;
+  // Simple flat structure - node names become camelCase variables
+  // Example: "Manual Trigger" → manualTrigger.prompt
+  // Example: "HTTP Request" → httpRequest.statusCode
+  [nodeName: string]: any;
 }
 
 export interface EvaluationResult {
@@ -57,26 +24,18 @@ export interface EvaluationResult {
 }
 
 // ============================================================================
-// EXPRESSION CACHE
+// HELPERS
 // ============================================================================
 
-// Cache compiled JSONata expressions to avoid recompiling
-const expressionCache = new Map<string, Expression>();
-
-function getCachedExpression(expression: string): Expression {
-  if (expressionCache.has(expression)) {
-    return expressionCache.get(expression)!;
-  }
-
-  try {
-    const compiled = jsonata(expression);
-    expressionCache.set(expression, compiled);
-    return compiled;
-  } catch (error) {
-    throw new Error(
-      `Failed to compile JSONata expression "${expression}": ${error}`,
-    );
-  }
+/**
+ * Convert a node name to camelCase variable name
+ * "Manual Trigger" → "manualTrigger"
+ * "HTTP Request 2" → "httpRequest2"
+ */
+export function toCamelCase(str: string): string {
+  return str
+    .replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => char.toUpperCase())
+    .replace(/^[A-Z]/, (char) => char.toLowerCase());
 }
 
 // ============================================================================
@@ -84,7 +43,13 @@ function getCachedExpression(expression: string): Expression {
 // ============================================================================
 
 /**
- * Evaluate a JSONata expression with the given context
+ * Evaluate a JavaScript expression with the given context
+ *
+ * Examples:
+ *   manualTrigger.prompt
+ *   manualTrigger.max_length * 2
+ *   httpRequest.statusCode === 200 ? 'success' : 'failed'
+ *   workflow.name + ' - ' + dates.today
  */
 export async function evaluateExpression(
   expression: string,
@@ -93,10 +58,72 @@ export async function evaluateExpression(
   try {
     // Trim whitespace from expression
     const trimmedExpression = expression.trim();
-    const compiled = getCachedExpression(trimmedExpression);
 
-    // JSONata's evaluate() returns a Promise - must await it
-    const result = await compiled.evaluate(context);
+    // Create parameter names and values from context
+    const paramNames = Object.keys(context);
+    const paramValues = Object.values(context);
+
+    // Non-reserved globals we can shadow as parameters
+    // Note: 'eval' and 'arguments' can't be shadowed in strict mode
+    const shadowableGlobals = [
+      'window',
+      'document',
+      'global',
+      'process',
+      'fetch',
+      'XMLHttpRequest',
+      'WebSocket',
+      'localStorage',
+      'sessionStorage',
+      'indexedDB',
+      'alert',
+      'confirm',
+      'prompt',
+      'print',
+      'open',
+      'close',
+      'location',
+      'navigator',
+      'history',
+      'console',
+      'performance',
+      'requestAnimationFrame',
+      'setInterval',
+      'setTimeout',
+      'clearInterval',
+      'clearTimeout',
+    ];
+
+    // Create a function with shadowable globals and context variables as parameters
+    // Reserved keywords (import, require, Function, etc.) can't be parameter names,
+    // but they're already blocked in strict mode or won't work in this context
+    const fn = new Function(
+      ...shadowableGlobals,
+      ...paramNames,
+      'JSON',
+      'Math',
+      'Date',
+      'String',
+      'Number',
+      'Boolean',
+      'Array',
+      'Object',
+      `"use strict"; return (${trimmedExpression});`
+    );
+
+    // Execute the function with undefined for blocked globals, context values, and safe globals
+    const result = fn(
+      ...shadowableGlobals.map(() => undefined),
+      ...paramValues,
+      JSON,
+      Math,
+      Date,
+      String,
+      Number,
+      Boolean,
+      Array,
+      Object
+    );
 
     return {
       success: true,
@@ -257,14 +284,15 @@ export async function evaluateProperties(
 // ============================================================================
 
 /**
- * Validate a JSONata expression without executing it
+ * Validate a JavaScript expression without executing it
  */
 export function validateExpression(expression: string): {
   valid: boolean;
   error?: string;
 } {
   try {
-    getCachedExpression(expression);
+    // Try to create a function with the expression to check syntax
+    new Function(`return (${expression})`);
     return { valid: true };
   } catch (error) {
     return {
@@ -304,9 +332,3 @@ export function validateTemplate(template: string): {
   };
 }
 
-/**
- * Clear the compiled expression cache (useful for testing or memory management)
- */
-export function clearExpressionCache(): void {
-  expressionCache.clear();
-}

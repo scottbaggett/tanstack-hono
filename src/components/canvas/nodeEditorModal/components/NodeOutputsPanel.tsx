@@ -30,8 +30,8 @@ export function NodeOutputsPanel({ executionResult }: NodeOutputsPanelProps) {
   return (
     <div className="flex flex-col h-full">
       {/* Header with Tabs */}
-      <div className="px-4 pt-4 pb-2 border-b border-surface-6">
-        <div className="flex items-center justify-between mb-3">
+      <div className="px-4 pb-2 border-b h-12 flex items-center">
+        <div className="flex items-center justify-between grow">
           <h3 className="font-semibold text-sm text-surface-11 uppercase tracking-wide">
             OUTPUT
           </h3>

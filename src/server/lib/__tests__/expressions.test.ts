@@ -1,150 +1,160 @@
-/**
- * Expression System Test
- *
- * Tests the JSONata-based expression system with $ prefix variables
- */
+import { describe, it, expect } from 'vitest';
+import { evaluateExpression, evaluateTemplate } from '../expressions';
+import type { ExpressionContext } from '../expressions';
 
-import { describe, expect, it } from "vitest";
-import { evaluateTemplate } from "../expressions";
+describe('JavaScript Expression Evaluation', () => {
+  const testContext: ExpressionContext = {
+    manualTrigger: {
+      prompt: 'Write a called, from a black box to a clear box',
+      max_length: '200 words',
+    },
+    httpRequest: {
+      statusCode: 200,
+      body: { success: true },
+    },
+    parameters: {
+      model: 'gpt-4',
+      temperature: 0.7,
+    },
+    dates: {
+      now: '2025-01-05T10:30:00Z',
+      today: '2025-01-05',
+      timestamp: 1704450600000,
+    },
+    workflow: {
+      id: 'wf_123',
+      name: 'Test Workflow',
+    },
+  };
 
-describe("Expression System", () => {
-	it("should access simple $json property", async () => {
-		const result = await evaluateTemplate("{{ $json.text }}", {
-			$json: { text: "Hello World" },
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("Hello World");
-	});
+  describe('Simple variable access', () => {
+    it('should access manualTrigger.prompt', async () => {
+      const result = await evaluateExpression('manualTrigger.prompt', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('Write a called, from a black box to a clear box');
+    });
 
-	it("should access nested property", async () => {
-		const result = await evaluateTemplate("{{ $json.result.message }}", {
-			$json: { result: { message: "Success!" } },
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("Success!");
-	});
+    it('should access nested object', async () => {
+      const result = await evaluateExpression('httpRequest.body.success', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(true);
+    });
 
-	it("should handle template with multiple references", async () => {
-		const result = await evaluateTemplate(
-			"Exit code: {{ $json.exitCode }}, Output: {{ $json.stdout }}",
-			{ $json: { exitCode: 0, stdout: "Hello!" } },
-		);
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("Exit code: 0, Output: Hello!");
-	});
+    it('should access parameters', async () => {
+      const result = await evaluateExpression('parameters.model', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('gpt-4');
+    });
+  });
 
-	it("should access $parameters", async () => {
-		const result = await evaluateTemplate("{{ $parameters.command }}", {
-			$parameters: { command: 'echo "test"' },
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBe('echo "test"');
-	});
+  describe('Math operations', () => {
+    it('should perform addition', async () => {
+      const result = await evaluateExpression('httpRequest.statusCode + 100', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(300);
+    });
 
-	it("should access $item[0]", async () => {
-		const result = await evaluateTemplate("{{ $item[0].json.text }}", {
-			$item: [{ json: { text: "First item" }, binary: {} }],
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("First item");
-	});
+    it('should perform multiplication', async () => {
+      const result = await evaluateExpression('parameters.temperature * 10', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(7);
+    });
 
-	it("should access $items by node name", async () => {
-		const result = await evaluateTemplate(
-			'{{ $items["HTTP Request"][0].json.statusCode }}',
-			{
-				$items: {
-					"HTTP Request": [{ json: { statusCode: 200 }, binary: {} }],
-				},
-			},
-		);
-		expect(result.success).toBe(true);
-		expect(result.value).toBe(200);
-	});
+    it('should use Math functions', async () => {
+      const result = await evaluateExpression('Math.round(parameters.temperature)', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(1);
+    });
+  });
 
-	it("should handle missing properties gracefully", async () => {
-		const result = await evaluateTemplate("{{ $json.missing }}", {
-			$json: { existing: "value" },
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBeUndefined();
-	});
+  describe('String operations', () => {
+    it('should concatenate strings', async () => {
+      const result = await evaluateExpression('workflow.name + " - " + dates.today', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('Test Workflow - 2025-01-05');
+    });
 
-	it("should handle empty context", async () => {
-		const result = await evaluateTemplate("{{ $json.anything }}", {});
-		expect(result.success).toBe(true);
-		expect(result.value).toBeUndefined();
-	});
+    it('should use string methods', async () => {
+      const result = await evaluateExpression('manualTrigger.prompt.toUpperCase()', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('WRITE A CALLED, FROM A BLACK BOX TO A CLEAR BOX');
+    });
+  });
 
-	it("should support array indexing", async () => {
-		const result = await evaluateTemplate("{{ $json.items[0] }}", {
-			$json: { items: ["first", "second", "third"] },
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("first");
-	});
+  describe('Conditional expressions', () => {
+    it('should evaluate ternary operator', async () => {
+      const result = await evaluateExpression('httpRequest.statusCode === 200 ? "success" : "failed"', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('success');
+    });
 
-	it("should support arithmetic operations", async () => {
-		const result = await evaluateTemplate("{{ $json.count * 2 }}", {
-			$json: { count: 5 },
-		});
-		expect(result.success).toBe(true);
-		expect(result.value).toBe(10);
-	});
+    it('should evaluate boolean logic', async () => {
+      const result = await evaluateExpression('httpRequest.statusCode >= 200 && httpRequest.statusCode < 300', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(true);
+    });
+  });
 
-	it("should support string concatenation", async () => {
-		const result = await evaluateTemplate(
-			'{{ $json.firstName & " " & $json.lastName }}',
-			{
-				$json: { firstName: "John", lastName: "Doe" },
-			},
-		);
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("John Doe");
-	});
+  describe('Security - blocked globals', () => {
+    it('should block window access', async () => {
+      const result = await evaluateExpression('window', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(undefined);
+    });
 
-	it("should support ternary conditionals", async () => {
-		const result = await evaluateTemplate(
-			"{{ $json.score > 80 ? 'pass' : 'fail' }}",
-			{
-				$json: { score: 85 },
-			},
-		);
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("pass");
-	});
+    it('should block document access', async () => {
+      const result = await evaluateExpression('document', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(undefined);
+    });
 
-	it("should handle complex nested access", async () => {
-		const result = await evaluateTemplate(
-			'{{ $items["API Call"][0].json.data.user.profile.email }}',
-			{
-				$items: {
-					"API Call": [
-						{
-							json: {
-								data: {
-									user: {
-										profile: {
-											email: "user@example.com",
-										},
-									},
-								},
-							},
-							binary: {},
-						},
-					],
-				},
-			},
-		);
-		expect(result.success).toBe(true);
-		expect(result.value).toBe("user@example.com");
-	});
+    it('should block fetch', async () => {
+      const result = await evaluateExpression('fetch', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(undefined);
+    });
 
-	it("should handle invalid expressions", async () => {
-		const result = await evaluateTemplate("{{ $json.field ++ }}", {
-			$json: { field: "value" },
-		});
-		expect(result.success).toBe(false);
-		expect(result.error).toBeDefined();
-	});
+    it('should block alert', async () => {
+      const result = await evaluateExpression('alert', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe(undefined);
+    });
+
+    // Note: eval cannot be shadowed in strict mode, but its use is limited
+    // In a real sandboxed environment (worker processes), it would be fully blocked
+  });
+
+  describe('Template evaluation', () => {
+    it('should evaluate template with simple variable', async () => {
+      const result = await evaluateTemplate('{{ manualTrigger.prompt }}', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('Write a called, from a black box to a clear box');
+    });
+
+    it('should evaluate template with math', async () => {
+      const result = await evaluateTemplate('Status: {{ httpRequest.statusCode + 100 }}', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('Status: 300');
+    });
+
+    it('should evaluate template with string concat', async () => {
+      const result = await evaluateTemplate('{{ workflow.name }} on {{ dates.today }}', testContext);
+      expect(result.success).toBe(true);
+      expect(result.value).toBe('Test Workflow on 2025-01-05');
+    });
+  });
+
+  describe('Error handling', () => {
+    it('should handle undefined variable', async () => {
+      const result = await evaluateExpression('nonexistent.field', testContext);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+
+    it('should handle syntax error', async () => {
+      const result = await evaluateExpression('manualTrigger.prompt +', testContext);
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+    });
+  });
 });

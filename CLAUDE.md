@@ -107,3 +107,4 @@ src/server/lib/
 - **Error cases**: Always test failure scenarios
 - **Edge cases**: Test boundary conditions and invalid inputs
 - **Security tests**: For encryption/auth, test wrong keys, tampered data
+- this project uses PNPM not NPM!

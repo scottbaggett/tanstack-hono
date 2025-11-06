@@ -87,10 +87,12 @@ function TreeNode({ label, value, path, level, draggable, nodeName }: TreeNodePr
 
 	const handleDragStart = (e: React.DragEvent) => {
 		e.stopPropagation();
-		// Generate n8n-style expression: $items["NodeName"][0].json.field
+		// Generate simplified expression: {{ nodeName.field }}
+		// Remove "json." prefix from path since we flatten the structure
+		const fieldPath = path.replace(/^json\./, '');
 		const expression = nodeName
-			? `{{ $items["${nodeName}"][0].${path} }}`
-			: `{{ ${path} }}`;
+			? `{{ ${nodeName}.${fieldPath} }}`
+			: `{{ ${fieldPath} }}`;
 		e.dataTransfer.setData("text/plain", expression);
 		e.dataTransfer.effectAllowed = "copy";
 	};

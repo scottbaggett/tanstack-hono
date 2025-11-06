@@ -129,6 +129,9 @@ executeRoutes
           console.error("Workflow execution completed with errors:", result.errors);
         }
 
+        // Convert Map to Record for JSON serialization
+        const nodeResults = Object.fromEntries(result.nodeResults);
+
         // Always return success: true so frontend can access runId
         // The actual execution status is in data.status
         return c.json({
@@ -137,7 +140,7 @@ executeRoutes
             workflowId,
             runId,
             status: result.status,
-            nodeResults: Array.from(result.nodeResults.values()),
+            nodeResults, // Real NodeExecutionResult structure
             outputs: result.finalOutputs,
             errors: result.errors,
             durationMs: result.totalDurationMs,
@@ -297,13 +300,17 @@ executeRoutes
           })
           .where(eq(workflowRuns.id, runId));
 
-        // Send completion event
+        // Convert Map to Record for JSON serialization
+        const nodeResults = Object.fromEntries(result.nodeResults);
+
+        // Send completion event with nodeResults for frontend caching
         await streamWriter.write(
           `data: ${JSON.stringify({
             type: "run_completed",
             runId,
             status: result.status,
             durationMs: result.totalDurationMs,
+            nodeResults, // Real NodeExecutionResult structure
           })}\n\n`,
         );
       } catch (error) {

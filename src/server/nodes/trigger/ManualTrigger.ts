@@ -67,12 +67,12 @@ export class ManualTrigger implements INodeType {
       context.evaluatedProperties || context.getNodeParameters?.() || {};
 
     // Try to get input data from properties
-    if (evaluatedProperties.inputData) {
+    if (evaluatedProperties.outputData) {
       try {
         const parsed =
-          typeof evaluatedProperties.inputData === "string"
-            ? JSON.parse(evaluatedProperties.inputData)
-            : evaluatedProperties.inputData;
+          typeof evaluatedProperties.outputData === "string"
+            ? JSON.parse(evaluatedProperties.outputData)
+            : evaluatedProperties.outputData;
 
         if (typeof parsed === "object" && parsed !== null) {
           inputData = parsed as Record<string, unknown>;

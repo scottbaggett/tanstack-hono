@@ -18,6 +18,7 @@ import {
   EditorView,
   keymap,
 } from "@codemirror/view";
+import { FunctionSquare } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
 import type { ExpressionContext } from "@/server/lib/expressions";
@@ -84,7 +85,9 @@ interface AutocompleteSource {
   earlierNodes: Completion[];
 }
 
-function createAutocompleteExtension(source: AutocompleteSource): Extension {
+function createAutocompleteExtension(
+  getSource: () => AutocompleteSource,
+): Extension {
   return autocompletion({
     override: [
       (context: CompletionContext) => {
@@ -97,6 +100,9 @@ function createAutocompleteExtension(source: AutocompleteSource): Extension {
 
         const prefix = match[1];
         const from = context.pos - prefix.length;
+
+        // Get the current source dynamically (avoids stale closure)
+        const source = getSource();
 
         // Combine suggestions with section headers
         const options: Completion[] = [];
@@ -157,7 +163,7 @@ export interface ExpressionInputProps {
   value: string;
   onChange: (value: string) => void;
   executionContext?: ExpressionContext;
-  connectedNodes?: Array<{ id: string; name: string }>;
+  connectedNodes?: Array<{ id: string; name: string; variableName?: string }>;
   className?: string;
 }
 
@@ -174,57 +180,54 @@ export function ExpressionInput({
   const [evaluatedResult, setEvaluatedResult] = useState<string>("");
   const [evaluationError, setEvaluationError] = useState<string>("");
 
-  // Build autocomplete suggestions (n8n-style)
-  const autocompleteSource: AutocompleteSource = {
-    suggested: [
-      {
-        label: "$json",
-        type: "variable",
-        detail: "Current item's JSON data",
-        apply: "$json",
-      },
-      {
-        label: "$json.field",
-        type: "variable",
-        detail: "Access field from current item",
-        apply: "$json.",
-      },
-      {
-        label: "$item[0]",
-        type: "variable",
-        detail: "Access specific item by index",
-        apply: "$item[0]",
-      },
-      {
-        label: "$parameters",
-        type: "variable",
-        detail: "Current node's parameters",
-        apply: "$parameters",
-      },
-      {
-        label: "$parameters.field",
-        type: "variable",
-        detail: "Access parameter field",
-        apply: "$parameters.",
-      },
-    ],
-    earlierNodes: connectedNodes.map((node) => ({
-      label: `$items["${node.name}"]`,
-      type: "variable",
-      detail: `Data from ${node.name} node`,
-      apply: `$items["${node.name}"]`,
-    })),
-  };
+  // Store connectedNodes in a ref so autocomplete can access latest value
+  const connectedNodesRef = useRef(connectedNodes);
+  connectedNodesRef.current = connectedNodes;
 
-  // Initialize CodeMirror
-  // biome-ignore lint/correctness/useExhaustiveDependencies: We don't want to re-initialize the editor when the autocompleteSource or placeholder changes
+  // Initialize CodeMirror (once)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: We only want to initialize once
   useEffect(() => {
     if (!editorRef.current) return;
 
     const extensions: Extension[] = [
       keymap.of(defaultKeymap),
       expressionHighlighter, // Add expression syntax highlighting
-      createAutocompleteExtension(autocompleteSource),
+      createAutocompleteExtension(() => {
+        // Read latest connectedNodes from ref (avoids stale closure)
+        const currentNodes = connectedNodesRef.current;
+
+        return {
+          suggested: [
+            {
+              label: "parameters",
+              type: "variable",
+              detail: "Current node's parameters",
+              apply: "parameters",
+            },
+            {
+              label: "parameters.fieldName",
+              type: "variable",
+              detail: "Access parameter field",
+              apply: "parameters.",
+            },
+          ],
+          earlierNodes: currentNodes.map((node) => {
+            // Use provided variableName if available, otherwise compute camelCase
+            const camelCaseName =
+              node.variableName ||
+              node.name
+                .replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => char.toUpperCase())
+                .replace(/^[A-Z]/, (char) => char.toLowerCase());
+
+            return {
+              label: camelCaseName,
+              type: "variable",
+              detail: `Data from ${node.name} node`,
+              apply: `${camelCaseName}.`,
+            };
+          }),
+        };
+      }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           const newValue = update.state.doc.toString();
@@ -286,6 +289,70 @@ export function ExpressionInput({
         ".cm-expression-content": {
           color: "var(--blue-11)",
           fontWeight: "500",
+        },
+        // Autocomplete dropdown styling for dark mode
+        ".cm-tooltip-autocomplete": {
+          backgroundColor: "var(--color-surface-1) !important",
+          border: "1px solid var(--color-surface-6) !important",
+          borderRadius: "6px",
+          boxShadow:
+            "0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)",
+          color: "var(--color-surface-12)",
+        },
+        ".cm-tooltip-autocomplete > ul": {
+          backgroundColor: "var(--color-surface-1) !important",
+          maxHeight: "400px",
+          overflowY: "auto",
+        },
+        ".cm-tooltip-autocomplete > ul > li": {
+          backgroundColor: "transparent",
+        },
+        ".cm-tooltip-autocomplete ul li": {
+          color: "var(--color-surface-12)",
+          padding: "6px 12px",
+          cursor: "pointer",
+        },
+        ".cm-tooltip-autocomplete ul li[aria-selected]": {
+          backgroundColor: "var(--info-9)",
+          color: "var(--color-surface-1)",
+        },
+        ".cm-completionLabel": {
+          color: "var(--color-surface-12)",
+        },
+        ".cm-tooltip-autocomplete ul li[aria-selected] .cm-completionLabel": {
+          color: "var(--color-surface-1)",
+        },
+        ".cm-completionDetail": {
+          color: "var(--color-surface-10)",
+          fontSize: "0.85em",
+        },
+        ".cm-tooltip-autocomplete ul li[aria-selected] .cm-completionDetail": {
+          color: "var(--color-surface-3)",
+        },
+        ".cm-completionIcon": {
+          color: "var(--color-surface-10)",
+        },
+        ".cm-tooltip-autocomplete ul li[aria-selected] .cm-completionIcon": {
+          color: "var(--color-surface-1)",
+        },
+        ".cm-completionMatchedText": {
+          color: "var(--info-11)",
+          fontWeight: "600",
+        },
+        ".cm-tooltip-autocomplete ul li[aria-selected] .cm-completionMatchedText":
+          {
+            color: "var(--info-3)",
+          },
+        // Section headers (like "SUGGESTED", "EARLIER NODES")
+        ".cm-tooltip-autocomplete ul li[aria-disabled='true']": {
+          color: "var(--color-surface-10)",
+          fontSize: "0.75em",
+          fontWeight: "600",
+          textTransform: "uppercase",
+          padding: "8px 12px 4px",
+          backgroundColor: "transparent",
+          cursor: "default",
+          opacity: "0.8",
         },
       }),
       EditorView.lineWrapping,
@@ -358,10 +425,7 @@ export function ExpressionInput({
       {/* Editor with fx icon */}
       <div className="relative border border-surface-6 rounded-md">
         <div className="absolute left-2 top-2 z-10 pointer-events-none">
-          <LucideIcon
-            name="function-square"
-            className="w-4 h-4 text-surface-11"
-          />
+          <FunctionSquare className="size-5 text-mint-9" strokeWidth={1} />
         </div>
         <div ref={editorRef} />
       </div>
@@ -408,19 +472,15 @@ export function ExpressionInput({
           {/* Tips Section */}
           <div className="pt-2 border-t border-surface-6">
             <p className="text-xs text-surface-11">
-              <span className="font-medium">Tip:</span> Anything inside{" "}
+              <span className="font-medium">Tip:</span> Use simple dot notation
+              inside{" "}
               <code className="px-1 py-0.5 bg-surface-4 rounded">
                 {"{{ }}"}
               </code>{" "}
-              is a JSONata expression.{" "}
-              <a
-                href="https://docs.jsonata.org/overview.html"
-                className="text-info-11 hover:text-info-10"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Learn more
-              </a>
+              to access data. Example:{" "}
+              <code className="px-1 py-0.5 bg-surface-4 rounded">
+                manualTrigger.prompt
+              </code>
             </p>
           </div>
         </div>
