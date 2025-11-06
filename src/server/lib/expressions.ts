@@ -12,8 +12,9 @@
 
 export interface ExpressionContext {
   // Simple flat structure - node names become camelCase variables
-  // Example: "Manual Trigger" → manualTrigger.prompt
+  // Example: "Text Input" → textInput.text
   // Example: "HTTP Request" → httpRequest.statusCode
+  // No $items, $json, $parameters complexity - just clean node accessors!
   [nodeName: string]: any;
 }
 
@@ -165,13 +166,13 @@ export function extractExpressions(template: string): string[] {
 }
 
 /**
- * Evaluate a template string by replacing JSONata expressions with their evaluated values
+ * Evaluate a template string by replacing expressions with their evaluated values
  * Supports both {{expression}} and ${expression} syntax
  *
  * Example:
- *   "Hello {{$parameters.name}}, you have {{$json.count}} items"
- *   with context { $parameters: { name: "Alice" }, $json: { count: 5 } }
- *   returns: "Hello Alice, you have 5 items"
+ *   "Hello {{textInput.name}}, you are {{textInput.age}} years old"
+ *   with context { textInput: { name: "Alice", age: 25 } }
+ *   returns: "Hello Alice, you are 25 years old"
  */
 export async function evaluateTemplate(
   template: string,

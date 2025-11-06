@@ -82,7 +82,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
   });
 
   return (
-    <div className="w-80 bg-editor-panel border-r overflow-y-auto h-full flex flex-col">
+    <div className="w-80 bg-editor-panel border-r h-full flex flex-col">
       {/* Header */}
       <div className="p-4 border-b">
         <h2 className="text-lg font-semibold mb-2">Nodes</h2>
@@ -96,7 +96,7 @@ export function NodePanel({ onNodeDrag }: NodePanelProps) {
       </div>
 
       {/* Node Categories */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 no-scrollbar">
         {sortedCategories.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
             <p>No nodes found</p>

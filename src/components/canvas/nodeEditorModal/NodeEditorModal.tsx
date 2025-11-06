@@ -40,6 +40,7 @@ interface NodeEditorModalProps {
   allNodes: Node[];
   nodeRegistry: NodeRegistryData | undefined;
   executionCache: Record<string, Record<string, unknown>>;
+  readOnly?: boolean;
 }
 
 export function NodeEditorModal({
@@ -51,6 +52,7 @@ export function NodeEditorModal({
   allNodes,
   nodeRegistry,
   executionCache,
+  readOnly = false,
 }: NodeEditorModalProps) {
   const nodeData = selectedNode.data as Record<string, unknown>;
   const [executionResult, setExecutionResult] =
@@ -64,11 +66,19 @@ export function NodeEditorModal({
   useEffect(() => {
     // Load this node's execution result for OUTPUT panel
     const cachedResult = executionCache[selectedNode.id];
-    if (cachedResult && Array.isArray(cachedResult) && cachedResult[0]) {
+
+    // Handle both array format and NodeExecutionResult format
+    if (Array.isArray(cachedResult) && cachedResult[0]) {
+      // Old format: [{ json, error }]
       const nodeRun = cachedResult[0];
-      setExecutionResult(
-        nodeRun.error ? { error: nodeRun.error } : nodeRun.data,
-      );
+      setExecutionResult(nodeRun as INodeExecutionData);
+    } else if (cachedResult && typeof cachedResult === 'object') {
+      // New format: { data: { main: [{ json, error }] } }
+      const nodeResult = cachedResult as any;
+      const firstItem = nodeResult?.data?.main?.[0] || nodeResult?.data?.output?.[0];
+      if (firstItem) {
+        setExecutionResult(firstItem as INodeExecutionData);
+      }
     }
 
     // Load all execution cache for INPUT panel to show upstream nodes
@@ -137,6 +147,10 @@ export function NodeEditorModal({
   const connectedNodes = allNodes.filter((node) =>
     connectedNodeIds.includes(node.id),
   );
+
+  // Check if node has validation errors (blocks execution)
+  const validation = selectedNode.data.validation as any;
+  const hasValidationErrors = validation && !validation.isValid;
 
   const handleExecute = async () => {
     setIsExecuting(true);
@@ -266,36 +280,47 @@ export function NodeEditorModal({
               </h2>
             </div>
           </div>
-          {/* Execute Buttons */}
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={handleExecutePrevious}
-              disabled={isExecuting}
-              size="sm"
-              variant="outline"
-            >
-              {isExecuting ? (
-                <LucideIcon
-                  name="loader-2"
-                  className="h-4 w-4 mr-2 animate-spin"
-                />
-              ) : (
-                <LucideIcon name="skip-back" className="h-4 w-4 mr-2" />
-              )}
-              Execute Previous
-            </Button>
-            <Button onClick={handleExecute} disabled={isExecuting} size="sm">
-              {isExecuting ? (
-                <LucideIcon
-                  name="loader-2"
-                  className="h-4 w-4 mr-2 animate-spin"
-                />
-              ) : (
-                <LucideIcon name="play" className="h-4 w-4 mr-2" />
-              )}
-              Execute Step
-            </Button>
-          </div>
+          {/* Execute Buttons - Hidden in read-only mode */}
+          {!readOnly && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleExecutePrevious}
+                disabled={isExecuting}
+                size="sm"
+                variant="outline"
+              >
+                {isExecuting ? (
+                  <LucideIcon
+                    name="loader-2"
+                    className="h-4 w-4 mr-2 animate-spin"
+                  />
+                ) : (
+                  <LucideIcon name="skip-back" className="h-4 w-4 mr-2" />
+                )}
+                Execute Previous
+              </Button>
+              <Button
+                onClick={handleExecute}
+                disabled={isExecuting || hasValidationErrors}
+                size="sm"
+                title={
+                  hasValidationErrors
+                    ? "Fix validation errors before executing"
+                    : undefined
+                }
+              >
+                {isExecuting ? (
+                  <LucideIcon
+                    name="loader-2"
+                    className="h-4 w-4 mr-2 animate-spin"
+                  />
+                ) : (
+                  <LucideIcon name="play" className="h-4 w-4 mr-2" />
+                )}
+                Execute Step
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Three Panel Layout */}
@@ -319,6 +344,7 @@ export function NodeEditorModal({
               executionResults={allExecutionResults?.[selectedNode.id]}
               allExecutionResults={allExecutionResults || executionCache}
               connectedNodes={connectedNodes}
+              readOnly={readOnly}
             />
           </div>
 

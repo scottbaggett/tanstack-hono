@@ -297,6 +297,43 @@ export class WorkflowOrchestrator {
       `[${nodeId}] Starting execution (type: ${nodeType})`,
     );
 
+    // Check for validation errors before execution
+    const validationState = (nodeData.data as any)?.validation;
+    if (validationState && !validationState.isValid) {
+      const errorMessages = validationState.errors
+        .map((e: any) => `${e.field}: ${e.message}`)
+        .join(", ");
+
+      this.config.logger.error(
+        `[${nodeId}] Node has validation errors: ${errorMessages}`,
+      );
+
+      const now = Date.now();
+      this.nodeResults.set(nodeId, {
+        nodeId,
+        nodeType,
+        status: "failed",
+        stage: this.stages.get(nodeId),
+        error: new Error(
+          `Node has ${validationState.errors.length} validation error(s). Fix these errors before executing.`,
+        ),
+        inputData: {},
+        data: {},
+        events: [],
+        durationMs: 0,
+        startTime: now,
+        endTime: now,
+      });
+
+      this.config.onNodeStatusChange?.({
+        nodeId,
+        status: "failed",
+        stage: this.stages.get(nodeId),
+      });
+
+      return; // Don't execute
+    }
+
     // Get node implementation
     const nodeInstance = nodeRegistry.getNodeType(nodeType);
 
@@ -650,9 +687,6 @@ export class WorkflowOrchestrator {
 		nodeId: string,
 		nodeType: string,
 	): Promise<Record<string, unknown>> {
-		// Build $items map: node name -> execution data
-		const $items: Record<string, INodeExecutionData[]> = {};
-
 		// Map node IDs to node names from workflow definition
 		const nodeIdToName = new Map<string, string>();
 		for (const node of this.config.definition.nodes) {
@@ -664,39 +698,37 @@ export class WorkflowOrchestrator {
 			nodeIdToName.set(node.id, nodeName);
 		}
 
-		// Populate $items with data from all nodes in state
+		// Build simple camelCase expression context (matches frontend ExpressionInput)
+		const nodeNameCounts: Record<string, number> = {};
+		const context: Record<string, any> = {};
+
 		for (const [stateNodeId, nodeOutputs] of Object.entries(this.state)) {
 			const nodeName = nodeIdToName.get(stateNodeId) || stateNodeId;
+
 			// Get the main output (usually the 'output' handle)
 			const mainOutput = nodeOutputs.output || nodeOutputs.main || Object.values(nodeOutputs)[0];
 			if (mainOutput && Array.isArray(mainOutput)) {
-				$items[nodeName] = mainOutput as INodeExecutionData[];
+				// Convert "Text Input" -> "textInput"
+				let camelCaseName = nodeName
+					.replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => char.toUpperCase())
+					.replace(/^[A-Z]/, (char) => char.toLowerCase());
+
+				// Handle duplicate names
+				if (nodeNameCounts[camelCaseName]) {
+					nodeNameCounts[camelCaseName]++;
+					camelCaseName = `${camelCaseName}${nodeNameCounts[camelCaseName]}`;
+				} else {
+					nodeNameCounts[camelCaseName] = 1;
+				}
+
+				// Add direct camelCase accessor with just the .json data
+				// Users write: {{ textInput.text }} ✓ (clean and simple)
+				const firstItem = mainOutput[0];
+				if (firstItem && firstItem.json) {
+					context[camelCaseName] = firstItem.json;
+				}
 			}
 		}
-
-		// Build $item array from all connected inputs
-		const $item: INodeExecutionData[] = [];
-		const inputKeys = Object.keys(inputData);
-		for (const key of inputKeys) {
-			const input = inputData[key];
-			if (input && Array.isArray(input) && input.length > 0) {
-				$item.push(...input);
-			}
-		}
-
-		// Get first input's data for $json
-		let $json: Record<string, any> | undefined;
-		if ($item.length > 0) {
-			$json = $item[0].json as Record<string, any>;
-		}
-
-		// Build expression context (n8n-style, all variables use $ prefix)
-		const context: ExpressionContext = {
-			$json,
-			$item: $item as Array<{ json: Record<string, any>; binary?: Record<string, any> }>,
-			$items: $items as Record<string, Array<{ json: Record<string, any>; binary?: Record<string, any> }>>,
-			$parameters: parameters,
-		};
 
 		// Recursively evaluate all string parameters
 		const evaluateValue = async (value: unknown): Promise<unknown> => {
@@ -728,10 +760,10 @@ export class WorkflowOrchestrator {
 		};
 
 		const evaluated = await evaluateValue(parameters) as Record<string, unknown>;
-		this.config.logger.debug(`[${nodeId}] Evaluated parameters:`, {
-			original: parameters,
-			evaluated,
-			context: JSON.stringify(context, null, 2),
+		this.config.logger.debug(`[${nodeId}] Expression evaluation:`, {
+			availableVariables: Object.keys(context),
+			originalParameters: parameters,
+			evaluatedParameters: evaluated,
 		});
 		return evaluated;
 	}

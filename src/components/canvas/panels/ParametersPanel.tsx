@@ -1,5 +1,7 @@
 import type { Node } from "@xyflow/react";
 import type React from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { ExpressionInput } from "@/components/shared/ExpressionInput";
 import { SchemaBuilder } from "@/components/shared/SchemaBuilder";
 import { Input } from "@/components/ui/input";
@@ -13,6 +15,10 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import type { INodeExecutionData } from "@/types/interfaces";
+import type {
+  INodeValidationState,
+  IValidationError,
+} from "@/types/validation";
 import { CredentialSelector } from "./CredentialSelector";
 
 interface NodeProperty {
@@ -39,6 +45,7 @@ interface ParametersPanelProps {
   executionResults?: INodeExecutionData;
   allExecutionResults?: Record<string, INodeExecutionData>;
   connectedNodes?: Node[];
+  readOnly?: boolean;
 }
 
 export function ParametersPanel({
@@ -50,6 +57,7 @@ export function ParametersPanel({
   executionResults: _executionResults,
   allExecutionResults,
   connectedNodes = [],
+  readOnly = false,
 }: ParametersPanelProps) {
   const nodeData = selectedNode.data as Record<string, unknown>;
   // Support both new nodeType and legacy nodeId
@@ -108,6 +116,64 @@ export function ParametersPanel({
     }
   };
 
+  // Track validation errors for all fields
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, IValidationError>
+  >({});
+
+  // Callback for field validation changes
+  const handleFieldValidation = (
+    fieldName: string,
+    error: IValidationError | null,
+  ) => {
+    setValidationErrors((prev) => {
+      const next = { ...prev };
+      if (error) {
+        next[fieldName] = error;
+      } else {
+        delete next[fieldName];
+      }
+      return next;
+    });
+  };
+
+  // Update node data with validation state whenever errors change
+  useEffect(() => {
+    const errors = Object.values(validationErrors);
+    const validationState: INodeValidationState = {
+      isValid: errors.length === 0,
+      errors,
+      lastValidated: Date.now(),
+    };
+
+    // Update node data with validation state
+    onUpdateNode(selectedNode.id, {
+      validation: validationState,
+    });
+  }, [validationErrors, selectedNode.id, onUpdateNode]);
+
+  // Show toast notifications for validation errors
+  useEffect(() => {
+    const errors = Object.values(validationErrors);
+    const errorCount = errors.length;
+
+    if (errorCount > 0) {
+      // Show error toast with list of errors
+      const errorList = errors
+        .map((e) => `• ${e.field}: ${e.message}`)
+        .join("\n");
+
+      toast.error(`Validation Error${errorCount > 1 ? "s" : ""}`, {
+        description: errorList,
+        duration: Infinity, // Persist until errors are fixed
+        id: `validation-${selectedNode.id}`, // Use same ID to replace previous toast
+      });
+    } else {
+      // Dismiss the error toast when all errors are fixed
+      toast.dismiss(`validation-${selectedNode.id}`);
+    }
+  }, [validationErrors, selectedNode.id]);
+
   // Build simple expression context - node names become camelCase variables
   // Example: "Manual Trigger" → manualTrigger.prompt
   const expressionContext = (() => {
@@ -122,34 +188,37 @@ export function ParametersPanel({
     for (const node of connectedNodes) {
       const nodeResult = allExecutionResults[node.id] as any;
 
-      if (nodeResult && nodeResult.data && !nodeResult.error) {
-        // Get node display name
-        const nodeName =
-          (node.data?.displayName as string) ||
-          (node.data?.name as string) ||
-          node.id;
+      // Skip if no result or error
+      if (!nodeResult || nodeResult.error) {
+        continue;
+      }
 
-        // Convert to camelCase for simple access
-        let camelCaseName = nodeName
-          .replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => char.toUpperCase())
-          .replace(/^[A-Z]/, (char) => char.toLowerCase());
+      // Get node display name
+      const nodeName =
+        (node.data?.displayName as string) ||
+        (node.data?.name as string) ||
+        node.id;
 
-        // Handle duplicate node names by appending number
-        if (nodeNameCounts[camelCaseName]) {
-          nodeNameCounts[camelCaseName]++;
-          camelCaseName = `${camelCaseName}${nodeNameCounts[camelCaseName]}`;
-        } else {
-          nodeNameCounts[camelCaseName] = 1;
-        }
+      // Convert to camelCase for simple access
+      let camelCaseName = nodeName
+        .replace(/[^a-zA-Z0-9]+(.)/g, (_, char) => char.toUpperCase())
+        .replace(/^[A-Z]/, (char) => char.toLowerCase());
 
-        // Get first item from main or output handle
-        const firstItem =
-          nodeResult.data.main?.[0] || nodeResult.data.output?.[0];
+      // Handle duplicate node names by appending number
+      if (nodeNameCounts[camelCaseName]) {
+        nodeNameCounts[camelCaseName]++;
+        camelCaseName = `${camelCaseName}${nodeNameCounts[camelCaseName]}`;
+      } else {
+        nodeNameCounts[camelCaseName] = 1;
+      }
 
-        if (firstItem && firstItem.json) {
-          // Flatten the structure - just use the json data directly
-          context[camelCaseName] = firstItem.json;
-        }
+      // Get first item from main or output handle
+      // nodeResult.data.main = [{ json: {...} }]
+      const outputData = nodeResult.data?.main?.[0] || nodeResult.data?.output?.[0];
+
+      if (outputData?.json) {
+        // Use the json data directly
+        context[camelCaseName] = outputData.json;
       }
     }
 
@@ -318,6 +387,7 @@ export function ParametersPanel({
                       handleCredentialChange(credReq.name, cred)
                     }
                     required={credReq.required}
+                    disabled={readOnly}
                   />
                 </div>
               );
@@ -412,6 +482,11 @@ export function ParametersPanel({
                             ? JSON.stringify(property.default, null, 2)
                             : "{}"
                         }
+                        disabled={readOnly}
+                        fieldName={property.name}
+                        onValidationChange={(error) =>
+                          handleFieldValidation(property.name, error)
+                        }
                       />
                     );
                   }
@@ -427,6 +502,7 @@ export function ParametersPanel({
                           onValueChange={(val) =>
                             handlePropertyChange(property.name, val)
                           }
+                          disabled={readOnly}
                         >
                           <SelectTrigger className="bg-surface-3">
                             <SelectValue />
@@ -457,6 +533,7 @@ export function ParametersPanel({
                           onDrop={(e) => handleDrop(e, property.name)}
                           placeholder={String(property.default || "")}
                           className="bg-surface-3"
+                          disabled={readOnly}
                         />
                       );
                     }
@@ -468,6 +545,7 @@ export function ParametersPanel({
                         }
                         executionContext={expressionContext}
                         connectedNodes={connectedNodesData}
+                        readOnly={readOnly}
                       />
                     );
                   }
@@ -478,6 +556,7 @@ export function ParametersPanel({
                         onCheckedChange={(checked) =>
                           handlePropertyChange(property.name, checked)
                         }
+                        disabled={readOnly}
                       />
                     );
                   }
@@ -495,6 +574,7 @@ export function ParametersPanel({
                         onDrop={(e) => handleDrop(e, property.name)}
                         placeholder={String(property.default || "")}
                         className="bg-surface-3"
+                        disabled={readOnly}
                       />
                     );
                   }
@@ -512,6 +592,7 @@ export function ParametersPanel({
                           onDrop={(e) => handleDrop(e, property.name)}
                           placeholder={String(property.default || "")}
                           className="bg-surface-3"
+                          disabled={readOnly}
                         />
                       );
                     }
@@ -523,6 +604,7 @@ export function ParametersPanel({
                         }
                         executionContext={expressionContext}
                         connectedNodes={connectedNodesData}
+                        readOnly={readOnly}
                       />
                     );
                   }

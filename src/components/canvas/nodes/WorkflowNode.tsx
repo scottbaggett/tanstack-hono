@@ -11,6 +11,7 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 import { memo } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
 import type { INodeExecutionStatus } from "../../../types/interfaces";
+import type { INodeValidationState } from "../../../types/validation";
 
 interface WorkflowNodeProps {
   data: {
@@ -21,8 +22,9 @@ interface WorkflowNodeProps {
     icon?: string;
     color?: string;
     executionStatus?: INodeExecutionStatus;
-
+    isSelectedInExecution?: boolean;
     stage?: number;
+    validation?: INodeValidationState;
   };
   isConnecting?: boolean;
   isSelected?: boolean;
@@ -36,6 +38,10 @@ export const WorkflowNode = memo(function WorkflowNode({
   const nodeIcon = data.icon || "box";
   const colorPalette = data.color || "standard-gray";
 
+  // Check validation state (different from execution error)
+  const hasValidationErrors = data.validation && !data.validation.isValid;
+  const validationErrorCount = data.validation?.errors.length || 0;
+
   return (
     <div
       data-node-color={colorPalette}
@@ -48,17 +54,20 @@ export const WorkflowNode = memo(function WorkflowNode({
 				flex items-center justify-center
 				transition-all duration-200 size-24
 				${
-          data.executionStatus === "completed"
-            ? "bg-green-10/50 border-green-9/50"
-            : data.executionStatus === "failed"
-              ? "bg-red-10/50 border-red-9/50"
-              : data.executionStatus === "running"
-                ? "bg-yellow-10/50 border-yellow-9/50"
-                : data.executionStatus === "pending"
-                  ? "bg-gray-10/50 border-gray-9/50 opacity-60"
-                  : data.executionStatus === "skipped"
-                    ? "bg-gray-10/30 border-gray-9/30 opacity-40"
-                    : "bg-node/80 border-node-border/50"
+          // Validation errors take priority (before execution)
+          hasValidationErrors
+            ? "bg-red-10/30 border-red-9 border-2"
+            : data.executionStatus === "completed"
+              ? "bg-green-10/50 border-green-9/50"
+              : data.executionStatus === "failed"
+                ? "bg-red-10/50 border-red-9/50"
+                : data.executionStatus === "running"
+                  ? "bg-yellow-10/50 border-yellow-9/50"
+                  : data.executionStatus === "pending"
+                    ? "bg-gray-10/50 border-gray-9/50 opacity-60"
+                    : data.executionStatus === "skipped"
+                      ? "bg-gray-10/30 border-gray-9/30 opacity-40"
+                      : "bg-node/80 border-node-border/50"
         }
 				${
           isSelected
@@ -67,7 +76,8 @@ export const WorkflowNode = memo(function WorkflowNode({
               ? ""
               : "hover:border-node-border"
         }
-				${isConnecting ? "opacity-50" : "opacity-100"}`}
+				${isConnecting ? "opacity-50" : "opacity-100"}
+				${data.isSelectedInExecution ? "ring-4 ring-info-9/40 ring-offset-2 ring-offset-background" : ""}`}
       >
         {/* Single Input Handle (Left Side) */}
         <Handle
@@ -99,6 +109,18 @@ export const WorkflowNode = memo(function WorkflowNode({
 
         {nodeIcon && (
           <LucideIcon name={nodeIcon} className="size-10 shrink-0 " />
+        )}
+
+        {/* Validation Error Badge (appears before execution) */}
+        {hasValidationErrors && (
+          <div
+            className="absolute -top-2 -right-2 size-6 rounded-full bg-red-9 border-2 border-surface-1 flex items-center justify-center"
+            title={`${validationErrorCount} validation error${validationErrorCount > 1 ? "s" : ""}`}
+          >
+            <span className="text-xs font-bold text-white">
+              {validationErrorCount}
+            </span>
+          </div>
         )}
 
         {/* Execution Status Badge */}

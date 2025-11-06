@@ -67,9 +67,13 @@ export async function executeAgent(
 	// Get model from evaluatedProperties
 	const modelFromProperty = evaluatedProperties.model as string | undefined;
 
-	// Debug: log what we received
-	console.log('[AGENT] Model from properties:', modelFromProperty);
-	console.log('[AGENT] All evaluatedProperties:', Object.keys(evaluatedProperties));
+	// Debug: log what we received (AFTER expression evaluation)
+	console.log('[AGENT] ===== EVALUATED PROPERTIES (expressions already resolved) =====');
+	console.log('[AGENT] systemPrompt:', systemPrompt);
+	console.log('[AGENT] userPrompt:', userPrompt);
+	console.log('[AGENT] model:', modelFromProperty);
+	console.log('[AGENT] temperature:', temperature);
+	console.log('[AGENT] ================================================================');
 
 	if (modelFromProperty) {
 		// Use model from node properties (simplified approach)

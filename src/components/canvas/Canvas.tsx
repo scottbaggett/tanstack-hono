@@ -39,6 +39,7 @@ interface CanvasProps {
   runId?: string;
   nodeExecutionsMap?: Map<string, any>;
   onNodeClick?: (nodeId: string) => void;
+  onNodeDoubleClick?: (nodeId: string) => void;
   executionStream?: ReturnType<typeof import("@/hooks/use-execution-stream").useExecutionStream>;
 }
 
@@ -54,6 +55,7 @@ export function Canvas({
   runId,
   nodeExecutionsMap,
   onNodeClick,
+  onNodeDoubleClick,
   executionStream,
 }: CanvasProps) {
   const navigate = useNavigate();
@@ -95,12 +97,13 @@ export function Canvas({
   // Track the last synced definition to prevent unnecessary updates
   const lastSyncedDefinitionRef = useRef<string>("");
 
-  // Overlay execution status on nodes when in execution mode
+  // Overlay execution status and selection state on nodes when in execution mode
   useEffect(() => {
     if (executionMode && nodeExecutionsMap) {
       setNodes((nds) =>
         nds.map((node) => {
           const nodeExecution = nodeExecutionsMap.get(node.id);
+          const isSelected = selectedNodeId === node.id;
 
           if (!nodeExecution) {
             return {
@@ -108,6 +111,7 @@ export function Canvas({
               data: {
                 ...node.data,
                 executionStatus: "pending",
+                isSelectedInExecution: isSelected,
               },
             };
           }
@@ -119,12 +123,13 @@ export function Canvas({
             data: {
               ...node.data,
               executionStatus: nodeExecution.status,
+              isSelectedInExecution: isSelected,
             },
           };
         }),
       );
     }
-  }, [executionMode, nodeExecutionsMap, setNodes]);
+  }, [executionMode, nodeExecutionsMap, selectedNodeId, setNodes]);
 
   // Update node execution status in real-time from execution stream
   useEffect(() => {
@@ -462,6 +467,10 @@ export function Canvas({
               }
             }}
             onNodeDoubleClick={(_, node) => {
+              if (executionMode && onNodeDoubleClick) {
+                onNodeDoubleClick(node.id);
+                return;
+              }
               if (executionMode && onNodeClick) {
                 onNodeClick(node.id);
                 return;

@@ -5,6 +5,7 @@ import {
 	Outlet,
 	Scripts,
 } from "@tanstack/react-router";
+import { Toaster } from "@/components/ui/sonner";
 import { ThemeContextProvider } from "../context/ThemeContext";
 import { queryClient } from "../lib/query-client";
 import type { RouterContext } from "../routerContext";
@@ -132,6 +133,7 @@ function RootComponent() {
 				<ThemeContextProvider>
 					<QueryClientProvider client={queryClient}>
 						<Outlet />
+						<Toaster position="bottom-right" />
 					</QueryClientProvider>
 				</ThemeContextProvider>
 				<Scripts />

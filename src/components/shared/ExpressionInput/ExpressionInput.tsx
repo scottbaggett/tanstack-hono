@@ -401,7 +401,7 @@ export function ExpressionInput({
 
     if (!executionContext) {
       setEvaluatedResult("");
-      setEvaluationError("No execution data available");
+      setEvaluationError(""); // Don't show error if no context
       return;
     }
 
@@ -412,8 +412,19 @@ export function ExpressionInput({
         setEvaluatedResult(String(result.value));
         setEvaluationError("");
       } else {
-        setEvaluatedResult("");
-        setEvaluationError(result.error || "Evaluation failed");
+        // Check if error is due to undefined variable (previous nodes not executed)
+        const errorMsg = result.error || "Evaluation failed";
+        const isUndefinedError = errorMsg.includes("is not defined") || errorMsg.includes("undefined");
+
+        if (isUndefinedError) {
+          // Not a real error - just missing data from upstream nodes
+          setEvaluatedResult("");
+          setEvaluationError(""); // Clear error, we'll show a helpful message instead
+        } else {
+          // Real syntax/evaluation error
+          setEvaluatedResult("");
+          setEvaluationError(errorMsg);
+        }
       }
     })();
   }, [value, executionContext]);
@@ -461,6 +472,10 @@ export function ExpressionInput({
                 <span className="text-error-11">{evaluationError}</span>
               ) : evaluatedResult ? (
                 evaluatedResult
+              ) : hasExpression && executionContext ? (
+                <span className="text-surface-10">
+                  Execute previous nodes for preview
+                </span>
               ) : (
                 <span className="text-surface-10">
                   {hasExpression ? "Evaluating..." : "Enter an expression"}
