@@ -21,12 +21,15 @@ import type { StreamEvent } from "../../types/execution";
 import type {
   IExecutionContext,
   INodeExecutionData,
+  INodeExecutionStatus,
   IWorkflowDefinition,
+  IWorkflowRunStatus,
 } from "../../types/interfaces";
 import { db } from "../db";
 import type { InternalStep, InternalTraceData } from "../db/schema";
-import { nodeExecutions } from "../db/schema";
+import { executionEvents, nodeExecutions } from "../db/schema";
 import { type ExpressionContext, evaluateTemplate } from "../lib/expressions";
+import { calculateStages } from "../lib/stages";
 import { nodeRegistry } from "../nodes/registry";
 import type { EngineRequest, RequestResponseMetadata } from "../types/agent";
 import { ExecuteFunctions } from "./ExecuteFunctions";
@@ -48,6 +51,14 @@ export interface OrchestrationConfig {
   secrets: Map<string, string>;
   logger: Console;
   skipPersistence?: boolean; // Skip database persistence (for testing)
+  onNodeStatusChange?: (event: NodeStatusEvent) => void; // Callback for real-time status updates
+}
+
+export interface NodeStatusEvent {
+  nodeId: string;
+  status: INodeExecutionStatus;
+  stage?: number;
+  error?: string;
 }
 
 export type NodeExecutionMode = "execute" | "webhook" | "poll";
@@ -58,11 +69,12 @@ export type NodeExecutionMode = "execute" | "webhook" | "poll";
 export interface NodeExecutionResult {
   nodeId: string;
   nodeType: string;
-  status: "success" | "error" | "skipped";
+  status: INodeExecutionStatus; // Using typed status from interfaces
   // Execution metadata
   startTime: number;
   endTime: number;
   durationMs: number;
+  stage?: number; // Execution stage (calculated from workflow topology)
   // Data flow
   inputData: Record<string, unknown>; // Data received from upstream nodes
   data?: Record<string, INodeExecutionData[]>; // Result data per output handle (n8n: resultData)
@@ -79,7 +91,7 @@ export interface NodeExecutionResult {
 export interface OrchestrationResult {
   workflowId: string;
   runId: string;
-  status: "success" | "error";
+  status: IWorkflowRunStatus; // Using typed status from interfaces
   nodeResults: Map<string, NodeExecutionResult>;
   finalOutputs: Record<string, unknown>;
   allEvents: StreamEvent[];
@@ -98,6 +110,7 @@ export class WorkflowOrchestrator {
   private nodeResults: Map<string, NodeExecutionResult> = new Map();
   private allEvents: StreamEvent[] = [];
   private errors: Array<{ nodeId?: string; error: Error }> = [];
+  private stages: Map<string, number> = new Map(); // nodeId -> stage number
 
   /**
    * Conversation memory scoped to this workflow run
@@ -165,6 +178,12 @@ export class WorkflowOrchestrator {
         `[ORCHESTRATOR] Starting workflow: ${this.config.workflowId}`,
       );
 
+      // Calculate stages for all nodes based on workflow topology
+      this.calculateExecutionStages();
+      this.config.logger.info(
+        `[ORCHESTRATOR] Calculated stages for ${this.stages.size} nodes`,
+      );
+
       // Get execution order using topological sort
       const executionOrder = this.getExecutionOrder();
       this.config.logger.info(
@@ -208,7 +227,7 @@ export class WorkflowOrchestrator {
       return {
         workflowId: this.config.workflowId,
         runId: this.config.runId,
-        status: this.errors.length === 0 ? "success" : "error",
+        status: this.errors.length === 0 ? "completed" : "failed",
         nodeResults: this.nodeResults,
         finalOutputs: this.state,
         allEvents: this.allEvents,
@@ -228,7 +247,7 @@ export class WorkflowOrchestrator {
       return {
         workflowId: this.config.workflowId,
         runId: this.config.runId,
-        status: "error",
+        status: "failed",
         nodeResults: this.nodeResults,
         finalOutputs: this.state,
         allEvents: this.allEvents,
@@ -267,6 +286,13 @@ export class WorkflowOrchestrator {
       );
     }
 
+    // Emit node running status
+    this.config.onNodeStatusChange?.({
+      nodeId,
+      status: "running",
+      stage: this.stages.get(nodeId),
+    });
+
     this.config.logger.info(
       `[${nodeId}] Starting execution (type: ${nodeType})`,
     );
@@ -284,7 +310,7 @@ export class WorkflowOrchestrator {
     this.config.logger.debug(`[${nodeId}] Input data:`, inputData);
 
 		// Evaluate expressions in node parameters
-		const evaluatedParameters = this.evaluateNodeParameters(
+		const evaluatedParameters = await this.evaluateNodeParameters(
 			nodeParameters,
 			inputData,
 			nodeId,
@@ -447,7 +473,8 @@ export class WorkflowOrchestrator {
         this.nodeResults.set(nodeId, {
           nodeId,
           nodeType,
-          status: "success",
+          status: "completed",
+          stage: this.stages.get(nodeId),
           inputData: inputData as Record<string, unknown>,
           data: outputs,
           internalTrace, // NEW: Store agent's internal trace
@@ -455,6 +482,13 @@ export class WorkflowOrchestrator {
           durationMs: endTime - startTime,
           startTime,
           endTime,
+        });
+
+        // Emit node completed status
+        this.config.onNodeStatusChange?.({
+          nodeId,
+          status: "completed",
+          stage: this.stages.get(nodeId),
         });
 
         this.allEvents.push(...events);
@@ -492,13 +526,21 @@ export class WorkflowOrchestrator {
       this.nodeResults.set(nodeId, {
         nodeId,
         nodeType,
-        status: "success",
+        status: "completed",
+        stage: this.stages.get(nodeId),
         inputData: inputData as Record<string, unknown>,
         data: outputs,
         events,
         durationMs: endTime - startTime,
         startTime,
         endTime,
+      });
+
+      // Emit node completed status
+      this.config.onNodeStatusChange?.({
+        nodeId,
+        status: "completed",
+        stage: this.stages.get(nodeId),
       });
 
       // Collect events
@@ -510,16 +552,27 @@ export class WorkflowOrchestrator {
 
       this.config.logger.error(`[${nodeId}] Execution failed:`, error);
 
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
       this.nodeResults.set(nodeId, {
         nodeId,
         nodeType,
-        status: "error",
+        status: "failed",
+        stage: this.stages.get(nodeId),
         inputData: inputData as Record<string, unknown>,
         error: error instanceof Error ? error : new Error(String(error)),
         events: [],
         durationMs: endTime - startTime,
         startTime,
         endTime,
+      });
+
+      // Emit node failed status
+      this.config.onNodeStatusChange?.({
+        nodeId,
+        status: "failed",
+        stage: this.stages.get(nodeId),
+        error: errorMessage,
       });
 
       throw error;
@@ -591,12 +644,12 @@ export class WorkflowOrchestrator {
 	 * Evaluate expressions in node parameters
 	 * Resolves {{expression}} syntax using data from connected nodes
 	 */
-	private evaluateNodeParameters(
+	private async evaluateNodeParameters(
 		parameters: Record<string, unknown>,
 		inputData: Record<string, INodeExecutionData[]>,
 		nodeId: string,
 		nodeType: string,
-	): Record<string, unknown> {
+	): Promise<Record<string, unknown>> {
 		// Build expression context from input data
 		const context: ExpressionContext = {
 			node: {
@@ -633,9 +686,9 @@ export class WorkflowOrchestrator {
     }
 
 		// Recursively evaluate all string parameters
-		const evaluateValue = (value: unknown): unknown => {
+		const evaluateValue = async (value: unknown): Promise<unknown> => {
 			if (typeof value === "string") {
-				const result = evaluateTemplate(value, context);
+				const result = await evaluateTemplate(value, context);
 				if (!result.success) {
 					this.config.logger.error(
 						`[${nodeId}] Expression evaluation failed:`,
@@ -661,7 +714,7 @@ export class WorkflowOrchestrator {
 			return value;
 		};
 
-		const evaluated = evaluateValue(parameters) as Record<string, unknown>;
+		const evaluated = await evaluateValue(parameters) as Record<string, unknown>;
 		this.config.logger.debug(`[${nodeId}] Evaluated parameters:`, {
 			original: parameters,
 			evaluated,
@@ -721,6 +774,28 @@ export class WorkflowOrchestrator {
     }
 
     return inputData;
+  }
+
+  /**
+   * Calculate execution stages for all nodes based on workflow topology
+   * Uses the same algorithm as src/server/lib/stages.ts but stores results in memory
+   */
+  private calculateExecutionStages(): void {
+    // Create mock node executions with just nodeIds for stage calculation
+    const mockExecutions = this.config.definition.nodes.map((node) => ({
+      nodeId: node.id,
+    })) as any[];
+
+    // Calculate stages using the shared algorithm
+    const executionsWithStages = calculateStages(
+      this.config.definition,
+      mockExecutions,
+    );
+
+    // Store stages in memory for quick lookup during execution
+    for (const execution of executionsWithStages) {
+      this.stages.set(execution.nodeId, execution.stage);
+    }
   }
 
   /**
@@ -806,18 +881,49 @@ export class WorkflowOrchestrator {
 
     try {
       for (const [nodeId, result] of this.nodeResults.entries()) {
+        // Get node data for label
+        const nodeData = this.config.definition.nodes.find((n) => n.id === nodeId);
+        const nodeName = (nodeData?.data as any)?.label || nodeId;
+
+        // Also persist execution events for node start/complete
+        await db.insert(executionEvents).values([
+          {
+            runId: this.config.runId,
+            nodeId,
+            eventType: "node_start",
+            eventData: {
+              nodeName,
+              stage: result.stage,
+            } as any,
+            timestamp: new Date(result.startTime),
+          },
+          {
+            runId: this.config.runId,
+            nodeId,
+            eventType: result.status === "failed" ? "node_error" : "node_complete",
+            eventData: {
+              nodeName,
+              stage: result.stage,
+              status: result.status,
+              ...(result.error && { message: result.error.message }),
+            } as any,
+            timestamp: new Date(result.endTime),
+          },
+        ]);
+
         await db.insert(nodeExecutions).values({
           runId: this.config.runId,
           nodeId,
           nodeType: result.nodeType,
           status: result.status,
+          stage: result.stage,
           inputs: result.inputData as any,
           outputs: result.data as any,
           internalTrace: result.internalTrace,
           startedAt: new Date(result.startTime),
           completedAt: new Date(result.endTime),
           errorMessage:
-            result.status === "error" ? "Execution failed" : undefined,
+            result.status === "failed" ? "Execution failed" : undefined,
         });
       }
       this.config.logger.info(

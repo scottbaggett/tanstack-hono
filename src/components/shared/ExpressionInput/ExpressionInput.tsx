@@ -338,14 +338,17 @@ export function ExpressionInput({
       return;
     }
 
-    const result = evaluateTemplate(value, executionContext);
-    if (result.success) {
-      setEvaluatedResult(String(result.value));
-      setEvaluationError("");
-    } else {
-      setEvaluatedResult("");
-      setEvaluationError(result.error || "Evaluation failed");
-    }
+    // Async evaluation
+    (async () => {
+      const result = await evaluateTemplate(value, executionContext);
+      if (result.success) {
+        setEvaluatedResult(String(result.value));
+        setEvaluationError("");
+      } else {
+        setEvaluatedResult("");
+        setEvaluationError(result.error || "Evaluation failed");
+      }
+    })();
   }, [value, executionContext]);
 
   const hasExpression = hasExpressions(value);
@@ -409,9 +412,9 @@ export function ExpressionInput({
               <code className="px-1 py-0.5 bg-surface-4 rounded">
                 {"{{ }}"}
               </code>{" "}
-              is a CEL expression.{" "}
+              is a JSONata expression.{" "}
               <a
-                href="https://docs.example.com/expressions"
+                href="https://docs.jsonata.org/overview.html"
                 className="text-info-11 hover:text-info-10"
                 target="_blank"
                 rel="noopener noreferrer"

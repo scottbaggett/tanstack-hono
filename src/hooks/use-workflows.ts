@@ -11,6 +11,7 @@ import type {
 	WorkflowsListResponse,
 	WorkflowRun,
 	WorkflowRunsListResponse,
+	NodeExecution,
 } from "@/server/types/api";
 
 /**
@@ -122,7 +123,9 @@ export function useUpdateWorkflow() {
 		},
 		onSuccess: (data) => {
 			queryClient.invalidateQueries({ queryKey: ["workflows"] });
-			queryClient.invalidateQueries({ queryKey: ["workflows", data.id] });
+			if (data?.id) {
+				queryClient.invalidateQueries({ queryKey: ["workflows", data.id] });
+			}
 		},
 	});
 }
@@ -269,7 +272,7 @@ export function useWorkflowRun(
 
 			const response = await apiRequest<{
 				run: WorkflowRun;
-				executions: unknown[];
+				executions: NodeExecution[];
 			}>(`/api/workflows/${workflowId}/runs/${runId}`, {
 				method: "GET",
 			});
@@ -281,5 +284,37 @@ export function useWorkflowRun(
 			return response.data;
 		},
 		enabled: !!workflowId && !!runId && typeof window !== "undefined",
+	});
+}
+
+/**
+ * Delete a workflow run
+ */
+export function useDeleteWorkflowRun() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (input: {
+			workflowId: string;
+			runId: string;
+		}) => {
+			const { workflowId, runId } = input;
+
+			const response = await apiRequest<{ success: boolean }>(
+				`/api/workflows/${workflowId}/runs/${runId}`,
+				{ method: "DELETE" },
+			);
+
+			if (!response.success) {
+				throw new Error(response.error || "Failed to delete workflow run");
+			}
+
+			return response.data;
+		},
+		onSuccess: (_, variables) => {
+			queryClient.invalidateQueries({
+				queryKey: ["workflow-runs", variables.workflowId],
+			});
+		},
 	});
 }

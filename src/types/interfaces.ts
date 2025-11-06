@@ -115,6 +115,27 @@ export interface INodeTypeDescription extends INodeTypeBaseDescription {
 // NODE EXECUTION
 // ============================================================================
 
+/**
+ * Node execution status
+ * Used consistently across database, orchestrator, and UI
+ */
+export type INodeExecutionStatus =
+	| "pending"    // Node has not started yet
+	| "running"    // Node is currently executing
+	| "completed"  // Node finished successfully
+	| "failed"     // Node execution failed
+	| "skipped";   // Node was skipped (conditional execution)
+
+/**
+ * Workflow run status
+ */
+export type IWorkflowRunStatus =
+	| "pending"    // Workflow has not started
+	| "running"    // Workflow is executing
+	| "completed"  // Workflow finished successfully
+	| "failed"     // Workflow execution failed
+	| "error";     // Workflow encountered an error
+
 export interface IExecutionContext {
 	nodeId: string;
 	nodeType: string;

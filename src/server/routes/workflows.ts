@@ -25,6 +25,11 @@ import {
   workflows,
   workflowVersions,
 } from "../db/schema";
+import type { IWorkflowDefinition } from "@/types/interfaces";
+import {
+  calculateStages,
+  sortNodeExecutionsByStage,
+} from "../lib/stages";
 
 // ============================================================================
 // ROUTE HANDLER
@@ -347,8 +352,9 @@ workflowRoutes
   })
   .get("/:workflowId/runs/:runId", async (c) => {
     try {
-      const { runId } = c.req.param();
+      const { workflowId, runId } = c.req.param();
 
+      // Get the workflow run
       const run = await db
         .select()
         .from(workflowRuns)
@@ -365,17 +371,42 @@ workflowRoutes
         );
       }
 
+      // Get workflow definition to calculate stages
+      const workflow = await db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, workflowId))
+        .limit(1);
+
+      if (workflow.length === 0) {
+        return c.json(
+          {
+            success: false,
+            error: "Workflow not found",
+          },
+          404,
+        );
+      }
+
       // Get node executions for this run
       const executions = await db
         .select()
         .from(nodeExecutions)
         .where(eq(nodeExecutions.runId, runId));
 
+      // Calculate stages and sort by stage
+      const workflowDefinition = workflow[0].definition as IWorkflowDefinition;
+      const executionsWithStages = calculateStages(
+        workflowDefinition,
+        executions,
+      );
+      const sortedExecutions = sortNodeExecutionsByStage(executionsWithStages);
+
       return c.json({
         success: true,
         data: {
           run: run[0],
-          executions,
+          executions: sortedExecutions,
         },
       });
     } catch (error) {
@@ -445,6 +476,77 @@ workflowRoutes
           success: false,
           error:
             error instanceof Error ? error.message : "Failed to run workflow",
+        },
+        500,
+      );
+    }
+  })
+  .delete("/:workflowId/runs/:runId", async (c) => {
+    try {
+      const { workflowId, runId } = c.req.param();
+      const user = getAuthUser(c);
+
+      // Verify the run exists and belongs to the workflow
+      const run = await db
+        .select()
+        .from(workflowRuns)
+        .where(eq(workflowRuns.id, runId))
+        .limit(1);
+
+      if (run.length === 0) {
+        return c.json(
+          {
+            success: false,
+            error: "Run not found",
+          },
+          404,
+        );
+      }
+
+      // Verify the workflow belongs to the user
+      const workflow = await db
+        .select()
+        .from(workflows)
+        .where(eq(workflows.id, workflowId))
+        .limit(1);
+
+      if (workflow.length === 0) {
+        return c.json(
+          {
+            success: false,
+            error: "Workflow not found",
+          },
+          404,
+        );
+      }
+
+      if (workflow[0].ownerId !== user.userId) {
+        return c.json(
+          {
+            success: false,
+            error: "Unauthorized",
+          },
+          403,
+        );
+      }
+
+      // Delete the run (cascade will delete related node_executions and execution_events)
+      await db.delete(workflowRuns).where(eq(workflowRuns.id, runId));
+
+      return c.json({
+        success: true,
+        message: "Run deleted successfully",
+      });
+    } catch (error) {
+      console.error("Failed to delete workflow run:", error);
+
+      return c.json(
+        {
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to delete workflow run",
         },
         500,
       );

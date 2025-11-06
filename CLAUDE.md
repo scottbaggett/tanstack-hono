@@ -61,6 +61,26 @@ See `docs/agents/` for full implementation plan and status.
 - Tool registration happens in `src/server/nodes/load.ts`
 - All tools must have Zod schemas for validation
 
+### Type System & Naming Conventions
+
+**Interface Naming:**
+- All interfaces MUST be prefixed with `I` (e.g., `IWorkflowDefinition`, `INodeType`)
+- All type aliases MUST be prefixed with `I` (e.g., `INodeExecutionStatus`, `IWorkflowRunStatus`)
+- This applies to ALL types defined in `src/types/interfaces.ts`
+- Exceptions: Zod-inferred types in API schemas (e.g., `WorkflowRun` from `WorkflowRunSchema`)
+
+**Type Consistency:**
+- Define core types ONCE in `src/types/interfaces.ts` with the `I` prefix
+- Use these types consistently across database schema, orchestrator, and UI
+- Database status fields MUST use the exact string literals from type definitions
+- Never use similar-but-different values (e.g., don't use "success" when type defines "completed")
+
+**Status Type Rules:**
+- Node execution status: Use `INodeExecutionStatus` type
+- Workflow run status: Use `IWorkflowRunStatus` type
+- Both are defined in `src/types/interfaces.ts`
+- Status mappings should NOT be needed if types are used correctly everywhere
+
 ### Testing Guidelines
 
 - **Use Vitest** for all new tests (project standard)

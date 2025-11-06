@@ -39,6 +39,7 @@ interface CanvasProps {
   runId?: string;
   nodeExecutionsMap?: Map<string, any>;
   onNodeClick?: (nodeId: string) => void;
+  executionStream?: ReturnType<typeof import("@/hooks/use-execution-stream").useExecutionStream>;
 }
 
 // Define available node types
@@ -53,6 +54,7 @@ export function Canvas({
   runId,
   nodeExecutionsMap,
   onNodeClick,
+  executionStream,
 }: CanvasProps) {
   const navigate = useNavigate();
   const reactFlowInstance = useRef<ReactFlowInstance | null>(null);
@@ -99,6 +101,7 @@ export function Canvas({
       setNodes((nds) =>
         nds.map((node) => {
           const nodeExecution = nodeExecutionsMap.get(node.id);
+
           if (!nodeExecution) {
             return {
               ...node,
@@ -109,26 +112,41 @@ export function Canvas({
             };
           }
 
-          // Map database status to execution status
-          const statusMap: Record<string, string> = {
-            completed: "completed",
-            failed: "failed",
-            running: "running",
-            pending: "pending",
-            skipped: "skipped",
-          };
-
+          // Database now stores status values that match INodeExecutionStatus type
+          // from src/types/interfaces.ts, so we can use them directly
           return {
             ...node,
             data: {
               ...node.data,
-              executionStatus: statusMap[nodeExecution.status] || "pending",
+              executionStatus: nodeExecution.status,
             },
           };
         }),
       );
     }
   }, [executionMode, nodeExecutionsMap, setNodes]);
+
+  // Update node execution status in real-time from execution stream
+  useEffect(() => {
+    if (executionStream && executionStream.nodeStatuses.size > 0) {
+      setNodes((nds) =>
+        nds.map((node) => {
+          const nodeStatus = executionStream.nodeStatuses.get(node.id);
+          if (!nodeStatus) {
+            return node;
+          }
+
+          return {
+            ...node,
+            data: {
+              ...node.data,
+              executionStatus: nodeStatus.status,
+            },
+          };
+        }),
+      );
+    }
+  }, [executionStream?.nodeStatuses, setNodes, executionStream]);
 
   // Sync nodes and edges when workflow loads (only if definition actually changed)
   useEffect(() => {
@@ -404,6 +422,7 @@ export function Canvas({
           hasSelectedNode={!!selectedNode}
           isSaving={updateWorkflow.isPending || createWorkflow.isPending}
           onSave={handleSave}
+          executionStream={executionStream}
         />
       )}
 

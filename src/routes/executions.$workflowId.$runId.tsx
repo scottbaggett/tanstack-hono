@@ -5,7 +5,6 @@
  */
 
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { formatDistanceToNow } from "date-fns";
 import { useState } from "react";
 import { Canvas } from "@/components/canvas/Canvas";
 import { ExecutionHeader } from "@/components/canvas/ExecutionHeader";

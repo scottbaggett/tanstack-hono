@@ -8,6 +8,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Canvas } from "@/components/canvas/Canvas";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
+import { useExecutionStream } from "@/hooks/use-execution-stream";
 
 interface WorkflowSearch {
 	nodeId?: string;
@@ -29,6 +30,15 @@ function WorkflowPage() {
 	// Ensure user is authenticated
 	useProtectedRoute();
 
-	// Render the workflow editor
-	return <Canvas workflowId={workflowId} selectedNodeId={nodeId} />;
+	// Execution stream for real-time feedback
+	const executionStream = useExecutionStream();
+
+	// Render the workflow editor with execution stream
+	return (
+		<Canvas
+			workflowId={workflowId}
+			selectedNodeId={nodeId}
+			executionStream={executionStream}
+		/>
+	);
 }

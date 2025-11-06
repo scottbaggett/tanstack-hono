@@ -202,6 +202,8 @@ export const nodeExecutions = pgTable(
 		nodeType: varchar("node_type", { length: 100 }).notNull(),
 		// Status: pending, running, completed, failed, skipped
 		status: varchar("status", { length: 20 }).default("pending").notNull(),
+		// Execution stage (calculated from workflow topology)
+		stage: integer("stage"),
 		// Input data passed to the node
 		inputs: jsonb("inputs"),
 		// Output data produced by the node
@@ -221,6 +223,7 @@ export const nodeExecutions = pgTable(
 		index("node_executions_run_id_idx").on(table.runId),
 		index("node_executions_node_id_idx").on(table.nodeId),
 		index("node_executions_status_idx").on(table.status),
+		index("node_executions_stage_idx").on(table.stage),
 	],
 );
 

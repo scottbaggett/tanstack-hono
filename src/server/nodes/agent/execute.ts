@@ -67,6 +67,10 @@ export async function executeAgent(
 	// Get model from evaluatedProperties
 	const modelFromProperty = evaluatedProperties.model as string | undefined;
 
+	// Debug: log what we received
+	console.log('[AGENT] Model from properties:', modelFromProperty);
+	console.log('[AGENT] All evaluatedProperties:', Object.keys(evaluatedProperties));
+
 	if (modelFromProperty) {
 		// Use model from node properties (simplified approach)
 		const { ChatOpenAI } = await import("@langchain/openai");
@@ -111,8 +115,10 @@ export async function executeAgent(
 			throw new Error(`Unsupported provider: ${modelConfig.provider}`);
 		}
 	} else {
-		// Fall back to connection-based model
-		model = await getChatModel(context);
+		// No model selected in properties
+		throw new Error(
+			'No model selected. Please select a model from the "Model" dropdown in the node properties.',
+		);
 	}
 
 	const langchainTools = await getTools(context);

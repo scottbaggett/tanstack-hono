@@ -1,25 +1,30 @@
 /**
- * Workflow Executions List Route
+ * Workflow Executions Route - n8n Style
  *
- * Lists all execution runs for a workflow at /workflow/:workflowId/executions
+ * Two-panel layout:
+ * - Left: Executions list
+ * - Right: Graph replay (Canvas in execution mode)
+ * - Bottom: Expandable logs panel
  */
 
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { formatDistanceToNow } from "date-fns";
+import { Filter } from "lucide-react";
+import { useState } from "react";
+import { Canvas } from "@/components/canvas/Canvas";
 import { LucideIcon } from "@/components/icon/LucideIcon";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProtectedRoute } from "@/hooks/use-protected-route";
-import { useWorkflow, useWorkflowRuns } from "@/hooks/use-workflows";
+import {
+  useWorkflow,
+  useWorkflowRun,
+  useWorkflowRuns,
+} from "@/hooks/use-workflows";
+import type { NodeExecution } from "@/server/types/api";
+import { cn } from "../lib/utils";
 
 export const Route = createFileRoute("/executions/$workflowId")({
   component: ExecutionsPage,
@@ -28,53 +33,72 @@ export const Route = createFileRoute("/executions/$workflowId")({
 function ExecutionsPage() {
   useProtectedRoute();
   const { workflowId } = Route.useParams();
-  const { data: workflow, isLoading: workflowLoading } =
-    useWorkflow(workflowId);
+  const { data: workflow } = useWorkflow(workflowId);
   const {
     data: runs,
     isLoading: runsLoading,
-    error: runsError,
     refetch,
   } = useWorkflowRuns(workflowId);
 
-  const isLoading = workflowLoading || runsLoading;
+  // Selected execution
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(
+    runs?.[0]?.id || null,
+  );
+
+  // Fetch selected run details
+  const { data: selectedRunData } = useWorkflowRun(
+    workflowId,
+    selectedRunId || null,
+  );
+
+  // Logs panel state
+  const [isLogsPanelExpanded, setIsLogsPanelExpanded] = useState(false);
+
+  // Auto-select first run when runs load
+  if (runs && runs.length > 0 && !selectedRunId) {
+    setSelectedRunId(runs[0].id);
+  }
+
+  // Create nodeExecutionsMap from selected run
+  const nodeExecutionsMap = new Map<string, NodeExecution>();
+  if (selectedRunData?.executions) {
+    for (const execution of selectedRunData.executions) {
+      nodeExecutionsMap.set(execution.nodeId, execution);
+    }
+  }
 
   return (
-    <div className="container mx-auto py-8 px-4 max-w-7xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Link
-              to="/workflow/$workflowId"
-              params={{ workflowId }}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <LucideIcon name="arrow-left" className="h-4 w-4" />
-            </Link>
-            <h1 className="text-4xl font-bold">
-              {workflow?.name || "Workflow"} Executions
+    <div className="h-screen w-screen flex flex-col bg-background">
+      {/* Top Bar */}
+      <div className="border-b px-4 py-3 flex items-center justify-between bg-background z-10">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/workflow/$workflowId"
+            params={{ workflowId }}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <LucideIcon name="arrow-left" className="h-5 w-5" />
+          </Link>
+          <div>
+            <h1 className="text-lg font-semibold">
+              {workflow?.name || "Workflow"} - Executions
             </h1>
           </div>
-          <p className="text-muted-foreground">
-            View and debug all execution runs for this workflow
-          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="sm"
             onClick={() => refetch()}
             disabled={runsLoading}
           >
             <LucideIcon
               name={runsLoading ? "loader-2" : "refresh-cw"}
-              className={`mr-2 h-4 w-4 ${runsLoading ? "animate-spin" : ""}`}
+              className={`${runsLoading ? "animate-spin" : ""}`}
             />
             Refresh
           </Button>
           <Link to="/workflow/$workflowId" params={{ workflowId }}>
-            <Button variant="outline" size="sm">
+            <Button variant="default" size="sm">
               <LucideIcon name="edit" className="mr-2 h-4 w-4" />
               Edit Workflow
             </Button>
@@ -82,148 +106,193 @@ function ExecutionsPage() {
         </div>
       </div>
 
-      {/* Error State */}
-      {runsError && (
-        <Alert variant="destructive" className="mb-6">
-          <LucideIcon name="alert-circle" className="h-4 w-4" />
-          <AlertDescription>
-            Failed to load executions:{" "}
-            {runsError instanceof Error ? runsError.message : "Unknown error"}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => refetch()}
-              className="ml-4"
-            >
-              Retry
+      {/* Main Layout: Left Panel + Right Panel */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Panel: Executions List */}
+        <div className="w-100 border-r bg-background flex flex-col shrink-0">
+          <div className="p-3 border-b flex items-center justify-between">
+            <h2 className="font-semibold">Execution History</h2>
+            <Button size="icon" variant="ghost" className="size-7">
+              <Filter className="size-4!" />
             </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+          </div>
+          <ScrollArea className="flex-1 w-full">
+            {runsLoading && (
+              <div className="p-4 space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            )}
 
-      {/* Loading State */}
-      {isLoading && (
-        <div className="space-y-4">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Card key={i}>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-6 w-24" />
-                </div>
-                <Skeleton className="h-4 w-32 mt-2" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
-          ))}
+            {!runsLoading && (!runs || runs.length === 0) && (
+              <div className="p-8 text-center">
+                <LucideIcon
+                  name="inbox"
+                  className="h-12 w-12 mx-auto text-muted-foreground mb-3"
+                />
+                <p className="text-sm text-muted-foreground">
+                  No executions yet
+                </p>
+              </div>
+            )}
+
+            {!runsLoading && runs && runs.length > 0 && (
+              <div className="p-2">
+                {runs.map((run) => (
+                  <button
+                    key={run.id}
+                    type="button"
+                    onClick={() => setSelectedRunId(run.id)}
+                    className={cn(
+                      "w-full text-left p-2 transition-colors",
+                      selectedRunId === run.id
+                        ? "bg-accent/50"
+                        : "hover:bg-accent",
+                      run.status === "completed" &&
+                        "border-l-green-500 border-l-8",
+                      run.status === "error" && "border-l-red-500 border-l-8",
+                    )}
+                  >
+                    <div className={cn("flex items-center justify-between")}>
+                      <span className="text-sm">
+                        {new Date(run.startedAt).toLocaleDateString()}{" "}
+                        {new Date(run.startedAt).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                      {run.status} in{" "}
+                      {run.durationMs && (
+                        <span className="text-xs text-muted-foreground">
+                          {(run.durationMs / 1000).toFixed(2)}s
+                        </span>
+                      )}{" "}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
         </div>
-      )}
 
-      {/* Empty State */}
-      {!isLoading && !runsError && (!runs || runs.length === 0) && (
-        <div className="text-center py-12">
-          <div className="mx-auto w-24 h-24 rounded-full bg-muted flex items-center justify-center mb-4">
+        {/* Right Panel: Graph Replay */}
+        <div
+          className={`flex-1 flex flex-col transition-all ${
+            isLogsPanelExpanded ? "h-[60%]" : "h-full"
+          }`}
+        >
+          {selectedRunId && selectedRunData ? (
+            <div className="flex-1 relative">
+              <Canvas
+                workflowId={workflowId}
+                executionMode={true}
+                runId={selectedRunId}
+                nodeExecutionsMap={nodeExecutionsMap}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-muted/20">
+              <div className="text-center">
+                <LucideIcon
+                  name="play-circle"
+                  className="h-16 w-16 mx-auto text-muted-foreground mb-4"
+                />
+                <p className="text-lg font-medium text-muted-foreground">
+                  Select an execution to view
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom Panel: Expandable Logs */}
+      <div
+        className={`border-t bg-background transition-all ${
+          isLogsPanelExpanded ? "h-[40%]" : "h-12"
+        }`}
+      >
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-muted/20">
+          <div className="flex items-center gap-2">
+            <LucideIcon name="terminal" className="h-4 w-4" />
+            <span className="text-sm font-medium">Execution Logs</span>
+            {selectedRunData && (
+              <span className="text-xs text-muted-foreground">
+                Run: {selectedRunId}
+              </span>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsLogsPanelExpanded(!isLogsPanelExpanded)}
+          >
             <LucideIcon
-              name="play-circle"
-              className="h-12 w-12 text-muted-foreground"
+              name={isLogsPanelExpanded ? "chevron-down" : "chevron-up"}
+              className="h-4 w-4"
             />
-          </div>
-          <h3 className="text-2xl font-semibold mb-2">No executions yet</h3>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Run this workflow to see execution history and debug data flow
-          </p>
-          <Link to="/workflow/$workflowId" params={{ workflowId }}>
-            <Button size="lg">
-              <LucideIcon name="edit" className="mr-2 h-4 w-4" />
-              Go to Workflow Editor
-            </Button>
-          </Link>
+          </Button>
         </div>
-      )}
 
-      {/* Executions List */}
-      {!isLoading && !runsError && runs && runs.length > 0 && (
-        <>
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm text-muted-foreground">
-              {runs.length} execution{runs.length !== 1 ? "s" : ""} total
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            {runs.map((run) => (
-              <Card
-                key={run.id}
-                className="hover:shadow-lg transition-shadow cursor-pointer"
-              >
-                <Link
-                  to="/executions/$workflowId/$runId"
-                  params={{ workflowId, runId: run.id }}
-                >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="flex items-center gap-2 mb-2">
-                          <StatusBadge status={run.status} />
-                          <span className="text-sm font-mono text-muted-foreground">
-                            {run.id.slice(0, 8)}...
-                          </span>
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                          Started{" "}
-                          {formatDistanceToNow(new Date(run.startedAt), {
-                            addSuffix: true,
-                          })}
-                          {run.completedAt && (
-                            <>
-                              {" • "}
-                              Completed{" "}
-                              {formatDistanceToNow(new Date(run.completedAt), {
-                                addSuffix: true,
-                              })}
-                            </>
-                          )}
-                          {run.status === "running" && (
-                            <span className="ml-2 text-yellow-600">
-                              • Running...
-                            </span>
-                          )}
-                        </CardDescription>
+        {isLogsPanelExpanded && (
+          <ScrollArea className="h-[calc(100%-3rem)] p-4">
+            {selectedRunId ? (
+              <div className="font-mono text-xs space-y-1">
+                <div className="text-muted-foreground">
+                  [
+                  {new Date(
+                    selectedRunData?.run?.startedAt || "",
+                  ).toLocaleTimeString()}
+                  ] Workflow execution started
+                </div>
+                {selectedRunData?.executions?.map((exec) => (
+                  <div key={exec.id} className="space-y-0.5">
+                    <div className="text-muted-foreground">
+                      [{new Date(exec.startedAt || "").toLocaleTimeString()}]{" "}
+                      Node "{exec.nodeId}" started
+                    </div>
+                    {exec.status === "completed" && (
+                      <div className="text-green-600">
+                        [{new Date(exec.completedAt || "").toLocaleTimeString()}
+                        ] Node "{exec.nodeId}" completed
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <LucideIcon name="chevron-right" className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      {run.totalTokensUsed && (
-                        <div className="flex items-center gap-1">
-                          <LucideIcon name="zap" className="h-4 w-4" />
-                          {run.totalTokensUsed.toLocaleString()} tokens
-                        </div>
-                      )}
-                      {run.errorMessage && (
-                        <div className="flex items-center gap-1 text-destructive">
-                          <LucideIcon name="alert-circle" className="h-4 w-4" />
-                          {run.errorMessage}
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Link>
-              </Card>
-            ))}
-          </div>
-        </>
-      )}
+                    )}
+                    {exec.status === "failed" && (
+                      <div className="text-red-600">
+                        [{new Date(exec.completedAt || "").toLocaleTimeString()}
+                        ] Node "{exec.nodeId}" failed:{" "}
+                        {exec.errorMessage || "Unknown error"}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="text-muted-foreground">
+                  [
+                  {new Date(
+                    selectedRunData?.run?.completedAt || "",
+                  ).toLocaleTimeString()}
+                  ] Workflow execution {selectedRunData?.run?.status}
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Select an execution to view logs
+              </p>
+            )}
+          </ScrollArea>
+        )}
+      </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  size = "default",
+}: {
+  status: string;
+  size?: "default" | "sm";
+}) {
   const statusConfig = {
     pending: { label: "Pending", variant: "secondary" as const, icon: "clock" },
     running: {
@@ -232,7 +301,7 @@ function StatusBadge({ status }: { status: string }) {
       icon: "loader-2",
     },
     completed: {
-      label: "Completed",
+      label: "Success",
       variant: "default" as const,
       icon: "check-circle",
     },
@@ -247,10 +316,15 @@ function StatusBadge({ status }: { status: string }) {
     statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
 
   return (
-    <Badge variant={config.variant} className="flex items-center gap-1">
+    <Badge
+      variant={config.variant}
+      className={`flex items-center gap-1 ${
+        size === "sm" ? "text-xs py-0 px-2" : ""
+      }`}
+    >
       <LucideIcon
         name={config.icon}
-        className={`h-3 w-3 ${status === "running" ? "animate-spin" : ""}`}
+        className={`size-4 ${status === "running" ? "animate-spin" : ""}`}
       />
       {config.label}
     </Badge>

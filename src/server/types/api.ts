@@ -6,20 +6,24 @@
  */
 
 import { z } from "zod";
-import type { IWorkflowDefinition } from "@/types/interfaces";
+import type {
+	INodeExecutionStatus,
+	IWorkflowDefinition,
+	IWorkflowRunStatus,
+} from "@/types/interfaces";
 
 // ============================================================================
 // COMMON TYPES
 // ============================================================================
 
 export const ApiResponseSchema = z.object({
-	success: z.boolean(),
-	error: z.string().optional(),
-	data: z.unknown().optional(),
+  success: z.boolean(),
+  error: z.string().optional(),
+  data: z.unknown().optional(),
 });
 
 export type ApiResponse<T = unknown> = z.infer<typeof ApiResponseSchema> & {
-	data?: T;
+  data?: T;
 };
 
 // ============================================================================
@@ -27,33 +31,33 @@ export type ApiResponse<T = unknown> = z.infer<typeof ApiResponseSchema> & {
 // ============================================================================
 
 export const UserSchema = z.object({
-	id: z.string(),
-	email: z.string().email(),
-	username: z.string(),
-	fullName: z.string().nullable(),
+  id: z.string(),
+  email: z.string().email(),
+  username: z.string(),
+  fullName: z.string().nullable(),
 });
 
 export type User = z.infer<typeof UserSchema>;
 
 export const RegisterRequestSchema = z.object({
-	email: z.string().email("Invalid email address"),
-	username: z.string().min(3).max(100),
-	password: z.string().min(8),
-	fullName: z.string().max(255).optional(),
+  email: z.string().email("Invalid email address"),
+  username: z.string().min(3).max(100),
+  password: z.string().min(8),
+  fullName: z.string().max(255).optional(),
 });
 
 export type RegisterRequest = z.infer<typeof RegisterRequestSchema>;
 
 export const LoginRequestSchema = z.object({
-	email: z.string().email("Invalid email address"),
-	password: z.string().min(1),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1),
 });
 
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
 export const AuthResponseSchema = z.object({
-	user: UserSchema,
-	token: z.string(),
+  user: UserSchema,
+  token: z.string(),
 });
 
 export type AuthResponse = z.infer<typeof AuthResponseSchema>;
@@ -70,15 +74,15 @@ export type AuthResponse = z.infer<typeof AuthResponseSchema>;
  * TODO: Create proper Zod schemas matching IWorkflowNode and IWorkflowEdge
  */
 export const WorkflowDefinitionSchema = z.object({
-	nodes: z.record(z.any(), z.any()), // TODO: Proper IWorkflowNode schema
-	edges: z.array(z.any()), // TODO: Proper IWorkflowEdge schema
-	viewport: z
-		.object({
-			x: z.number(),
-			y: z.number(),
-			zoom: z.number(),
-		})
-		.optional(),
+  nodes: z.record(z.any(), z.any()), // TODO: Proper IWorkflowNode schema
+  edges: z.array(z.any()), // TODO: Proper IWorkflowEdge schema
+  viewport: z
+    .object({
+      x: z.number(),
+      y: z.number(),
+      zoom: z.number(),
+    })
+    .optional(),
 });
 
 /**
@@ -88,36 +92,36 @@ export const WorkflowDefinitionSchema = z.object({
 export type WorkflowDefinition = IWorkflowDefinition;
 
 export const WorkflowSchema = z.object({
-	id: z.string(),
-	userId: z.string(),
-	name: z.string(),
-	description: z.string().nullable().optional(),
-	definition: WorkflowDefinitionSchema,
-	created_at: z.string(),
-	updated_at: z.string(),
+  id: z.string(),
+  userId: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  definition: WorkflowDefinitionSchema,
+  created_at: z.string(),
+  updated_at: z.string(),
 });
 
 export type Workflow = z.infer<typeof WorkflowSchema>;
 
 export const WorkflowsListResponseSchema = z.object({
-	workflows: z.array(WorkflowSchema),
-	total: z.number(),
+  workflows: z.array(WorkflowSchema),
+  total: z.number(),
 });
 
 export type WorkflowsListResponse = z.infer<typeof WorkflowsListResponseSchema>;
 
 export const CreateWorkflowRequestSchema = z.object({
-	name: z.string().min(1),
-	description: z.string().optional(),
-	definition: WorkflowDefinitionSchema,
+  name: z.string().min(1),
+  description: z.string().optional(),
+  definition: WorkflowDefinitionSchema,
 });
 
 export type CreateWorkflowRequest = z.infer<typeof CreateWorkflowRequestSchema>;
 
 export const UpdateWorkflowRequestSchema = z.object({
-	name: z.string().optional(),
-	description: z.string().optional(),
-	definition: WorkflowDefinitionSchema.optional(),
+  name: z.string().optional(),
+  description: z.string().optional(),
+  definition: WorkflowDefinitionSchema.optional(),
 });
 
 export type UpdateWorkflowRequest = z.infer<typeof UpdateWorkflowRequestSchema>;
@@ -127,40 +131,40 @@ export type UpdateWorkflowRequest = z.infer<typeof UpdateWorkflowRequestSchema>;
 // ============================================================================
 
 export const WorkflowRunSchema = z.object({
-	id: z.string(),
-	workflowId: z.string(),
-	ownerId: z.string().nullable(),
-	status: z.enum(["pending", "running", "completed", "failed"]),
-	inputs: z.record(z.string(), z.unknown()).nullable().optional(),
-	outputs: z.record(z.string(), z.unknown()).nullable().optional(),
-	errorMessage: z.string().nullable().optional(),
-	startedAt: z.string(),
-	completedAt: z.string().nullable().optional(),
-	totalTokensUsed: z.number().nullable().optional(),
-	durationMs: z.number().nullable().optional(),
+  id: z.string(),
+  workflowId: z.string(),
+  ownerId: z.string().nullable(),
+  status: z.enum(["pending", "running", "completed", "failed", "error"]) satisfies z.ZodType<IWorkflowRunStatus>,
+  inputs: z.record(z.string(), z.unknown()).nullable().optional(),
+  outputs: z.record(z.string(), z.unknown()).nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+  startedAt: z.string(),
+  completedAt: z.string().nullable().optional(),
+  totalTokensUsed: z.number().nullable().optional(),
+  durationMs: z.number().nullable().optional(),
 });
 
 export type WorkflowRun = z.infer<typeof WorkflowRunSchema>;
 
 export const WorkflowRunsListResponseSchema = z.object({
-	runs: z.array(WorkflowRunSchema),
-	total: z.number().optional(),
+  runs: z.array(WorkflowRunSchema),
+  total: z.number().optional(),
 });
 
 export type WorkflowRunsListResponse = z.infer<
-	typeof WorkflowRunsListResponseSchema
+  typeof WorkflowRunsListResponseSchema
 >;
 
 export const RunWorkflowRequestSchema = z.object({
-	inputs: z.record(z.string(), z.unknown()).optional(),
+  inputs: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type RunWorkflowRequest = z.infer<typeof RunWorkflowRequestSchema>;
 
 export const RunWorkflowResponseSchema = z.object({
-	runId: z.string(),
-	workflowId: z.string(),
-	status: z.string(),
+  runId: z.string(),
+  workflowId: z.string(),
+  status: z.string(),
 });
 
 export type RunWorkflowResponse = z.infer<typeof RunWorkflowResponseSchema>;
@@ -170,10 +174,32 @@ export type RunWorkflowResponse = z.infer<typeof RunWorkflowResponseSchema>;
 // ============================================================================
 
 export const ExecutionEventSchema = z.object({
-	id: z.string(),
-	type: z.string(),
-	timestamp: z.string(),
-	data: z.record(z.string(), z.unknown()).optional(),
+  id: z.string(),
+  type: z.string(),
+  timestamp: z.string(),
+  data: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type ExecutionEvent = z.infer<typeof ExecutionEventSchema>;
+
+// ============================================================================
+// NODE EXECUTION TYPES
+// ============================================================================
+
+export const NodeExecutionSchema = z.object({
+  id: z.string(),
+  runId: z.string(),
+  nodeId: z.string(),
+  nodeType: z.string(),
+  status: z.enum(["pending", "running", "completed", "failed", "skipped"]) satisfies z.ZodType<INodeExecutionStatus>,
+  stage: z.number().nullable().optional(),
+  inputs: z.record(z.string(), z.unknown()).nullable().optional(),
+  outputs: z.record(z.string(), z.unknown()).nullable().optional(),
+  internalTrace: z.unknown().nullable().optional(),
+  tokensUsed: z.number().nullable().optional(),
+  startedAt: z.string().nullable().optional(),
+  completedAt: z.string().nullable().optional(),
+  errorMessage: z.string().nullable().optional(),
+});
+
+export type NodeExecution = z.infer<typeof NodeExecutionSchema>;
