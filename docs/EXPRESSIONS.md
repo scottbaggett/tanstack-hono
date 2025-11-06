@@ -1,454 +1,747 @@
 # Expressions in Workflows
 
-This guide explains how to use expressions in your workflow node properties to create dynamic, data-driven workflows.
+This guide explains how to use JavaScript expressions in your workflow node properties to create dynamic, data-driven workflows.
 
 ## Table of Contents
 
 1. [Overview](#overview)
 2. [Basic Syntax](#basic-syntax)
 3. [Available Variables](#available-variables)
-4. [The $json Accessor](#the-json-accessor)
+4. [Expression Context](#expression-context)
 5. [Examples](#examples)
-6. [Advanced Usage](#advanced-usage)
-7. [Limitations](#limitations)
+6. [Autocomplete & Drag-and-Drop](#autocomplete--drag-and-drop)
+7. [Advanced Usage](#advanced-usage)
+8. [Security](#security)
+9. [Limitations](#limitations)
+10. [Troubleshooting](#troubleshooting)
 
 ## Overview
 
-Expressions allow you to write dynamic statements to access and transform your workflow data. Instead of hard-coding values, you can:
+Expressions allow you to write dynamic JavaScript statements to access and transform your workflow data. Instead of hard-coding values, you can:
 
-- Reference data from connected nodes via `$json`, `$item`, and `$items`
-- Access node configuration via `$parameters`
-- Perform calculations and comparisons
-- Use built-in functions (string, array, math operations)
+- Reference data from connected nodes using simple dot notation
+- Access node configuration via `parameters`
+- Perform calculations, comparisons, and string operations
+- Use standard JavaScript methods (Math, String, Array, etc.)
 - Create conditional logic
 
-**Expression Engine**: We use [JSONata](https://jsonata.org/) for expression evaluation. JSONata is a lightweight query and transformation language designed for JSON data, making it perfect for workflows.
+**Expression Engine**: We use sandboxed JavaScript evaluation for expressions. This provides a familiar, powerful syntax that's easy to learn for both engineers and non-engineers.
 
 ### Expression Syntax
 
 Expressions are written inside your node properties using double curly braces:
 
 ```
-{{ expression }}    // Standard syntax
+{{ expression }}
 ```
 
 ### Simple Examples
 
+```javascript
+{{ manualTrigger.prompt }}                    // Get prompt from Manual Trigger node
+{{ httpRequest.statusCode }}                  // Get status code from HTTP Request node
+{{ parameters.temperature * 2 }}              // Math operations with node parameters
+{{ structuredOutput.score > 0.8 ? "Pass" : "Fail" }}  // Conditional
+{{ dates.today }}                             // Current date
+{{ previousNode.text.toUpperCase() }}         // String transformation
 ```
-{{ $json.text }}                              // Get text from current input
-{{ $item[0].json.count }}                     // Get count from first input
-{{ $items["Structured Output"][0].json.model }} // Get model from specific node
-{{ $parameters.temperature * 2 }}             // Math operations with node parameters
-{{ $json.count > 10 ? "many" : "few" }}       // Conditional
+
+## Basic Syntax
+
+### Node Names as Variables
+
+Connected nodes are accessible as **camelCase variables** based on their display names:
+
+| Node Display Name | Variable Name |
+|------------------|---------------|
+| Manual Trigger | `manualTrigger` |
+| HTTP Request | `httpRequest` |
+| Structured Output | `structuredOutput` |
+| Text Input | `textInput` |
+| API Call | `apiCall` |
+
+**Conversion Rules:**
+- Spaces and special characters removed
+- First letter lowercase
+- Words capitalized (camelCase)
+- Numbers preserved
+
+**Examples:**
+```javascript
+{{ manualTrigger.prompt }}           // "Manual Trigger" node
+{{ httpRequest.data.userId }}        // "HTTP Request" node
+{{ structuredOutput.model }}         // "Structured Output" node
+```
+
+### Duplicate Node Names
+
+If you have multiple nodes with the same name, they're numbered sequentially:
+
+```javascript
+{{ manualTrigger.prompt }}           // First Manual Trigger
+{{ manualTrigger2.prompt }}          // Second Manual Trigger
+{{ manualTrigger3.prompt }}          // Third Manual Trigger
+```
+
+**How it works:**
+- First occurrence: no number
+- Second occurrence: `2` suffix
+- Third occurrence: `3` suffix
+- And so on...
+
+### Property Access
+
+Use standard JavaScript dot notation to access nested properties:
+
+```javascript
+{{ manualTrigger.user.email }}       // Nested object
+{{ httpRequest.results[0] }}         // Array access
+{{ apiCall.data.users[0].name }}     // Combined nested access
 ```
 
 ## Available Variables
 
-### `$json` - Current Item Data
+### Node Variables (camelCase)
 
-Access data from the **first connected input** with execution data:
+Every connected node with execution data is available as a variable:
 
+```javascript
+{{ manualTrigger.prompt }}
+{{ httpRequest.statusCode }}
+{{ structuredOutput.model }}
 ```
-{{ $json.text }}              // Access text property
-{{ $json.results[0] }}        // First result from array
-{{ $json.user.name }}         // Nested access
+
+**What you get:**
+- Direct access to the node's JSON output data
+- No need for complex path syntax
+- Autocomplete suggestions as you type
+
+### `parameters` - Current Node's Configuration
+
+Access the current node's parameter values:
+
+```javascript
+{{ parameters.systemPrompt }}
+{{ parameters.temperature }}
+{{ parameters.mode }}
 ```
 
-**What is $json?**
-- Accesses the `json` property of `INodeExecutionData` from the first available input
-- Automatically selects the first connected node that has execution data
-- All data types (strings, numbers, objects, arrays) flow through this property
+**Note:** These are configuration values set in the node's Parameters panel, NOT data from upstream nodes.
 
-### `$item[index]` - Access Specific Input by Index
+### `previousNode` - Last Connected Node
 
-Access data from a **specific connected input** by its index:
+Shorthand to access the most recently connected node:
 
-```
-{{ $item[0].json.text }}       // First input's data
-{{ $item[1].json.model }}      // Second input's data
-{{ $item[0].binary.file }}     // Binary data from first input
+```javascript
+{{ previousNode.text }}
+{{ previousNode.score }}
 ```
 
 **When to use:**
-- When you have multiple inputs connected to a node
-- When you need to access data from a specific input, not just the first
+- Simple linear workflows
+- You don't need to specify which node
+- Quick access to immediate upstream data
 
-**Index order:**
-- `0` = first connected input
-- `1` = second connected input
-- etc.
+### `dates` - Date Helpers
 
-### `$items["NodeName"]` - Access Specific Node by Name
+Built-in date utilities:
 
-Access data from a **specific node by its name**:
-
-```
-{{ $items["Structured Output"][0].json.model }}    // Access Structured Output node
-{{ $items["HTTP Request"][0].json.statusText }}    // Access HTTP Request node
-{{ $items["Text Input"][0].json.text }}            // Access Text Input node
+```javascript
+{{ dates.now }}          // ISO timestamp: "2024-01-15T10:30:00.000Z"
+{{ dates.today }}        // Date only: "2024-01-15"
+{{ dates.timestamp }}    // Unix timestamp: 1705318200000
 ```
 
-**Pattern:**
-- `$items["NodeName"]` returns an array of execution items from that node
-- `[0]` gets the first item (most common)
-- `.json` accesses the json property
-- `.field` accesses the specific field
-
-**When to use:**
-- When you want to reference a specific upstream node by name
-- When you need clarity about where data comes from
-- When you have multiple paths and want to be explicit
-
-### `$parameters` - Current Node's Parameters
-
-Access the **current node's configuration values**:
-
-```
-{{ $parameters.systemPrompt }}       // Property value
-{{ $parameters.temperature }}        // Config value
-{{ $parameters.settings.timeout }}   // Nested property
+**Common patterns:**
+```javascript
+"Generated on {{ dates.today }}"
+"Timestamp: {{ dates.timestamp }}"
 ```
 
-**Note**: These are configuration values set in the node's property panel, NOT data from upstream nodes.
+### `workflow` - Workflow Metadata
 
-### `$binary` - Binary Data (Legacy)
+Access workflow information:
 
-Access binary data from connected nodes:
-
-```
-{{ $item[0].binary.image }}          // Binary data from first input
-{{ $items["File Node"][0].binary.document }}  // Binary from specific node
+```javascript
+{{ workflow.id }}        // Workflow ID
+{{ workflow.name }}      // Workflow name
 ```
 
-## The $json Accessor
+## Expression Context
 
-**IMPORTANT**: `$json` is the accessor/selector for accessing the `json` property of `INodeExecutionData`, NOT a data type indicator.
+The expression context contains all available data. Here's the complete structure:
 
-### What is $json?
-
-Every node returns data in this structure:
-```typescript
-INodeExecutionData {
-  json: IDataObject,        // Main structured data
-  binary?: IBinaryKeyData   // Optional binary data
-}
-```
-
-The `$json` accessor allows you to access properties from the `json` object.
-
-### All Data Types Flow Through $json
-
-The `json` property can hold ANY JSON-serializable data:
-- Strings: `{{ $json.message }}`
-- Numbers: `{{ $json.count }}`
-- Booleans: `{{ $json.isActive }}`
-- Objects: `{{ $json.user.name }}`
-- Arrays: `{{ $json.items[0] }}`
-
-**Key Point**: `$json` doesn't mean "this is JSON data" - it means "access the json property". All data types (strings, numbers, etc.) flow through this property.
-
-## Basic Syntax
-
-### Variable Access
-
-Access nested properties with dot notation:
-
-```
-{{ $json.results[0].score }}           // Array access from current input
-{{ $parameters.settings.debug }}       // Nested configuration
-{{ $item[1].json.user.email }}         // Nested from specific input
-{{ $items["API Call"][0].json.data }}  // From specific node
-```
-
-### Operators
-
-**Arithmetic**
-```
-{{ 10 + 5 }}                              // 15
-{{ $parameters.value * 2 }}
-{{ 100 / $json.divisor }}
-```
-
-**Comparison**
-```
-{{ $json.score >= 0.8 }}                  // true/false
-{{ $parameters.name == "admin" }}
-{{ $json.count != null }}
-```
-
-**Logical**
-```
-{{ $json.score > 0.8 && $json.verified == true }}
-{{ $parameters.debug || $parameters.verbose }}
-{{ !$json.isDeleted }}
-```
-
-**String Concatenation**
-```
-{{ "Hello " + $parameters.name }}
-{{ $json.firstName + " " + $json.lastName }}
-```
-
-### Conditionals (Ternary)
-
-```
-{{ $json.score > 0.8 ? "Pass" : "Fail" }}
-{{ $parameters.mode == "strict" ? 10 : 100 }}
-{{ $items["Validator"][0].json.isValid ? "Proceed" : "Reject" }}
-```
-
-## Real-World Expression Examples
-
-### Example 1: Accessing Data from Current Input
-
-**Scenario**: Get text from the first connected input
-
-```
-{{ $json.text }}
-```
-
-**Explanation**:
-- `$json` accesses the json property from the first available input
-- `.text` gets the text field
-
-### Example 2: Accessing Data from Specific Node
-
-**Scenario**: Get model name from "Structured Output" node
-
-```
-{{ $items["Structured Output"][0].json.model }}
-```
-
-**Explanation**:
-- `$items["Structured Output"]` gets items from that specific node
-- `[0]` gets the first execution item
-- `.json.model` accesses the model field
-
-### Example 3: Using Multiple Inputs
-
-**Scenario**: Combine data from two different inputs
-
-```
-"User {{ $item[0].json.name }} requested {{ $item[1].json.itemCount }} items"
-```
-
-**Explanation**:
-- `$item[0].json.name` gets name from first input
-- `$item[1].json.itemCount` gets item count from second input
-- Combines into single string
-
-### Example 4: Conditional Based on Node Output
-
-**Scenario**: Choose processing mode based on data size
-
-```
-{{ $json.itemCount > 100 ? "batch" : "realtime" }}
-```
-
-**Explanation**:
-- Access `itemCount` from current input
-- If > 100, use "batch", otherwise "realtime"
-
-### Example 5: Combining Node Data with Parameters
-
-**Scenario**: Create a prompt using both input data and node config
-
-```
-"Analyze this text about {{ $json.topic }} using {{ $parameters.mode }} mode"
-```
-
-**Explanation**:
-- `$json.topic` from input data
-- `$parameters.mode` from node configuration
-- Combined into dynamic prompt
-
-### Example 6: Accessing Deeply Nested Data
-
-**Scenario**: Get email from nested user object
-
-```
-{{ $items["API Response"][0].json.data.user.profile.email }}
-```
-
-**Explanation**: Chain dot notation to access nested properties from a specific node
-
-### Example 7: Working with Arrays
-
-**Scenario**: Get first item's score from results array
-
-```
-{{ $json.results[0].score }}
-```
-
-**Explanation**:
-- Access `results` array from current input
-- Get first element `[0]`
-- Access its `score` property
-
-## Advanced Usage
-
-### Template Strings with Multiple Expressions
-
-A single property can contain multiple expressions:
-
-```
-"Processing {{ $json.count }} items in {{ $parameters.mode }} mode for {{ $items["User Input"][0].json.userId }}"
-```
-
-Result: `"Processing 5 items in batch mode for user123"`
-
-**Key**: Mix static text with multiple `{{ }}` expressions
-
-### Accessing Complex Structures
-
-Access complex nested data:
-
-```
-{{ $json.data.users[0].profile.settings.notifications.email }}
-```
-
-**Explanation**: Chain as many property accesses as needed
-
-### Comparing Data from Different Nodes
-
-```
-{{ $items["Node A"][0].json.value > $items["Node B"][0].json.threshold ? "high" : "low" }}
-```
-
-**Explanation**: Compare values from two different nodes
-
-### Runtime Data Inspection & Drag-and-Drop
-
-Use the **Input Explorer** panel to see the actual structure of node outputs:
-
-1. Execute a workflow
-2. Click on a node to open the editor
-3. View the **Input** panel on the left showing connected nodes' data
-4. Expand the JSON structure to see available fields
-5. **Drag properties directly into parameter fields** to generate expressions automatically
-
-**Drag-and-Drop Behavior**:
-When you drag a property from the Input Explorer, it generates the full n8n-style path:
-
-- From "Structured Output" node's `model` field → `{{ $items["Structured Output"][0].json.model }}`
-- From "HTTP Request" node's `statusCode` field → `{{ $items["HTTP Request"][0].json.statusCode }}`
-- Binary data → `{{ $items["File Reader"][0].binary.file }}`
-
-**Manual typing**: If Input Explorer shows:
-```json
+```javascript
 {
-  "json": {
-    "user": {
-      "name": "Alice",
-      "email": "alice@example.com"
-    }
+  // Connected nodes (camelCase names)
+  manualTrigger: {
+    prompt: "User's input",
+    userId: "123"
+  },
+  httpRequest: {
+    statusCode: 200,
+    data: { ... }
+  },
+
+  // Special variables
+  parameters: {
+    systemPrompt: "You are a helpful assistant",
+    temperature: 0.7
+  },
+  previousNode: {
+    // Same as last connected node
+  },
+  dates: {
+    now: "2024-01-15T10:30:00.000Z",
+    today: "2024-01-15",
+    timestamp: 1705318200000
+  },
+  workflow: {
+    id: "workflow-123",
+    name: "My Workflow"
   }
 }
 ```
 
-You can access with:
-```
-{{ $items["Node Name"][0].json.user.name }}   // Full path (recommended)
-{{ $json.user.name }}                          // Shorthand (first input only)
-```
+### How Data Flows
 
-## Expression Validation
+1. **Node executes** → produces `INodeExecutionData` with `json` property
+2. **System builds context** → converts node names to camelCase
+3. **Expression evaluates** → accesses data via simple variables
+4. **Result returned** → used in current node's execution
 
-The system validates expressions when you type them. The **Result** preview shows:
-- Evaluated value if successful
-- Error message if invalid
-- "No execution data available" if you need to run the workflow first
+**Example:**
+```typescript
+// Node output structure
+INodeExecutionData {
+  data: {
+    main: [{
+      json: {
+        prompt: "Hello world",
+        userId: "123"
+      }
+    }]
+  }
+}
 
-**Common issues:**
-```
-{{ $items["NonExistent"][0].json.value }}  // Error: Node not found
-{{ $json.missing }}                        // Returns undefined (no error)
-{{ $json.items[999] }}                     // Returns undefined (no error)
-```
-
-**Best Practices**:
-- Use Input Explorer to verify property names
-- Test expressions by running the workflow
-- Watch the Result preview to see evaluated values
-- Handle missing data gracefully with conditionals:
-  ```
-  {{ $json.value || "default" }}
-  ```
-
-## Choosing Between $json, $item, and $items
-
-### Use `$json` when:
-- ✅ You have one input and want the simplest syntax
-- ✅ You don't care which specific node provides the data
-- ✅ You want the first available data
-
-```
-{{ $json.text }}
+// Becomes accessible as:
+{{ manualTrigger.prompt }}     // "Hello world"
+{{ manualTrigger.userId }}     // "123"
 ```
 
-### Use `$item[index]` when:
-- ✅ You have multiple inputs and need a specific one by position
-- ✅ You want to reference "first input", "second input", etc.
-- ✅ Order matters more than node name
+## Examples
 
-```
-{{ $item[0].json.text }}     // First input
-{{ $item[1].json.model }}    // Second input
-```
+### Example 1: Simple Variable Access
 
-### Use `$items["NodeName"]` when:
-- ✅ You want to be explicit about where data comes from
-- ✅ You have complex workflows with multiple paths
-- ✅ Readability and maintainability matter
-- ✅ You might rearrange nodes later
+**Scenario:** Get user input from Manual Trigger
 
-```
-{{ $items["Structured Output"][0].json.model }}
-{{ $items["HTTP Request"][0].json.statusCode }}
+```javascript
+{{ manualTrigger.prompt }}
 ```
 
-**Recommendation**: Prefer `$items["NodeName"]` for clarity in complex workflows, use `$json` for simplicity in straightforward cases.
+**Result:** `"What is the weather like?"`
+
+---
+
+### Example 2: Nested Property Access
+
+**Scenario:** Get email from nested user object
+
+```javascript
+{{ httpRequest.data.user.email }}
+```
+
+**Result:** `"alice@example.com"`
+
+---
+
+### Example 3: Array Access
+
+**Scenario:** Get first result from array
+
+```javascript
+{{ apiCall.results[0].score }}
+```
+
+**Result:** `0.95`
+
+---
+
+### Example 4: String Concatenation
+
+**Scenario:** Combine multiple values into one string
+
+```javascript
+"Hello {{ manualTrigger.name }}, welcome back!"
+```
+
+**Result:** `"Hello Alice, welcome back!"`
+
+---
+
+### Example 5: Math Operations
+
+**Scenario:** Calculate adjusted score
+
+```javascript
+{{ structuredOutput.score * parameters.multiplier }}
+```
+
+**Result:** `7.5` (if score is 0.75 and multiplier is 10)
+
+---
+
+### Example 6: Conditional (Ternary)
+
+**Scenario:** Set mode based on score
+
+```javascript
+{{ structuredOutput.score > 0.8 ? "high" : "low" }}
+```
+
+**Result:** `"high"` (if score is 0.95)
+
+---
+
+### Example 7: String Methods
+
+**Scenario:** Convert text to uppercase
+
+```javascript
+{{ manualTrigger.text.toUpperCase() }}
+```
+
+**Result:** `"HELLO WORLD"`
+
+---
+
+### Example 8: Multiple Expressions in One Field
+
+**Scenario:** Create dynamic prompt with multiple values
+
+```javascript
+"Analyze {{ manualTrigger.topic }} on {{ dates.today }} using {{ parameters.mode }} mode"
+```
+
+**Result:** `"Analyze climate change on 2024-01-15 using strict mode"`
+
+---
+
+### Example 9: Using previousNode
+
+**Scenario:** Access last node's output
+
+```javascript
+{{ previousNode.text }}
+```
+
+**Result:** Same as accessing the last connected node by name
+
+---
+
+### Example 10: Complex Conditional
+
+**Scenario:** Multi-condition logic
+
+```javascript
+{{ httpRequest.statusCode === 200 ?
+   "Success: " + httpRequest.data.message :
+   "Error: " + httpRequest.statusText }}
+```
+
+**Result:** `"Success: Data retrieved"` or `"Error: Not Found"`
+
+---
+
+### Example 11: Array Length
+
+**Scenario:** Get count of items
+
+```javascript
+"Found {{ apiCall.results.length }} results"
+```
+
+**Result:** `"Found 15 results"`
+
+---
+
+### Example 12: Logical Operators
+
+**Scenario:** Combine multiple conditions
+
+```javascript
+{{ structuredOutput.score > 0.8 && structuredOutput.verified ? "approved" : "review" }}
+```
+
+**Result:** `"approved"` (if both conditions are true)
+
+---
+
+### Example 13: Math Functions
+
+**Scenario:** Round a number
+
+```javascript
+{{ Math.round(structuredOutput.confidence * 100) }}%
+```
+
+**Result:** `"87%"`
+
+---
+
+### Example 14: Date Formatting
+
+**Scenario:** Include current date in output
+
+```javascript
+"Report generated on {{ dates.today }}"
+```
+
+**Result:** `"Report generated on 2024-01-15"`
+
+---
+
+### Example 15: Default Values
+
+**Scenario:** Provide fallback for missing data
+
+```javascript
+{{ manualTrigger.email || "no-email@example.com" }}
+```
+
+**Result:** `"no-email@example.com"` (if email is undefined)
+
+## Autocomplete & Drag-and-Drop
+
+### Autocomplete
+
+The expression editor provides intelligent autocomplete as you type:
+
+1. **Type `{{` to start** an expression
+2. **Type a space** and see suggestions
+3. **Autocomplete shows:**
+   - **SUGGESTED**: `parameters`, common helpers
+   - **EARLIER NODES**: All connected nodes (camelCase)
+
+**Example:**
+```
+{{ man[TAB]          → manualTrigger.
+{{ manualTrigger.[TAB]  → Shows available properties
+```
+
+**Autocomplete sections:**
+
+**SUGGESTED:**
+- `parameters` - Current node's configuration
+- `parameters.fieldName` - Parameter fields
+
+**EARLIER NODES:**
+- `manualTrigger` - First Manual Trigger node
+- `manualTrigger2` - Second Manual Trigger node
+- `httpRequest` - HTTP Request node
+- etc.
+
+### Drag-and-Drop
+
+The **INPUT** panel (left side of node editor) shows execution data from connected nodes:
+
+1. **Execute your workflow** to populate data
+2. **Open a node** to see its editor
+3. **Expand nodes in INPUT panel** to see their data
+4. **Drag any field** into a parameter field
+
+**What happens:**
+- Dragging `prompt` from "Manual Trigger" generates: `{{ manualTrigger.prompt }}`
+- Dragging `statusCode` from "HTTP Request" generates: `{{ httpRequest.statusCode }}`
+- Dragging nested `user.email` generates: `{{ apiCall.user.email }}`
+
+**Views available:**
+- **Schema** - Tree view with drag-and-drop chips
+- **Table** - Tabular view with drag-and-drop rows
+- **JSON** - Raw JSON view
+
+### Expression Preview
+
+The **Result** section shows live evaluation:
+
+```javascript
+{{ manualTrigger.prompt }}
+
+Result:
+"What is the weather like?"
+```
+
+**States:**
+- ✅ **Evaluated value** - Expression is valid and has data
+- ❌ **Error message** - Expression has syntax error
+- ⏳ **"No execution data available"** - Workflow hasn't run yet
+- ⏳ **"Evaluating..."** - Expression is being processed
+
+## Advanced Usage
+
+### Combining Multiple Nodes
+
+Access data from multiple nodes in one expression:
+
+```javascript
+"User {{ manualTrigger.userId }} requested {{ httpRequest.itemCount }} items"
+```
+
+### Deeply Nested Access
+
+Chain property access as needed:
+
+```javascript
+{{ apiCall.response.data.users[0].profile.settings.email }}
+```
+
+### Complex Calculations
+
+Use standard JavaScript operations:
+
+```javascript
+{{ (structuredOutput.score * 100).toFixed(2) }}%
+```
+
+### String Manipulation
+
+Use built-in JavaScript string methods:
+
+```javascript
+{{ manualTrigger.text.toLowerCase().trim() }}
+{{ httpRequest.data.join(", ") }}
+{{ apiCall.description.substring(0, 100) }}
+```
+
+### Array Operations
+
+Work with arrays using JavaScript methods:
+
+```javascript
+{{ apiCall.items.length }}
+{{ apiCall.results[0].name }}
+{{ apiCall.scores.map(s => s * 2) }}  // Note: limited by sandbox
+```
+
+### Type Checking
+
+Check types before accessing:
+
+```javascript
+{{ typeof manualTrigger.value === "string" ? manualTrigger.value : "N/A" }}
+```
+
+### Template Literals (Alternative)
+
+Mix static text with expressions:
+
+```javascript
+Processing {{ apiCall.items.length }} items in {{ parameters.mode }} mode for user {{ manualTrigger.userId }}
+```
+
+## Security
+
+Expressions run in a **sandboxed JavaScript environment** with security restrictions:
+
+### Blocked Globals
+
+The following are **undefined** in expressions (security):
+
+- `window`, `document`, `global`
+- `process`, `require`, `import`
+- `fetch`, `XMLHttpRequest`, `WebSocket`
+- `localStorage`, `sessionStorage`, `indexedDB`
+- `alert`, `confirm`, `prompt`, `print`
+- `open`, `close`, `location`, `navigator`, `history`
+- `console`, `performance`
+- `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`
+- `requestAnimationFrame`
+
+### Allowed Features
+
+The following are **available** in expressions:
+
+- `JSON`, `Math`, `Date`
+- `String`, `Number`, `Boolean`, `Array`, `Object`
+- Standard JavaScript operators (`+`, `-`, `*`, `/`, `%`, `&&`, `||`, `!`, etc.)
+- Ternary conditionals (`? :`)
+- Property access (`.`, `[]`)
+
+### Strict Mode
+
+Expressions run in JavaScript strict mode for additional security:
+
+- No undeclared variables
+- No deleting variables
+- No eval in certain contexts
+- More restrictions on `this`
+
+### Future: Worker Isolation
+
+**Note:** In future releases, expressions will run in separate worker processes for complete isolation. Currently, the sandbox provides reasonable security for trusted workflows.
 
 ## Limitations
 
-### Expression Capabilities
+### What You CAN Do
 
-Expressions are designed for data access and simple transformations:
+✅ Access node data with dot notation
+✅ Access parameters, dates, workflow metadata
+✅ Math operations (`+`, `-`, `*`, `/`, `%`)
+✅ String operations (concatenation, methods)
+✅ Comparison operators (`>`, `<`, `===`, `!==`)
+✅ Logical operators (`&&`, `||`, `!`)
+✅ Ternary conditionals (`? :`)
+✅ Array/object access (`[]`, `.`)
+✅ Built-in methods (`Math.round`, `String.toUpperCase`, etc.)
 
-**You CAN**:
-- Access node outputs via `$json`, `$item`, `$items`
-- Access node parameters via `$parameters`
-- Use arithmetic, comparison, and logical operators
-- Use string concatenation
-- Use ternary conditionals
-- Access nested properties and arrays
+### What You CANNOT Do
 
-**You CANNOT**:
-- Execute arbitrary code or functions
-- Modify data (expressions are read-only)
-- Make network calls or file operations
-- Define custom functions
-- Use complex loops (use transform nodes instead)
+❌ Define custom functions
+❌ Use loops (for, while, etc.)
+❌ Make network calls
+❌ Access file system
+❌ Use `eval`, `Function` constructor
+❌ Access browser/Node.js APIs
+❌ Modify data (expressions are read-only)
+❌ Use async/await
 
-### Data Types in Expressions
+**For complex transformations:** Use Code nodes or dedicated transformation nodes instead of expressions.
 
-All data accessed via `$json` is JSON-serializable:
-- **Strings**: `{{ $json.message }}`
-- **Numbers**: `{{ $json.count }}`, `{{ $json.price }}`
-- **Booleans**: `{{ $json.isActive }}`
-- **Arrays**: `{{ $json.items[0] }}`
-- **Objects**: `{{ $json.user.name }}`
-- **Null/undefined**: Handled gracefully
+### Data Type Handling
 
-Remember: The `$json` accessor doesn't indicate type - it accesses the json property which can hold any of these types.
+Expressions work with JSON-serializable data:
+
+- ✅ **Strings**: `{{ manualTrigger.message }}`
+- ✅ **Numbers**: `{{ apiCall.count }}`, `{{ parameters.temperature }}`
+- ✅ **Booleans**: `{{ structuredOutput.isValid }}`
+- ✅ **Arrays**: `{{ httpRequest.items[0] }}`
+- ✅ **Objects**: `{{ apiCall.user.name }}`
+- ✅ **null**: Handled gracefully (returns `null`)
+- ✅ **undefined**: Handled gracefully (returns `undefined`)
+
+## Troubleshooting
+
+### Expression Returns `undefined`
+
+**Cause:** Property doesn't exist in node output
+
+**Solution:**
+1. Use INPUT panel to verify actual data structure
+2. Check spelling and capitalization
+3. Provide a default value: `{{ manualTrigger.field || "default" }}`
+
+**Example:**
+```javascript
+// Wrong property name
+{{ manualTrigger.promtp }}  // undefined (typo)
+
+// Correct
+{{ manualTrigger.prompt }}  // "Hello world"
+
+// With fallback
+{{ manualTrigger.missing || "fallback" }}  // "fallback"
+```
+
+---
+
+### "No execution data available"
+
+**Cause:** Workflow hasn't been executed yet
+
+**Solution:**
+1. Click "Execute Node" or "Execute Workflow" button
+2. Execution data will populate
+3. Expression will evaluate and show result
+
+---
+
+### Node Variable Not Found
+
+**Cause:** Node doesn't exist, isn't connected, or hasn't executed
+
+**Solution:**
+1. Verify node is connected upstream
+2. Check node name matches (use INPUT panel)
+3. Execute the workflow to populate data
+4. Remember: names are camelCase (`manualTrigger`, not `Manual Trigger`)
+
+---
+
+### Autocomplete Not Showing Nodes
+
+**Cause:** Nodes haven't been connected or data hasn't loaded
+
+**Solution:**
+1. Connect nodes with edges
+2. The autocomplete updates automatically
+3. All connected nodes appear in "EARLIER NODES" section
+
+---
+
+### Duplicate Node Shows Wrong Data
+
+**Cause:** Using wrong numbered variable
+
+**Solution:**
+```javascript
+// If you have two "Manual Trigger" nodes:
+{{ manualTrigger.prompt }}   // First one
+{{ manualTrigger2.prompt }}  // Second one
+{{ manualTrigger3.prompt }}  // Third one
+```
+
+Use INPUT panel to see which number corresponds to which node.
+
+---
+
+### Expression Syntax Error
+
+**Cause:** Invalid JavaScript syntax
+
+**Solution:**
+- Check for matching quotes: `"text"` or `'text'`
+- Check for matching braces: `{{ }}`
+- Valid operators: `+`, `-`, `*`, `/`, `===`, `!==`, `&&`, `||`
+- Use ternary: `condition ? true : false`
+
+**Common mistakes:**
+```javascript
+// Wrong
+{{ manualTrigger.text = "new" }}  // Can't assign
+{{ for (let i...) }}              // No loops
+
+// Right
+{{ manualTrigger.text }}
+{{ manualTrigger.count > 10 ? "many" : "few" }}
+```
+
+---
+
+### Getting `[object Object]` Instead of Value
+
+**Cause:** Accessing object instead of property
+
+**Solution:**
+```javascript
+// Wrong - returns whole object
+{{ manualTrigger }}  // [object Object]
+
+// Right - access specific property
+{{ manualTrigger.prompt }}  // "Hello world"
+
+// To see structure, use INPUT panel or convert to JSON
+{{ JSON.stringify(manualTrigger) }}
+```
+
+---
 
 ## Common Patterns
 
 ### Conditional Prompts
 
-```
+```javascript
 {{
-  $parameters.style == "formal" ?
+  parameters.style === "formal" ?
     "Please provide a professional response." :
     "Keep it casual and friendly."
 }}
@@ -456,99 +749,102 @@ Remember: The `$json` accessor doesn't indicate type - it accesses the json prop
 
 ### Combining Multiple Inputs
 
-```
-"Analyze {{ $item[0].json.topic }} with context: {{ $item[1].json.background }}"
-```
-
-### Accessing Specific Nodes
-
-```
-"Model: {{ $items["Structured Output"][0].json.model }}, Status: {{ $items["HTTP Request"][0].json.statusText }}"
+```javascript
+"Process {{ manualTrigger.topic }} with {{ httpRequest.itemCount }} items"
 ```
 
-### Formatting Output
+### Formatting Numbers
 
-```
-"Processed {{ $json.items.length }} items in {{ $parameters.mode }} mode"
-```
-
-### Checking for Data
-
-```
-{{ $json.email ? $json.email : "no-email@example.com" }}
+```javascript
+{{ Math.round(structuredOutput.confidence * 100) }}%
 ```
 
-### Accessing Array Data
+### String Templates
 
+```javascript
+"User {{ manualTrigger.name }} ({{ manualTrigger.email }}) requested access on {{ dates.today }}"
 ```
-"First result: {{ $json.items[0].title }}"
-"Last score: {{ $json.values[$json.values.length - 1] }}"
+
+### Checking for Missing Data
+
+```javascript
+{{ manualTrigger.email || "no-email@example.com" }}
+{{ apiCall.data ? apiCall.data.value : "N/A" }}
 ```
 
-## Troubleshooting
+### Array Length Checks
 
-### Expression returns undefined
+```javascript
+{{ httpRequest.items.length > 0 ? "Has items" : "Empty" }}
+```
 
-**Cause**: Property doesn't exist in node output
+### Nested Conditionals
 
-**Solution**:
-1. Use Input Explorer to verify the actual data structure
-2. Provide a default value: `{{ $json.field || "default" }}`
-
-### Node name not found
-
-**Cause**: Node doesn't exist or hasn't been executed
-
-**Solution**:
-1. Verify node name matches exactly (case-sensitive)
-2. Ensure node is upstream (connected before current node)
-3. Execute the workflow to populate execution data
-
-### Getting entire object instead of value
-
-**Cause**: Missing property access
-
-**Solution**: Add property path after `$json`:
-- Wrong: `{{ $json }}`
-- Right: `{{ $json.text }}`
-
-### "No execution data available"
-
-**Cause**: Workflow hasn't been executed yet
-
-**Solution**:
-1. Click "Execute Node" button to run the workflow
-2. Execution data will populate and expressions will evaluate
+```javascript
+{{
+  structuredOutput.score > 0.9 ? "excellent" :
+  structuredOutput.score > 0.7 ? "good" :
+  structuredOutput.score > 0.5 ? "average" :
+  "poor"
+}}
+```
 
 ## Quick Reference
 
-| Syntax | What it does | Example |
-|--------|-------------|---------|
-| `{{ $json.field }}` | Current input's field | `{{ $json.text }}` |
-| `{{ $item[0].json.field }}` | First input's field | `{{ $item[0].json.name }}` |
-| `{{ $items["Name"][0].json.field }}` | Specific node's field | `{{ $items["API"][0].json.data }}` |
-| `{{ $parameters.field }}` | Node parameter | `{{ $parameters.temperature }}` |
-| `{{ expr1 + expr2 }}` | Arithmetic | `{{ $json.a + $json.b }}` |
-| `{{ expr ? "yes" : "no" }}` | Conditional | `{{ $json.valid ? "OK" : "Error" }}` |
-| `{{ $json.arr[0] }}` | Array access | `{{ $json.items[0] }}` |
-| `{{ $json.obj.nested }}` | Object access | `{{ $json.user.name }}` |
+### Variable Access
+
+| Expression | Description |
+|-----------|-------------|
+| `{{ nodeName.field }}` | Access field from named node |
+| `{{ nodeName.nested.field }}` | Access nested property |
+| `{{ nodeName.array[0] }}` | Access array element |
+| `{{ parameters.field }}` | Current node parameter |
+| `{{ previousNode.field }}` | Last connected node |
+| `{{ dates.today }}` | Current date |
+| `{{ workflow.id }}` | Workflow ID |
+
+### Operators
+
+| Expression | Description |
+|-----------|-------------|
+| `{{ a + b }}` | Addition |
+| `{{ a - b }}` | Subtraction |
+| `{{ a * b }}` | Multiplication |
+| `{{ a / b }}` | Division |
+| `{{ a % b }}` | Modulo |
+| `{{ a === b }}` | Equality |
+| `{{ a !== b }}` | Inequality |
+| `{{ a > b }}` | Greater than |
+| `{{ a < b }}` | Less than |
+| `{{ a && b }}` | Logical AND |
+| `{{ a \|\| b }}` | Logical OR |
+| `{{ !a }}` | Logical NOT |
+| `{{ a ? b : c }}` | Ternary conditional |
+
+### Common Methods
+
+| Expression | Description |
+|-----------|-------------|
+| `{{ text.toUpperCase() }}` | Convert to uppercase |
+| `{{ text.toLowerCase() }}` | Convert to lowercase |
+| `{{ text.trim() }}` | Remove whitespace |
+| `{{ text.substring(0, 10) }}` | Get substring |
+| `{{ array.length }}` | Array length |
+| `{{ Math.round(num) }}` | Round number |
+| `{{ Math.floor(num) }}` | Round down |
+| `{{ Math.ceil(num) }}` | Round up |
+| `{{ JSON.stringify(obj) }}` | Convert to JSON string |
 
 ## Key Takeaways
 
-1. **Three ways to access data**:
-   - `$json` - Current input (simplest)
-   - `$item[index]` - Specific input by position
-   - `$items["NodeName"]` - Specific node by name (most explicit)
-
-2. **$json is an accessor, not a type**: It accesses the `json` property of `INodeExecutionData`
-
-3. **All data types flow through $json**: Strings, numbers, objects, arrays - everything goes in the json property
-
-4. **Use Input Explorer**: See actual execution data to build correct expressions
-
-5. **Graceful handling**: Missing fields return undefined rather than errors
-
-6. **Real-time preview**: The Result section shows evaluated values as you type
+1. **Simple syntax**: Use camelCase node names directly (`manualTrigger.prompt`)
+2. **No complex paths**: No more `$items["Node Name"][0].json.field` syntax
+3. **Autocomplete**: Type `{{` and see all available variables
+4. **Drag-and-drop**: Drag fields from INPUT panel to generate expressions
+5. **JavaScript-based**: Familiar syntax with standard operators and methods
+6. **Sandboxed**: Secure evaluation without access to dangerous APIs
+7. **Real-time preview**: See evaluated results as you type
+8. **Duplicate handling**: Nodes with same name get numbered (node, node2, node3)
 
 ## See Also
 
