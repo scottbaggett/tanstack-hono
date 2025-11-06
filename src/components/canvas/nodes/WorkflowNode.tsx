@@ -7,8 +7,10 @@
  */
 
 import { Handle, Position } from "@xyflow/react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { memo } from "react";
 import { LucideIcon } from "@/components/icon/LucideIcon";
+import type { INodeExecutionStatus } from "../../../types/interfaces";
 
 interface WorkflowNodeProps {
   data: {
@@ -18,14 +20,8 @@ interface WorkflowNodeProps {
     description?: string;
     icon?: string;
     color?: string;
-    executionStatus?:
-      | "pending"
-      | "running"
-      | "completed"
-      | "failed"
-      | "skipped"
-      | "success"
-      | "error";
+    executionStatus?: INodeExecutionStatus;
+
     stage?: number;
   };
   isConnecting?: boolean;
@@ -52,11 +48,9 @@ export const WorkflowNode = memo(function WorkflowNode({
 				flex items-center justify-center
 				transition-all duration-200 size-24
 				${
-          data.executionStatus === "completed" ||
-          data.executionStatus === "success"
+          data.executionStatus === "completed"
             ? "bg-green-10/50 border-green-9/50"
-            : data.executionStatus === "failed" ||
-                data.executionStatus === "error"
+            : data.executionStatus === "failed"
               ? "bg-red-10/50 border-red-9/50"
               : data.executionStatus === "running"
                 ? "bg-yellow-10/50 border-yellow-9/50"
@@ -108,24 +102,19 @@ export const WorkflowNode = memo(function WorkflowNode({
         )}
 
         {/* Execution Status Badge */}
-        {(data.executionStatus === "completed" ||
-          data.executionStatus === "success") && (
+        {data.executionStatus === "completed" && (
           <div className="absolute bottom-1.5 right-1.5">
             <LucideIcon name="check" className="size-5 text-foreground" />
           </div>
         )}
-        {(data.executionStatus === "failed" ||
-          data.executionStatus === "error") && (
-          <div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-red-9 border-2 border-surface-1 flex items-center justify-center">
-            <LucideIcon name="x" className="size-3 text-foreground" />
+        {data.executionStatus === "failed" && (
+          <div className="absolute bottom-1.5 right-1">
+            <AlertTriangle className="size-5 text-foreground" />
           </div>
         )}
         {data.executionStatus === "running" && (
-          <div className="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-yellow-9 border-2 border-surface-1 flex items-center justify-center">
-            <LucideIcon
-              name="loader-2"
-              className="size-3 text-foreground animate-spin"
-            />
+          <div className="absolute bottom-1.5 right-1">
+            <Loader2 className="size-5 text-foreground animate-spin" />
           </div>
         )}
         {data.executionStatus === "pending" && (

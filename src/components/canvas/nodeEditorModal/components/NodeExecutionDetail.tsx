@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ExecutionLogsViewer } from "./ExecutionLogsViewer";
+import type { NodeExecution } from "@/server/types/api";
+import type { INodeExecutionStatus } from "@/types/interfaces";
 
 interface NodeExecutionDetailProps {
 	nodeId: string;
-	nodeExecution?: any;
+	nodeExecution?: NodeExecution;
 	runId?: string;
 	workflowId?: string;
 	onClose: () => void;
@@ -108,17 +110,18 @@ export function NodeExecutionDetail({
 		);
 	}
 
-	const statusConfig = {
-		pending: { label: "Pending", variant: "secondary" as const },
-		running: { label: "Running", variant: "default" as const },
-		completed: { label: "Completed", variant: "default" as const },
-		failed: { label: "Failed", variant: "destructive" as const },
-		skipped: { label: "Skipped", variant: "secondary" as const },
+	const statusConfig: Record<
+		INodeExecutionStatus,
+		{ label: string; variant: "default" | "secondary" | "destructive" }
+	> = {
+		pending: { label: "Pending", variant: "secondary" },
+		running: { label: "Running", variant: "default" },
+		completed: { label: "Completed", variant: "default" },
+		failed: { label: "Failed", variant: "destructive" },
+		skipped: { label: "Skipped", variant: "secondary" },
 	};
 
-	const status =
-		statusConfig[nodeExecution.status as keyof typeof statusConfig] ||
-		statusConfig.pending;
+	const status = statusConfig[nodeExecution.status] || statusConfig.pending;
 
 	return (
 		<div className="absolute right-0 top-0 h-full w-96 bg-background border-l shadow-lg flex flex-col">

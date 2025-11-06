@@ -10,6 +10,7 @@ import { LucideIcon } from "@/components/icon/LucideIcon";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { WorkflowRun } from "@/server/types/api";
+import type { IWorkflowRunStatus } from "@/types/interfaces";
 
 interface ExecutionHeaderProps {
 	run: WorkflowRun;
@@ -26,27 +27,18 @@ export function ExecutionHeader({
 	onPrevious,
 	onNext,
 }: ExecutionHeaderProps) {
-	const statusConfig = {
-		pending: { label: "Pending", variant: "secondary" as const, icon: "clock" },
-		running: {
-			label: "Running",
-			variant: "default" as const,
-			icon: "loader-2",
-		},
-		completed: {
-			label: "Completed",
-			variant: "default" as const,
-			icon: "check-circle",
-		},
-		failed: {
-			label: "Failed",
-			variant: "destructive" as const,
-			icon: "x-circle",
-		},
+	const statusConfig: Record<
+		IWorkflowRunStatus,
+		{ label: string; variant: "default" | "secondary" | "destructive"; icon: string }
+	> = {
+		pending: { label: "Pending", variant: "secondary", icon: "clock" },
+		running: { label: "Running", variant: "default", icon: "loader-2" },
+		completed: { label: "Completed", variant: "default", icon: "check-circle" },
+		failed: { label: "Failed", variant: "destructive", icon: "x-circle" },
+		error: { label: "Error", variant: "destructive", icon: "alert-circle" },
 	};
 
-	const config =
-		statusConfig[run.status as keyof typeof statusConfig] || statusConfig.pending;
+	const config = statusConfig[run.status] || statusConfig.pending;
 
 	return (
 		<div className="border-b bg-background px-6 py-4">
